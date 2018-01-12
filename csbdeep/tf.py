@@ -1,0 +1,237 @@
+from __future__ import print_function, unicode_literals, absolute_import, division
+
+import numpy as np
+import os
+import warnings
+import tempfile, shutil
+import datetime
+
+import tensorflow as tf
+from tensorflow.python.framework import graph_util
+from tensorflow.python.framework import graph_io
+
+from keras import backend as K
+from keras.callbacks import Callback
+from keras.layers import Lambda
+
+
+
+def limit_memory(fraction = .75):
+    """ global setup function that tries to handle GPU memory allocation """
+
+    if K.backend() == "tensorflow":
+        K.set_image_data_format("channels_last")
+        ###we are in tensorflow land
+
+        import tensorflow as tf
+
+        config = tf.ConfigProto()
+        config.gpu_options.per_process_gpu_memory_fraction = fraction
+        session = tf.Session(config=config)
+        K.tensorflow_backend.set_session(session)
+        print("[tf_limit]\t setting config.gpu_options.per_process_gpu_memory_fraction to ",config.gpu_options.per_process_gpu_memory_fraction)
+    elif K.backend() == "theano":
+        K.set_image_data_format("channels_first")
+
+
+
+def export_SavedModel(model, outpath, format='zip'):
+    # assert not os.path.exists(dirname)
+
+    def export_to_dir(dirname):
+        if len(model.input_layers) > 1 or len(model.output_layers) > 1:
+            warnings.warn('not tested with multiple input or output layers')
+        builder = tf.saved_model.builder.SavedModelBuilder(dirname)
+        signature = tf.saved_model.signature_def_utils.predict_signature_def(
+            inputs  = {"input":  model.input},
+            outputs = {"output": model.output}
+        )
+        signature_def_map = { tf.saved_model.signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY : signature }
+        builder.add_meta_graph_and_variables(K.get_session(),
+                                             [tf.saved_model.tag_constants.SERVING],
+                                             signature_def_map=signature_def_map)
+        builder.save()
+
+    if format=='dir':
+        export_to_dir(outpath)
+    else:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpsubdir = os.path.join(tmpdir,'model')
+            export_to_dir(tmpsubdir)
+            shutil.make_archive(outpath, format, tmpsubdir)
+
+
+
+
+class MyTensorBoard(Callback):
+    def __init__(self, log_dir='./logs',
+                 freq=1,
+                 compute_histograms=False,
+                 n_images=3,
+                 prob_out=False,
+                 write_graph=False,
+                 prefix_with_timestamp=True,
+                 write_images=False):
+        super(MyTensorBoard, self).__init__()
+        if K.backend() != 'tensorflow':
+            raise RuntimeError('TensorBoard callback only works '
+                               'with the TensorFlow backend.')
+
+        self.freq = freq
+        self.image_freq = freq
+        self.prob_out = prob_out
+        self.merged = None
+        self.write_graph = write_graph
+        self.write_images = write_images
+        self.n_images = n_images
+        self.compute_histograms = compute_histograms
+
+        if prefix_with_timestamp:
+            log_dir = os.path.join(log_dir, datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S.%f"))
+
+        self.log_dir = log_dir
+
+    def set_model(self, model):
+        self.model = model
+        self.sess = K.get_session()
+        tf_sums = []
+
+        if self.compute_histograms and self.freq and self.merged is None:
+            for layer in self.model.layers:
+                for weight in layer.weights:
+                    tf_sums.append(tf.summary.histogram(weight.name, weight))
+
+                if hasattr(layer, 'output'):
+                    tf_sums.append(tf.summary.histogram('{}_out'.format(layer.name),
+                                                        layer.output))
+
+        # outputs
+        if K.image_dim_ordering() == "tf":
+            n_channels_in = self.model.input_shape[-1]
+            n_dim_in = len(self.model.input_shape)
+
+            # FIXME: not fully baked, eg. n_dim==5 multichannel doesnt work
+
+            if n_dim_in > 4:
+                # print("tensorboard shape: %s"%str(self.model.input_shape))
+                input_layer = Lambda(lambda x: K.max(K.max(x, axis=1), axis=-1, keepdims=True))(self.model.input)
+            else:
+                if n_channels_in > 3:
+                    input_layer = Lambda(lambda x: K.max(x, axis=-1, keepdims=True))(self.model.input)
+                elif n_channels_in == 2:
+                    input_layer = Lambda(lambda x: K.concatenate([x,x[...,:1]], axis=-1))(self.model.input)
+                else:
+                    input_layer = self.model.input
+
+            n_channels_out = self.model.output_shape[-1]
+            n_dim_out = len(self.model.output_shape)
+
+            if self.prob_out:
+                # first half of output channels is mean, second half scale
+                # assert n_channels_in*2 == n_channels_out
+                if n_channels_in*2 != n_channels_out:
+                    raise ValueError('prob_out: must be two output channels for every input channel')
+
+                sep = n_channels_in
+            else:
+                sep = n_channels_out
+
+            if n_dim_out > 4:
+                output_layer = Lambda(lambda x: K.max(K.max(x[...,:sep], axis=1), axis=-1, keepdims=True))(self.model.output)
+            else:
+                if sep > 3:
+                    output_layer = Lambda(lambda x: K.max(x[...,:sep], axis=-1, keepdims=True))(self.model.output)
+                elif sep == 2:
+                    output_layer = Lambda(lambda x: K.concatenate([x[...,:sep],x[...,:1]], axis=-1))(self.model.output)
+                else:
+                    output_layer = Lambda(lambda x: x[...,:sep])(self.model.output)
+
+            if self.prob_out:
+                # scale images
+                if n_dim_out > 4:
+                    scale_layer = Lambda(lambda x: K.max(K.max(x[...,sep:], axis=1), axis=-1, keepdims=True))(self.model.output)
+                else:
+                    if sep > 3:
+                        scale_layer = Lambda(lambda x: K.max(x[...,sep:], axis=-1, keepdims=True))(self.model.output)
+                    elif sep == 2:
+                        scale_layer = Lambda(lambda x: K.concatenate([x[...,sep:],x[...,-1:]], axis=-1))(self.model.output)
+                    else:
+                        scale_layer = Lambda(lambda x: x[...,sep:])(self.model.output)
+
+
+
+
+        else:
+            raise NotImplementedError()
+        #
+        #     n_channels = self.model.input_shape[0]
+        #     if n_channels > 1:
+        #         #input_layer  = Lambda(lambda x: x[n_channels // 2:n_channels // 2 + 1, :, :, :])(self.model.input)
+        #         input_layer = Lambda(lambda x: K.max(x, axis = 0))(self.model.input)
+        #     else:
+        #         input_layer = self.model.input
+        # #
+        # if K.image_dim_ordering() == "tf":
+        #     n_channels = self.model.input_shape[-1]
+        #     if n_channels>1:
+        #         input_layer = Lambda(lambda x: x[:, :, :, n_channels // 2:n_channels // 2 + 1])(self.model.input)
+        #     else:
+        #         input_layer = self.model.input
+        # else:
+        #     n_channels = self.model.input_shape[0]
+        #     if n_channels > 1:
+        #         #input_layer  = Lambda(lambda x: x[n_channels // 2:n_channels // 2 + 1, :, :, :])(self.model.input)
+        #         input_layer = Lambda(lambda x: K.max(x, axis = 0))(self.model.input)
+        #     else:
+        #         input_layer = self.model.input
+
+        tf_sums.append(tf.summary.image('input', input_layer, max_outputs=self.n_images))
+        if self.prob_out:
+            tf_sums.append(tf.summary.image('mean', output_layer, max_outputs=self.n_images))
+            tf_sums.append(tf.summary.image('scale', scale_layer, max_outputs=self.n_images))
+        else:
+            tf_sums.append(tf.summary.image('output', output_layer, max_outputs=self.n_images))
+
+        with tf.name_scope('merged'):
+            self.merged = tf.summary.merge(tf_sums)
+            # self.merged = tf.summary.merge([foo])
+
+        with tf.name_scope('summary_writer'):
+            if self.write_graph:
+                self.writer = tf.summary.FileWriter(self.log_dir,
+                                                    self.sess.graph)
+            else:
+                self.writer = tf.summary.FileWriter(self.log_dir)
+
+    def on_epoch_end(self, epoch, logs=None):
+        logs = logs or {}
+
+        if self.validation_data and self.freq:
+            if epoch % self.freq == 0:
+                # TODO: implement batched calls to sess.run
+                # (current call will likely go OOM on GPU)
+                if self.model.uses_learning_phase:
+                    cut_v_data = len(self.model.inputs)
+                    val_data = self.validation_data + [0]
+                    tensors = self.model.inputs + [K.learning_phase()]
+                else:
+                    val_data = list(v[:self.n_images] for v in self.validation_data)
+                    tensors = self.model.inputs
+                feed_dict = dict(zip(tensors, val_data))
+                result = self.sess.run([self.merged], feed_dict=feed_dict)
+                summary_str = result[0]
+
+                self.writer.add_summary(summary_str, epoch)
+
+        for name, value in logs.items():
+            if name in ['batch', 'size']:
+                continue
+            summary = tf.Summary()
+            summary_value = summary.value.add()
+            summary_value.simple_value = value.item()
+            summary_value.tag = name
+            self.writer.add_summary(summary, epoch)
+        self.writer.flush()
+
+    def on_train_end(self, _):
+        self.writer.close()
