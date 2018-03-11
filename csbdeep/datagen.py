@@ -1,8 +1,8 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
 
-import os
+# import os
 import numpy as np
-from glob import glob
+# from glob import glob
 from tifffile import imread
 # from time import time
 # import numexpr
@@ -16,6 +16,14 @@ except ImportError:
 from six.moves import map
 import collections
 from functools import reduce
+
+# https://www.scivision.co/python-idiomatic-pathlib-use/
+try:
+    from pathlib import Path
+    Path().expanduser()
+except (ImportError,AttributeError):
+    from pathlib2 import Path
+
 
 
 def _raise(e):
@@ -33,17 +41,18 @@ def compose(*funcs):
 
 
 def load_image_pairs(p,output,inputs,pattern='*.tif*'):
-    image_names = [os.path.split(f)[-1] for f in glob(os.path.join(p,output,pattern))]
+    p = Path(p)
+    image_names = [f.name for f in (p/output).glob(pattern)]
     consume ((
-        os.path.exists(os.path.join(p,i,n)) or _raise(FileNotFoundError(os.path.join(p,i,n)))
+        (p/i/n).exists() or _raise(FileNotFoundError(p/i/n))
         for i in inputs for n in image_names
     ))
-    xy_name_pairs = [(os.path.join(p,i,n),os.path.join(p,output,n)) for i in inputs for n in image_names]
+    xy_name_pairs = [(p/i/n, p/output/n) for i in inputs for n in image_names]
     n_images = len(xy_name_pairs)
 
     def _gen():
-        for fx,fy in xy_name_pairs:
-            x, y = imread(fx), imread(fy)
+        for fx, fy in xy_name_pairs:
+            x, y = imread(str(fx)), imread(str(fy))
             # x,y = x[:,256:-256,256:-256],y[:,256:-256,256:-256] #tmp
             x.shape == y.shape or _raise(ValueError())
             yield x, y
