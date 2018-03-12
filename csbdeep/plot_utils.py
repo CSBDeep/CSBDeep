@@ -59,7 +59,15 @@ def plot_some(*arr, title_list=None, pmin=0, pmax=100, **imshow_kwargs):
     arr = [ X_1, X_2, ..., X_n]
 
     where each X_i is a list of images
+    
+    :param arr: 
+    :param title_list: 
+    :param pmin: 
+    :param pmax: 
+    :param imshow_kwargs: 
+    :return: 
     """
+
 
 
     def color_image(a):
