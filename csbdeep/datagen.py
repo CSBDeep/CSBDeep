@@ -52,15 +52,37 @@ def get_tiff_pairs_from_folders(basepath,input_dirs,output_dir='GT',pattern='*.t
     Returns
     -------
     InputData
+        `InputData` object, whose `generator` is used to yield all matching TIFF pairs.
+        Important: the generator will return a tuple `(x,y)`, where `x` is from
+                   `input_dirs` and `y` is the corresponding image from the `output_dir`.
+
+    Examples
+    --------
+    >>> !tree data
+    data
+    ├── GT
+    │   ├── imageA.tif
+    │   └── imageB.tif
+    ├── input1
+    │   ├── imageA.tif
+    │   └── imageB.tif
+    └── input2
+        ├── imageA.tif
+        └── imageB.tif
+
+    >>> input_data = get_tiff_pairs_from_folders(basepath='data', input_dirs=['input1','input2'], output_dir='GT')
+    >>> n_images = input_data.size
+    >>> for input_x, output_y in input_data.generator:
+    >>>     ...
 
     Raises
     ------
     FileNotFoundError
         If an image found in `output_dir` does not exist in all `input_dirs`.
     ValueError
-        If corresponding images do not have the same size.
-
+        If corresponding images do not have the same size (raised by returned InputData.generator).
     """
+
     p = Path(basepath)
     image_names = [f.name for f in (p/output_dir).glob(pattern)]
     consume ((
@@ -85,6 +107,29 @@ def get_tiff_pairs_from_folders(basepath,input_dirs,output_dir='GT',pattern='*.t
 ## Patch filter
 
 def patch_filter_max(predicate=(lambda image,filtered: filtered > 0.4*np.percentile(image,99.9)), filter_size=None):
+    """Patch filter to be used for `create_patches` to determine for each image which patches
+    are eligible for sampling. The purpose is to only sample patches from "interesting" regions of the raw image that
+    actually contain non-background signal. To that end, a maximum filter is used to find the largest values in a
+    region.
+
+    Parameters
+    ----------
+    predicate : function, optional
+        Function that takes the raw image and the filtered image as inputs and
+        returns a binary mask of the same size as the image (to denote the locations
+        eligible for sampling for :obj:`create_patches`). At least one
+        pixel of the binary mask must be True.
+        If not provided, uses the default of accepting all regions whose maximum value is
+        above 40% of the 99.9th percentile of the raw image.
+    filter_size : tuple of ints, optional
+        Filter size for the max filter. Patch size will be used if not provided (None).
+
+    Returns
+    -------
+    function
+        Returns function to be used by :obj:`create_patches`.
+    """
+
     from scipy.ndimage.filters import maximum_filter
     def _filter(image, patch_size, dtype=np.float32):
         if dtype is not None:
@@ -151,18 +196,62 @@ def sample_patches_from_multiple_stacks(datas, patch_size, n_samples, patch_filt
 
 def create_patches (
         input_data,
-        patch_size=(8,32,32),
-        n_samples=2, # per image
-        # transforms=[tf_flip(0)],
+        patch_size,
+        n_samples,
         transforms=None,
         patch_filter=patch_filter_max(),
-        # patch_filter=None,
         percentiles=(1,99),
         # percentiles=lambda: (np.random.uniform(0,4), np.random.uniform(99.4,99.9)),
         percentile_axes=None,
         shuffle=True,
         verbose=True,
     ):
+    """Create normalized training data to be used for neural network training.
+
+    Parameters
+    ----------
+    input_data : :obj:`InputData`
+        Object that yields matching pairs of raw images.
+    patch_size : tuple of int
+        Shape of the patches to be extraced from raw images.
+        Must be compatible with the number of dimensions (2D/3D) and the shape of the raw images.
+    n_samples : int
+        Number of patches to be sampled/extracted from each raw image pair (after transformations, see below).
+    transforms : iterable of :obj:`Transform`, optional
+        List of `Transform` objects that apply additional transformations to the raw images.
+        This can be used to augment the set of raw images (e.g., by including rotations).
+    patch_filter : function, optional
+        Patch filter to determine for each image pair which patches are eligible to be extracted.
+        See :obj:`patch_filter_max`.
+    percentiles : tuple of two ints, or function that returns tuple of two ints
+        A tuple (`pmin`, `pmax`) or a function that returns such a tuple, where the extracted patches
+        are (affinely) normalized in such that a value of 0 (1) corresponds to the `pmin`-th (`pmax`-th) percentile
+        of the raw image. We recommend to supply a function that samples various percentile values.
+    percentile_axes : tuple of ints or None, optional
+        List of axis over which the percentiles are computed.
+        Only necessary for multi-channel images, where each channel may be normalized independently.
+    shuffle : bool, optional
+        Randomly shuffle all extracted patches.
+    verbose : bool, optional
+        Display overview of images, transforms, etc.
+
+    Returns
+    -------
+    tuple of :obj:`np.ndarray`
+        Returns a pair (`X`, `Y`) of arrays with the normalized extracted patches from all (transformed) raw images.
+        `X` is the array of patches extracted from input images with `Y` being the array of corresponding output patches.
+
+    Examples
+    --------
+    >>> input_data = get_tiff_pairs_from_folders(basepath='data', input_dirs=['input1','input2'], output_dir='GT')
+    >>> X, Y = create_patches(input_data, patch_size=(32,128,128), n_samples=16,
+                              percentiles = lambda: (np.random.uniform(1,4), np.random.uniform(99.4,99.9)))
+
+    Raises
+    ------
+    ValueError
+        Various reasons.
+    """
 
     ## percentiles
     _ps_ok = lambda ps: isinstance(ps,(list,tuple,np.ndarray)) and len(ps)==2 and all(map(np.isscalar,ps)) and (0<=ps[0]<ps[1]<=100)
