@@ -111,28 +111,28 @@ todo_include_todos = False
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'alabaster'
+# html_theme = 'alabaster'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
 #html_theme_options = {}
-html_theme_options = {
-    #"logo": "logo_biobeam_transp_red.png",
-    "description": "CSBDeep",
-    "logo_name":"false",
-    "logo_text_align":"center",
-    "github_type": "follow",
-    'github_user': 'mpicbg-csbd',
-    'github_repo': 'CSBDeep_code',
-    #"github_banner": "true",
-    "github_button": "true",
-    "show_related": "true",
-    "sidebar_link":"link",
-    "page_width":"1400px",
-#    "font_family": "minion pro",
-    
-}
+# html_theme_options = {
+#     #"logo": "logo_biobeam_transp_red.png",
+#     "description": "CSBDeep",
+#     "logo_name":"false",
+#     "logo_text_align":"center",
+#     "github_type": "follow",
+#     'github_user': 'mpicbg-csbd',
+#     'github_repo': 'CSBDeep_code',
+#     #"github_banner": "true",
+#     "github_button": "true",
+#     "show_related": "true",
+#     "sidebar_link":"link",
+#     "page_width":"1400px",
+# #    "font_family": "minion pro",
+
+# }
 
 # Add any paths that contain custom themes here, relative to this directory.
 #html_theme_path = []
