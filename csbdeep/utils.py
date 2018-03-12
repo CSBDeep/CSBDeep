@@ -2,15 +2,33 @@ from __future__ import print_function, unicode_literals, absolute_import, divisi
 
 # import os, sys
 import numpy as np
-import keras.backend as K
+# import keras.backend as K
 # from collections import namedtuple
 # import argparse
 # import json, six
 # import keras.models
 # from tqdm import tqdm_notebook, tqdm as tqdm_terminal
 
-IS_TF_DIM  = K.image_data_format() == "channels_last"
-IS_TF_BACK = K.backend() == "tensorflow"
+from six.moves import map
+import collections
+from functools import reduce
+
+# https://www.scivision.co/python-idiomatic-pathlib-use/
+try:
+    from pathlib import Path
+    Path().expanduser()
+except (ImportError,AttributeError):
+    from pathlib2 import Path
+
+
+
+def is_tf_dim():
+    import keras.backend as K
+    return K.image_data_format() == "channels_last"
+
+def is_tf_back():
+    import keras.backend as K
+    return K.backend() == "tensorflow"
 
 # # https://stackoverflow.com/a/39662359
 # def is_notebook():
@@ -35,7 +53,7 @@ IS_TF_BACK = K.backend() == "tensorflow"
 def moveaxis_if_tf(X):
     if X is None:
         return None
-    if IS_TF_DIM:
+    if is_tf_dim():
         X = np.moveaxis(X, 1, -1)
     return X
 
@@ -64,20 +82,50 @@ def moveaxis_if_tf(X):
 #         f.write(json.dumps(data,**kwargs))
 
 
-def normalize(x, pmin=3, pmax=99.8, axis = None, clip=False):
-    mi = np.percentile(x, pmin, axis = axis, keepdims=True).astype(np.float32)
-    ma = np.percentile(x, pmax, axis = axis, keepdims=True).astype(np.float32)
+def normalize(x, pmin=3, pmax=99.8, axis=None, clip=False, eps=1e-20, dtype=np.float32):
+    mi = np.percentile(x,pmin,axis=axis,keepdims=True)
+    ma = np.percentile(x,pmax,axis=axis,keepdims=True)
+    return normalize_mi_ma(x, mi, ma, clip=clip, eps=eps, dtype=dtype)
 
-    x = x.astype(np.float32)
 
-    eps = 1.e-20
+def normalize_mi_ma(x, mi, ma, clip=False, eps=1e-20, dtype=np.float32):
+    if dtype is not None:
+        x   = x.astype(dtype,copy=False)
+        mi  = dtype(mi) if np.isscalar(mi) else mi.astype(dtype,copy=False)
+        ma  = dtype(ma) if np.isscalar(ma) else ma.astype(dtype,copy=False)
+        eps = dtype(eps)
+
     try:
         import numexpr
-        c_eps = np.float32(eps)
-        y = numexpr.evaluate("(x - mi) / (ma - mi + c_eps)")
+        x = numexpr.evaluate("(x - mi) / ( ma - mi + eps )")
     except ImportError:
-        y = (1. * x - mi) / (ma - mi+eps)
+        x =                   (x - mi) / ( ma - mi + eps )
 
     if clip:
-        y = np.clip(y, 0, 1)
-    return y
+        x = np.clip(x,0,1)
+
+    return x
+
+
+
+
+def _raise(e):
+    raise e
+
+# https://docs.python.org/3/library/itertools.html#itertools-recipes
+def consume(iterator):
+    collections.deque(iterator, maxlen=0)
+
+def compose(*funcs):
+    return lambda x: reduce(lambda f,g: g(f), funcs, x)
+
+# def pipeline(*steps):
+#     return reduce(lambda f,g: g(f), steps)
+
+
+def shuffle_inplace(*arrs):
+    rng = np.random.RandomState()
+    state = rng.get_state()
+    for a in arrs:
+        rng.set_state(state)
+        rng.shuffle(a)
