@@ -11,6 +11,7 @@ setup(name='csbdeep',
 
       install_requires=["keras>=2.0.7",
                         "tqdm",
+                        "tifffile",
                         # "tensorflow-gpu>=1.2.0",
                         # "pandas>=0.20.1",
                         ],
