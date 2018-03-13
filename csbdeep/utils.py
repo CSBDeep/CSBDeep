@@ -1,4 +1,5 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
+from six.moves import range, zip, map, reduce, filter
 
 # import os, sys
 import numpy as np
@@ -9,9 +10,7 @@ import numpy as np
 # import keras.models
 # from tqdm import tqdm_notebook, tqdm as tqdm_terminal
 
-from six.moves import map
 import collections
-from functools import reduce
 
 # https://www.scivision.co/python-idiomatic-pathlib-use/
 try:

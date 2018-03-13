@@ -1,4 +1,5 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
+from six.moves import range, zip, map, reduce, filter
 
 from keras.layers import Dropout, Activation, BatchNormalization
 from keras.layers import Conv2D, MaxPooling2D, UpSampling2D, Conv3D, MaxPooling3D, UpSampling3D

@@ -1,8 +1,8 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
+from six.moves import range, zip, map, reduce, filter
 
 import numpy as np
 from tifffile import imread
-from six.moves import map
 from collections import namedtuple
 
 from tqdm import tqdm

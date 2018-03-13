@@ -1,4 +1,5 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
+from six.moves import range, zip, map, reduce, filter
 
 from .utils import moveaxis_if_tf
 from .losses import loss_laplace, loss_mse, loss_mae, loss_thresh_weighted_decay
@@ -8,8 +9,6 @@ import os, sys
 
 import keras.backend as K
 from keras.callbacks import Callback, TerminateOnNaN
-
-from six.moves import map
 
 
 class ParameterDecayCallback(Callback):
