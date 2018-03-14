@@ -11,8 +11,15 @@ CSBDeep -  a toolbox for applying CARE
 
 This is an example of an automatically generated docstring:
 
-.. autofunction:: csbdeep.plot_utils.plot_some
-
 .. automodule:: csbdeep.datagen
    :members:
 
+..
+    .. autofunction:: csbdeep.datagen.create_patches
+    .. autofunction:: csbdeep.datagen.get_tiff_pairs_from_folders
+    .. autofunction:: csbdeep.datagen.no_background_patches
+
+    .. autoclass:: csbdeep.datagen.InputData
+
+    .. autoclass:: csbdeep.datagen.Transform
+        :members:
