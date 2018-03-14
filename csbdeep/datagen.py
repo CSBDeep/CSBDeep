@@ -4,6 +4,7 @@ from six.moves import range, zip, map, reduce, filter
 import numpy as np
 from tifffile import imread
 from collections import namedtuple
+import sys
 
 from tqdm import tqdm
 from .utils import Path, normalize_mi_ma, _raise, consume, compose, shuffle_inplace
@@ -94,7 +95,7 @@ def get_tiff_pairs_from_folders(basepath,input_dirs,output_dir='GT',pattern='*.t
         (p/i/n).exists() or _raise(FileNotFoundError(p/i/n))
         for i in input_dirs for n in image_names
     ))
-    xy_name_pairs = [(p/i/n, p/output_dir/n) for i in input_dirs for n in image_names]
+    xy_name_pairs = [(p/input_dir/n, p/output_dir/n) for input_dir in input_dirs for n in image_names]
     n_images = len(xy_name_pairs)
     description = '{p}: output/target=\'{o}\' inputs={i}'.format(p=basepath,i=list(input_dirs),o=output_dir)
 
@@ -208,6 +209,20 @@ def sample_patches_from_multiple_stacks(datas, patch_size, n_samples, datas_mask
 def _valid_low_high_percentiles(ps):
     return isinstance(ps,(list,tuple,np.ndarray)) and len(ps)==2 and all(map(np.isscalar,ps)) and (0<=ps[0]<ps[1]<=100)
 
+def _memory_check(n_required_memory_bytes, thresh_free_frac=0.5, thresh_abs_bytes=1024*1024**2):
+    try:
+        # raise ImportError
+        import psutil
+        mem = psutil.virtual_memory()
+        mem_frac = n_required_memory_bytes / mem.available
+        if mem_frac > 1:
+            raise(MemoryError('Not enough available memory.'))
+        elif mem_frac > thresh_free_frac:
+            print('Warning: will use at least %.0f MB (%.1f%%) of available memory.\n' % (n_required_memory_bytes/1024**2,100*mem_frac), file=sys.stderr, flush=True)
+    except ImportError:
+        if n_required_memory_bytes > thresh_abs_bytes:
+            print('Warning: will use at least %.0f MB of memory.\n' % (n_required_memory_bytes/1024**2), file=sys.stderr, flush=True)
+
 def sample_percentiles(pmin=(1,4), pmax=(99.4,99.9)):
     """ TODO """
     _valid_low_high_percentiles(pmin) or _raise(ValueError(pmin))
@@ -218,7 +233,7 @@ def sample_percentiles(pmin=(1,4), pmax=(99.4,99.9)):
 def create_patches (
         input_data,
         patch_size,
-        n_samples,
+        n_patches_per_image,
         transforms = None,
         patch_filter = no_background_patches(),
         # percentiles = (1,99),
@@ -236,7 +251,7 @@ def create_patches (
     patch_size : tuple of int
         Shape of the patches to be extraced from raw images.
         Must be compatible with the number of dimensions (2D/3D) and the shape of the raw images.
-    n_samples : int
+    n_patches_per_image : int
         Number of patches to be sampled/extracted from each raw image pair (after transformations, see below).
     transforms : iterable of :obj:`Transform`, optional
         List of `Transform` objects that apply additional transformations to the raw images.
@@ -291,13 +306,17 @@ def create_patches (
     image_pairs = compose(*tf.generator)(image_pairs) # combine all transformations with raw images as input
     n_transforms = np.prod(tf.size)
     n_images = n_raw_images * n_transforms
-    n_patches = n_images * n_samples
+    n_patches = n_images * n_patches_per_image
+    n_required_memory_bytes = 2 * n_patches*np.prod(patch_size) * 4
+
+    ## memory check
+    _memory_check(n_required_memory_bytes)
 
     ## summary
     if verbose:
         print('='*66)
         print('%5d raw images x %4d transformations   = %5d images' % (n_raw_images,n_transforms,n_images))
-        print('%5d images     x %4d patches per image = %5d patches in total' % (n_images,n_samples,n_patches))
+        print('%5d images     x %4d patches per image = %5d patches in total' % (n_images,n_patches_per_image,n_patches))
         print('='*66)
         print('Input data:')
         print(input_data.description)
@@ -314,9 +333,9 @@ def create_patches (
 
     for i, (x,y,mask) in tqdm(enumerate(image_pairs),total=n_images):
 
-        _Y,_X = sample_patches_from_multiple_stacks((y,x), patch_size, n_samples, mask, patch_filter)
-        s = slice(i*n_samples,(i+1)*n_samples)
-        pmins, pmaxs = zip(*(norm_percentiles() for _ in range(n_samples)))
+        _Y,_X = sample_patches_from_multiple_stacks((y,x), patch_size, n_patches_per_image, mask, patch_filter)
+        s = slice(i*n_patches_per_image,(i+1)*n_patches_per_image)
+        pmins, pmaxs = zip(*(norm_percentiles() for _ in range(n_patches_per_image)))
         X[s] = normalize_mi_ma(_X, np.percentile(x,pmins,axis=percentile_axes,keepdims=True),
                                    np.percentile(x,pmaxs,axis=percentile_axes,keepdims=True))
         Y[s] = normalize_mi_ma(_Y, np.min(y),
