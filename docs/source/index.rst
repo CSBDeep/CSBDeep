@@ -9,7 +9,7 @@ CSBDeep -  a toolbox for applying CARE
    :maxdepth: 2
 
 
-This is an example of an automatically generated docstring:
+.. This is an example of an automatically generated docstring:
 
 .. automodule:: csbdeep.datagen
    :members:

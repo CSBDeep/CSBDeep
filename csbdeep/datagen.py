@@ -38,7 +38,7 @@ class Transform(namedtuple('Transform',('name','generator','size'))):
 class InputData(namedtuple('InputData',('generator','size','description'))):
     """TODO"""
 
-def get_tiff_pairs_from_folders(basepath,input_dirs,output_dir='GT',pattern='*.tif*'):
+def get_tiff_pairs_from_folders(basepath,source_dirs,target_dir='GT',pattern='*.tif*'):
     """Get pairs of corresponding TIFF images read from folders.
 
     Two images correspond to each other if they have the same file name, but are located in different folders.
@@ -47,10 +47,10 @@ def get_tiff_pairs_from_folders(basepath,input_dirs,output_dir='GT',pattern='*.t
     ----------
     basepath : str
         Base folder that contains sub-folders with images.
-    input_dirs : iterable
-        List of folder names relative to `basepath` that contain the input/source images (e.g., with low SNR).
-    output_dir : str
-        Folder name relative to `basepath` that contains the output/target images (e.g., with high SNR).
+    source_dirs : iterable
+        List of folder names relative to `basepath` that contain the source images (e.g., with low SNR).
+    target_dir : str
+        Folder name relative to `basepath` that contains the target images (e.g., with high SNR).
     pattern : str
         Glob pattern to match the desired TIFF images.
 
@@ -59,7 +59,7 @@ def get_tiff_pairs_from_folders(basepath,input_dirs,output_dir='GT',pattern='*.t
     InputData
         `InputData` object, whose `generator` is used to yield all matching TIFF pairs.
         **Important**: the generator will return a tuple `(x,y,mask)`, where `x` is from
-        `input_dirs` and `y` is the corresponding image from the `output_dir`; `mask` is
+        `source_dirs` and `y` is the corresponding image from the `target_dir`; `mask` is
         set to `None`.
 
     Examples
@@ -69,35 +69,35 @@ def get_tiff_pairs_from_folders(basepath,input_dirs,output_dir='GT',pattern='*.t
     ├── GT
     │   ├── imageA.tif
     │   └── imageB.tif
-    ├── input1
+    ├── source1
     │   ├── imageA.tif
     │   └── imageB.tif
-    └── input2
+    └── source2
         ├── imageA.tif
         └── imageB.tif
 
-    >>> input_data = get_tiff_pairs_from_folders(basepath='data', input_dirs=['input1','input2'], output_dir='GT')
-    >>> n_images = input_data.size
-    >>> for input_x, output_y, mask in input_data.generator:
+    >>> data = get_tiff_pairs_from_folders(basepath='data', source_dirs=['source1','source2'], target_dir='GT')
+    >>> n_images = data.size
+    >>> for source_x, target_y, mask in data.generator:
     >>>     ...
 
     Raises
     ------
     FileNotFoundError
-        If an image found in `output_dir` does not exist in all `input_dirs`.
+        If an image found in `target_dir` does not exist in all `source_dirs`.
     ValueError
         If corresponding images do not have the same size (raised by returned InputData.generator).
     """
 
     p = Path(basepath)
-    image_names = [f.name for f in (p/output_dir).glob(pattern)]
+    image_names = [f.name for f in (p/target_dir).glob(pattern)]
     consume ((
-        (p/i/n).exists() or _raise(FileNotFoundError(p/i/n))
-        for i in input_dirs for n in image_names
+        (p/s/n).exists() or _raise(FileNotFoundError(p/s/n))
+        for s in source_dirs for n in image_names
     ))
-    xy_name_pairs = [(p/input_dir/n, p/output_dir/n) for input_dir in input_dirs for n in image_names]
+    xy_name_pairs = [(p/source_dir/n, p/target_dir/n) for source_dir in source_dirs for n in image_names]
     n_images = len(xy_name_pairs)
-    description = '{p}: output/target=\'{o}\' inputs={i}'.format(p=basepath,i=list(input_dirs),o=output_dir)
+    description = '{p}: target=\'{o}\' sources={s}'.format(p=basepath,s=list(source_dirs),o=target_dir)
 
     def _gen():
         for fx, fy in xy_name_pairs:
@@ -115,7 +115,7 @@ def get_tiff_pairs_from_folders(basepath,input_dirs,output_dir='GT',pattern='*.t
 def no_background_patches(threshold=0.4, percentile=99.9):
     """Returns a patch filter to be used for :obj:`create_patches` to determine for each image pair which patches
     are eligible for sampling. The purpose is to only sample patches from "interesting" regions of the raw image that
-    actually contain some non-background signal. To that end, a maximum filter is applied to the output/target image
+    actually contain some non-background signal. To that end, a maximum filter is applied to the target image
     to find the largest values in a region.
 
     Parameters
@@ -155,6 +155,7 @@ def no_background_patches(threshold=0.4, percentile=99.9):
 def sample_patches_from_multiple_stacks(datas, patch_size, n_samples, datas_mask=None, patch_filter=None, verbose=False):
     """ TODO: sample matching patches of size `patch_size` from all arrays in `datas` """
 
+    # TODO: some of these checks are already required in 'create_patches'
     len(patch_size)==datas[0].ndim or _raise(ValueError())
 
     if not all(( a.shape == datas[0].shape for a in datas )):
@@ -223,7 +224,7 @@ def _memory_check(n_required_memory_bytes, thresh_free_frac=0.5, thresh_abs_byte
         if n_required_memory_bytes > thresh_abs_bytes:
             print('Warning: will use at least %.0f MB of memory.\n' % (n_required_memory_bytes/1024**2), file=sys.stderr, flush=True)
 
-def sample_percentiles(pmin=(1,4), pmax=(99.4,99.9)):
+def sample_percentiles(pmin=(1,3), pmax=(99.5,99.9)):
     """ TODO """
     _valid_low_high_percentiles(pmin) or _raise(ValueError(pmin))
     _valid_low_high_percentiles(pmax) or _raise(ValueError(pmax))
@@ -236,9 +237,8 @@ def create_patches (
         n_patches_per_image,
         transforms = None,
         patch_filter = no_background_patches(),
-        # percentiles = (1,99),
         percentiles = sample_percentiles(),
-        percentile_axes = None,
+        channel = None,
         shuffle = True,
         verbose = True,
     ):
@@ -263,9 +263,8 @@ def create_patches (
         A tuple (`pmin`, `pmax`) or a function that returns such a tuple, where the extracted patches
         are (affinely) normalized in such that a value of 0 (1) corresponds to the `pmin`-th (`pmax`-th) percentile
         of the raw image. We recommend to sample from a range of percentile values (see :obj:`sample_percentiles`).
-    percentile_axes : tuple of ints or None, optional
-        List of axis over which the percentiles are computed.
-        Only necessary for multi-channel images, where each channel may be normalized independently.
+    channel : int, optional
+        Index of channel for multi-channel images, to enable that each channel is normalized independently.
     shuffle : bool, optional
         Randomly shuffle all extracted patches.
     verbose : bool, optional
@@ -273,15 +272,14 @@ def create_patches (
 
     Returns
     -------
-    `tuple` of :obj:`np.ndarray`
+    `tuple` of `np.ndarray`
         Returns a pair (`X`, `Y`) of arrays with the normalized extracted patches from all (transformed) raw images.
         `X` is the array of patches extracted from input images with `Y` being the array of corresponding output patches.
 
     Examples
     --------
-    >>> input_data = get_tiff_pairs_from_folders(basepath='data', input_dirs=['input1','input2'], output_dir='GT')
-    >>> X, Y = create_patches(input_data, patch_size=(32,128,128), n_samples=16,
-                              percentiles = lambda: (np.random.uniform(1,4), np.random.uniform(99.4,99.9)))
+    >>> input_data = get_tiff_pairs_from_folders(basepath='data', source_dirs=['source1','source2'], target_dir='GT')
+    >>> X, Y = create_patches(input_data, patch_size=(32,128,128), n_samples=16)
 
     Raises
     ------
@@ -332,17 +330,22 @@ def create_patches (
     Y = np.empty_like(X)
 
     for i, (x,y,mask) in tqdm(enumerate(image_pairs),total=n_images):
+        # checks
+        x.shape == y.shape or _raise(ValueError())
+        mask is None or mask.shape == x.shape or _raise(ValueError())
+        (channel is None or (isinstance(channel,int) and 0<=channel<x.ndim)) or _raise(ValueError())
+        channel is None or patch_size[channel]==x.shape[channel] or _raise(ValueError('extracted patches must contain all channels.'))
 
-        _Y,_X = sample_patches_from_multiple_stacks((y,x), patch_size, n_patches_per_image, mask, patch_filter)
         s = slice(i*n_patches_per_image,(i+1)*n_patches_per_image)
         pmins, pmaxs = zip(*(norm_percentiles() for _ in range(n_patches_per_image)))
+        percentile_axes = None if channel is None else tuple((d for d in range(x.ndim) if d != channel))
+
+        _Y,_X = sample_patches_from_multiple_stacks((y,x), patch_size, n_patches_per_image, mask, patch_filter)
+
         X[s] = normalize_mi_ma(_X, np.percentile(x,pmins,axis=percentile_axes,keepdims=True),
                                    np.percentile(x,pmaxs,axis=percentile_axes,keepdims=True))
         Y[s] = normalize_mi_ma(_Y, np.min(y),
                                    np.percentile(y,pmaxs,axis=percentile_axes,keepdims=True))
-
-        # del x,y
-        # break
 
     if shuffle:
         shuffle_inplace(X,Y)
