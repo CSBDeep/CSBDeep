@@ -22,6 +22,7 @@ def net_model(input_shape,
               n_channel_out=1,
               residual=False,
               prob_out=False):
+    """ TODO """
 
     if last_activation is None:
         raise ValueError("last activation has to be given (e.g. 'sigmoid', 'relu')!")
@@ -55,31 +56,31 @@ def net_model(input_shape,
 
 
 def common_model(n_dim=2, n_depth=1, kern_size=3, n_first=16, n_channel_out=1, residual=True, prob_out=False):
-    """
-    construct a common CARE neural net based on U-Net [1] to be used for image restoration/enhancement
+    """Construct a common CARE neural net based on U-Net [1]_ to be used for image restoration/enhancement.
 
     Parameters
     ----------
-    n_dim: int
+    n_dim : int
         number of image dimensions (2 or 3)
-    n_depth: int
+    n_depth : int
         number of resolution levels of U-Net architecture
-    kern_size: int
+    kern_size : int
         size of convolution filter in all image dimensions
-    n_first: int
+    n_first : int
         number of convolution filters for first U-Net resolution level (value is doubled after each downsampling operation)
-    n_channel_out: int
+    n_channel_out : int
         number of channels of the predicted output image
-    residual: bool
+    residual : bool
         if True, model will internally predict the residual w.r.t. the input (typically better)
         requires number of input and output image channels to be equal
-    prob_out: bool
+    prob_out : bool
         standard regression (False) or probabilistic prediction (True)
         if True, model will predict two values for each input pixel (mean and positive scale value)
 
     Returns
     -------
-    function to construct the network, which takes as argument the shape of the input image
+    function
+        Function to construct the network, which takes as argument the shape of the input image
 
     Example
     -------
@@ -87,7 +88,7 @@ def common_model(n_dim=2, n_depth=1, kern_size=3, n_first=16, n_channel_out=1, r
 
     References
     ----------
-    [1] Olaf Ronneberger, Philipp Fischer, Thomas Brox, *U-Net: Convolutional Networks for Biomedical Image Segmentation*, MICCAI 2015
+    .. [1] Olaf Ronneberger, Philipp Fischer, Thomas Brox, *U-Net: Convolutional Networks for Biomedical Image Segmentation*, MICCAI 2015
     """
     def _build_this(input_shape):
         return net_model(input_shape, "relu", n_depth, n_first, (kern_size,)*n_dim, pool_size=(2,)*n_dim, n_channel_out=n_channel_out, residual=residual, prob_out=prob_out)
@@ -97,18 +98,23 @@ def common_model(n_dim=2, n_depth=1, kern_size=3, n_first=16, n_channel_out=1, r
 
 modelname = re.compile("^(?P<model>resunet|unet)(?P<n_dim>\d)(?P<prob_out>p)?_(?P<n_depth>\d+)_(?P<kern_size>\d+)_(?P<n_first>\d+)(_(?P<n_channel_out>\d+)out)?$")
 def common_model_by_name(model):
-    """
-    shorthand notation to call `common_model`
+    """Shorthand notation for equivalent use of :func:`common_model`.
 
     Parameters
     ----------
-    model: string
+    model : str
         define model to be created via string, which is parsed as a regular expression:
-        ^(?P<model>resunet|unet)(?P<n_dim>\d)(?P<prob_out>p)?_(?P<n_depth>\d+)_(?P<kern_size>\d+)_(?P<n_first>\d+)(_(?P<n_channel_out>\d+)out)?$
+        `^(?P<model>resunet|unet)(?P<n_dim>\d)(?P<prob_out>p)?_(?P<n_depth>\d+)_(?P<kern_size>\d+)_(?P<n_first>\d+)(_(?P<n_channel_out>\d+)out)?$`
 
     Returns
     -------
-    call to `common_model`
+    function
+        Calls :func:`common_model` with the respective parameters.
+
+    Raises
+    ------
+    ValueError
+        If argument `model` is not a valid string according to the regular expression.
 
     Example
     -------

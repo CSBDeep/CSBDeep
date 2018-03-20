@@ -13,13 +13,15 @@ from .utils import Path, normalize_mi_ma, _raise, consume, compose, shuffle_inpl
 ## Transforms (to be added later)
 
 class Transform(namedtuple('Transform',('name','generator','size'))):
-    """Extension of :obj:`namedtuple` with three fields: `name`, `generator`, and `size`.
+    """Extension of :func:`collections.namedtuple` with three fields: `name`, `generator`, and `size`.
 
+    Parameters
+    ----------
     name : str
         Name of the applied transformation.
     generator : function that returns a generator
         Function that takes a generator as input and itself returns a generator; input and returned
-        generator have the same structure as that of :obj:`InputData`.
+        generator have the same structure as that of :class:`RawData`.
         The purpose of the returned generator is to augment the images provided by the input generator
         through additional transformations.
         It is important that the returned generator also includes every input tuple unchanged.
@@ -50,21 +52,23 @@ class Transform(namedtuple('Transform',('name','generator','size'))):
 
 
 
-## Input data
+## Raw data
 
-class InputData(namedtuple('InputData',('generator','size','description'))):
-    """:obj:`namedtuple` with three fields: `generator`, `size`, and `description`.
+class RawData(namedtuple('RawData',('generator','size','description'))):
+    """:func:`collections.namedtuple` with three fields: `generator`, `size`, and `description`.
 
+    Parameters
+    ----------
     generator : function that returns a generator
         Function without arguments that returns a generator that yields tuples `(x,y,mask)`,
         where `x` is a source image (e.g., with low SNR) with `y` being the corresponding target image
         (e.g., with high SNR); `mask` can either be `None` or a boolean array that denotes which
-        pixels are eligible to extracted in :obj:`create_patches`. Note that `x`, `y`, and `mask`
-        must all be of type :obj:`np.ndarray` with the same shape.
+        pixels are eligible to extracted in :func:`create_patches`. Note that `x`, `y`, and `mask`
+        must all be of type :class:`numpy.ndarray` with the same shape.
     size : int
         Number of tuples that the `generator` will yield.
     description : str
-        Textual description of the input data.
+        Textual description of the raw data.
     """
 
 def get_tiff_pairs_from_folders(basepath,source_dirs,target_dir='GT',pattern='*.tif*'):
@@ -76,7 +80,7 @@ def get_tiff_pairs_from_folders(basepath,source_dirs,target_dir='GT',pattern='*.
     ----------
     basepath : str
         Base folder that contains sub-folders with images.
-    source_dirs : iterable
+    source_dirs : list or tuple
         List of folder names relative to `basepath` that contain the source images (e.g., with low SNR).
     target_dir : str
         Folder name relative to `basepath` that contains the target images (e.g., with high SNR).
@@ -85,13 +89,20 @@ def get_tiff_pairs_from_folders(basepath,source_dirs,target_dir='GT',pattern='*.
 
     Returns
     -------
-    InputData
-        `InputData` object, whose `generator` is used to yield all matching TIFF pairs.
+    RawData
+        `RawData` object, whose `generator` is used to yield all matching TIFF pairs.
         The generator will return a tuple `(x,y,mask)`, where `x` is from
         `source_dirs` and `y` is the corresponding image from the `target_dir`; `mask` is
         set to `None`.
 
-    Examples
+    Raises
+    ------
+    FileNotFoundError
+        If an image found in `target_dir` does not exist in all `source_dirs`.
+    ValueError
+        If corresponding images do not have the same size (raised by returned :class:`RawData.generator`).
+
+    Example
     --------
     >>> !tree data
     data
@@ -109,13 +120,6 @@ def get_tiff_pairs_from_folders(basepath,source_dirs,target_dir='GT',pattern='*.
     >>> n_images = data.size
     >>> for source_x, target_y, mask in data.generator:
     >>>     ...
-
-    Raises
-    ------
-    FileNotFoundError
-        If an image found in `target_dir` does not exist in all `source_dirs`.
-    ValueError
-        If corresponding images do not have the same size (raised by returned InputData.generator).
     """
 
     p = Path(basepath)
@@ -135,14 +139,14 @@ def get_tiff_pairs_from_folders(basepath,source_dirs,target_dir='GT',pattern='*.
             x.shape == y.shape or _raise(ValueError())
             yield x, y, None
 
-    return InputData(_gen, n_images, description)
+    return RawData(_gen, n_images, description)
 
 
 
 ## Patch filter
 
 def no_background_patches(threshold=0.4, percentile=99.9):
-    """Returns a patch filter to be used for :obj:`create_patches` to determine for each image pair which patches
+    """Returns a patch filter to be used for :func:`create_patches` to determine for each image pair which patches
     are eligible for sampling. The purpose is to only sample patches from "interesting" regions of the raw image that
     actually contain some non-background signal. To that end, a maximum filter is applied to the target image
     to find the largest values in a region.
@@ -161,7 +165,7 @@ def no_background_patches(threshold=0.4, percentile=99.9):
     function
         Function that takes an image pair (y,x) and the patch size as arguments and
         returns a binary mask of the same size as the image (to denote the locations
-        eligible for sampling for :obj:`create_patches`). At least one pixel of the
+        eligible for sampling for :func:`create_patches`). At least one pixel of the
         binary mask must be True, otherwise there are no patches to sample.
     """
 
@@ -181,8 +185,8 @@ def no_background_patches(threshold=0.4, percentile=99.9):
 
 ## Sample patches
 
-def _sample_patches_from_multiple_stacks(datas, patch_size, n_samples, datas_mask=None, patch_filter=None, verbose=False):
-    """ TODO: sample matching patches of size `patch_size` from all arrays in `datas` """
+def sample_patches_from_multiple_stacks(datas, patch_size, n_samples, datas_mask=None, patch_filter=None, verbose=False):
+    """ sample matching patches of size `patch_size` from all arrays in `datas` """
 
     # TODO: some of these checks are already required in 'create_patches'
     len(patch_size)==datas[0].ndim or _raise(ValueError())
@@ -271,7 +275,7 @@ def sample_percentiles(pmin=(1,3), pmax=(99.5,99.9)):
     Raises
     ------
     ValueError
-        If `pmin` of `pmax` are unsuitable.
+        If `pmin` or `pmax` are unsuitable.
     """
     _valid_low_high_percentiles(pmin) or _raise(ValueError(pmin))
     _valid_low_high_percentiles(pmax) or _raise(ValueError(pmax))
@@ -279,7 +283,7 @@ def sample_percentiles(pmin=(1,3), pmax=(99.5,99.9)):
     return lambda: (np.random.uniform(*pmin), np.random.uniform(*pmax))
 
 def create_patches (
-        input_data,
+        raw_data,
         patch_size,
         n_patches_per_image,
         transforms = None,
@@ -288,28 +292,29 @@ def create_patches (
         channel = None,
         shuffle = True,
         verbose = True,
+        # TODO: option to save patches to disk memmapped?
     ):
     """Create normalized training data to be used for neural network training.
 
     Parameters
     ----------
-    input_data : :obj:`InputData`
+    raw_data : :class:`RawData`
         Object that yields matching pairs of raw images.
-    patch_size : tuple of int
+    patch_size : tuple
         Shape of the patches to be extraced from raw images.
         Must be compatible with the number of dimensions (2D/3D) and the shape of the raw images.
     n_patches_per_image : int
         Number of patches to be sampled/extracted from each raw image pair (after transformations, see below).
-    transforms : iterable of :obj:`Transform`, optional
+    transforms : list of :class:`Transform`, optional
         List of `Transform` objects that apply additional transformations to the raw images.
         This can be used to augment the set of raw images (e.g., by including rotations).
     patch_filter : function, optional
-        Function to determine for each image pair which patches are eligible to be extracted.
-        See :obj:`no_background_patches`.
-    percentiles : tuple of ints, optional
+        Function to determine for each image pair which patches are eligible to be extracted
+        (default: :func:`no_background_patches`).
+    percentiles : tuple, optional
         A tuple (`pmin`, `pmax`) or a function that returns such a tuple, where the extracted patches
         are (affinely) normalized in such that a value of 0 (1) corresponds to the `pmin`-th (`pmax`-th) percentile
-        of the raw image. We recommend to sample from a range of percentile values (see :obj:`sample_percentiles`).
+        of the raw image (default: :func:`sample_percentiles`).
     channel : int, optional
         Index of channel for multi-channel images, to enable that each channel is normalized independently.
     shuffle : bool, optional
@@ -319,19 +324,19 @@ def create_patches (
 
     Returns
     -------
-    `tuple` of `np.ndarray`
+    `tuple` of :class:`numpy.ndarray`
         Returns a pair (`X`, `Y`) of arrays with the normalized extracted patches from all (transformed) raw images.
-        `X` is the array of patches extracted from input images with `Y` being the array of corresponding output patches.
-
-    Examples
-    --------
-    >>> input_data = get_tiff_pairs_from_folders(basepath='data', source_dirs=['source1','source2'], target_dir='GT')
-    >>> X, Y = create_patches(input_data, patch_size=(32,128,128), n_patches_per_image=16)
+        `X` is the array of patches extracted from source images with `Y` being the array of corresponding target patches.
 
     Raises
     ------
     ValueError
         Various reasons.
+
+    Example
+    --------
+    >>> raw_data = get_tiff_pairs_from_folders(basepath='data', source_dirs=['source1','source2'], target_dir='GT')
+    >>> X, Y = create_patches(raw_data, patch_size=(32,128,128), n_patches_per_image=16)
     """
 
     ## percentiles
@@ -346,7 +351,7 @@ def create_patches (
     ## images and transforms
     if transforms is None or len(transforms)==0:
         transforms = (Transform.identity(),)
-    image_pairs, n_raw_images = input_data.generator(), input_data.size
+    image_pairs, n_raw_images = raw_data.generator(), raw_data.size
     tf = Transform(*zip(*transforms)) # convert list of Transforms into Transform of lists
     image_pairs = compose(*tf.generator)(image_pairs) # combine all transformations with raw images as input
     n_transforms = np.prod(tf.size)
@@ -364,7 +369,7 @@ def create_patches (
         print('%5d images     x %4d patches per image = %5d patches in total' % (n_images,n_patches_per_image,n_patches))
         print('='*66)
         print('Input data:')
-        print(input_data.description)
+        print(raw_data.description)
         print('='*66)
         print('Transformations:')
         for t in transforms:
@@ -387,7 +392,7 @@ def create_patches (
         pmins, pmaxs = zip(*(norm_percentiles() for _ in range(n_patches_per_image)))
         percentile_axes = None if channel is None else tuple((d for d in range(x.ndim) if d != channel))
 
-        _Y,_X = _sample_patches_from_multiple_stacks((y,x), patch_size, n_patches_per_image, mask, patch_filter)
+        _Y,_X = sample_patches_from_multiple_stacks((y,x), patch_size, n_patches_per_image, mask, patch_filter)
 
         X[s] = normalize_mi_ma(_X, np.percentile(x,pmins,axis=percentile_axes,keepdims=True),
                                    np.percentile(x,pmaxs,axis=percentile_axes,keepdims=True))

@@ -12,6 +12,7 @@ from keras.callbacks import Callback, TerminateOnNaN
 
 
 class ParameterDecayCallback(Callback):
+    """ TODO """
     def __init__(self, parameter, decay, name=None, verbose=0):
         self.parameter = parameter
         self.decay = decay
@@ -30,6 +31,7 @@ class ParameterDecayCallback(Callback):
 
 
 def load_data(data,validation_split=0,n_images=None):
+    """ TODO """
     # print("Loading training data...")
     f = np.load(data)
     X, Y = f['X'], f['Y']
@@ -54,6 +56,7 @@ def load_data(data,validation_split=0,n_images=None):
 
 def prepare_model(model, optimizer, loss, metrics=('mse','mae'),
                   loss_bg_thresh=0, loss_bg_decay=0.06, Y=None):
+    """ TODO """
 
     loss_standard   = eval('loss_%s()'%loss)
     _metrics        = [eval('loss_%s()'%m) for m in metrics]

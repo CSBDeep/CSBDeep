@@ -8,52 +8,116 @@ import tempfile, shutil
 import datetime
 
 import tensorflow as tf
-from tensorflow.python.framework import graph_util
-from tensorflow.python.framework import graph_io
+# from tensorflow.python.framework import graph_util
+# from tensorflow.python.framework import graph_io
 
+import keras
 from keras import backend as K
 from keras.callbacks import Callback
 from keras.layers import Lambda
 
+from .utils import _raise, is_tf_dim, is_tf_back
 
 
-def limit_memory(fraction = .75):
-    """ global setup function that tries to handle GPU memory allocation """
 
-    if K.backend() == "tensorflow":
-        K.set_image_data_format("channels_last")
-        ###we are in tensorflow land
+def limit_gpu_memory(fraction, allow_growth=False):
+    """Limit GPU memory allocation for TensorFlow (TF) backend.
 
-        import tensorflow as tf
+    Parameters
+    ----------
+    fraction : float
+        Limit TF to use only a fraction (value between 0 and 1) of the available GPU memory.
+        Reduced memory allocation can be disabled if fraction is set to `None`.
+    allow_growth : bool, optional
+        If `False` (default), TF will allocate all designated (see `fraction`) memory all at once.
+        If `True`, TF will allocate memory as needed up to the limit imposed by `fraction`; this may
+        incur a performance penalty due to memory fragmentation.
 
-        config = tf.ConfigProto()
-        config.gpu_options.per_process_gpu_memory_fraction = fraction
-        session = tf.Session(config=config)
-        K.tensorflow_backend.set_session(session)
-        print("[tf_limit]\t setting config.gpu_options.per_process_gpu_memory_fraction to ",config.gpu_options.per_process_gpu_memory_fraction)
-    elif K.backend() == "theano":
-        K.set_image_data_format("channels_first")
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    ValueError
+        If `fraction` is not None or a float value between 0 and 1.
+    NotImplementedError
+        If TensorFlow is not used as the backend.
+    """
+
+    fraction is None or (np.isscalar(fraction) and 0<=fraction<=1) or _raise(ValueError('fraction must be between 0 and 1.'))
+
+    if is_tf_back():
+        # assert is_tf_dim()
+
+        if K.tensorflow_backend._SESSION is None:
+            config = tf.ConfigProto()
+            if fraction is not None:
+                config.gpu_options.per_process_gpu_memory_fraction = fraction
+            config.gpu_options.allow_growth = bool(allow_growth)
+            session = tf.Session(config=config)
+            K.tensorflow_backend.set_session(session)
+            # print("[tf_limit]\t setting config.gpu_options.per_process_gpu_memory_fraction to ",config.gpu_options.per_process_gpu_memory_fraction)
+        else:
+            warnings.warn('Too late too limit GPU memory, must be done before any computation.')
+    else:
+        raise NotImplementedError('Not using tensorflow backend.')
 
 
 
 def export_SavedModel(model, outpath, format='zip'):
-    # assert not os.path.exists(dirname)
+    """Export Keras model in TensorFlow's SavedModel_ format.
+
+    See `Your Model in Fiji`_ to learn how to use the exported model with our CSBDeep Fiji plugins.
+
+    .. _SavedModel: https://www.tensorflow.org/programmers_guide/saved_model#structure_of_a_savedmodel_directory
+    .. _`Your Model in Fiji`: https://github.com/CSBDeep/CSBDeep/wiki/Your-Model-in-Fiji
+
+    Parameters
+    ----------
+    model : :class:`keras.Model`
+        Keras model to be exported.
+    outpath : str
+        Path of the file/folder that the model will exported to.
+    format : str, optional
+        Can be 'dir' to export as a directory or 'zip' (default) to export as a ZIP file.
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    ValueError
+        Illegal arguments.
+
+    """
 
     def export_to_dir(dirname):
         if len(model.input_layers) > 1 or len(model.output_layers) > 1:
-            warnings.warn('not tested with multiple input or output layers')
+            warnings.warn('Not tested with multiple input or output layers.')
         builder = tf.saved_model.builder.SavedModelBuilder(dirname)
         signature = tf.saved_model.signature_def_utils.predict_signature_def(
-            inputs  = {"input":  model.input},
-            outputs = {"output": model.output}
+            inputs  = {'input':  model.input},
+            outputs = {'output': model.output}
         )
-        signature_def_map = { tf.saved_model.signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY : signature }
+        signature_def_map = { tf.saved_model.signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: signature }
         builder.add_meta_graph_and_variables(K.get_session(),
                                              [tf.saved_model.tag_constants.SERVING],
                                              signature_def_map=signature_def_map)
         builder.save()
 
-    if format=='dir':
+    ## checks
+    isinstance(model,keras.Model) or _raise(ValueError("'model' must be a Keras model."))
+    # supported_formats = tuple(['dir']+[name for name,description in shutil.get_archive_formats()])
+    supported_formats = 'dir','zip'
+    format in supported_formats or _raise(ValueError("Unsupported format '%s', must be one of %s." % (format,str(supported_formats))))
+
+    # remove '.zip' file name extension if necessary
+    if format == 'zip' and outpath.endswith('.zip'):
+        outpath = os.path.splitext(outpath)[0]
+
+    if format == 'dir':
         export_to_dir(outpath)
     else:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -65,6 +129,7 @@ def export_SavedModel(model, outpath, format='zip'):
 
 
 class MyTensorBoard(Callback):
+    """ TODO """
     def __init__(self, log_dir='./logs',
                  freq=1,
                  compute_histograms=False,

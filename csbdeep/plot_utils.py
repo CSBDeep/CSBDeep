@@ -3,7 +3,7 @@ from six.moves import range, zip, map, reduce, filter
 
 import numpy as np
 # from .utils import normalize
-import matplotlib
+# import matplotlib
 # matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 #plt.ioff()
@@ -33,6 +33,7 @@ from .utils import normalize
 
 
 def plot_history(history,*keys,logy=False,**kwargs):
+    """ TODO """
 
     if all(( isinstance(k,str) for k in keys )):
         w, keys = 1, [keys]
@@ -59,13 +60,13 @@ def plot_some(*arr, title_list=None, pmin=0, pmax=100, **imshow_kwargs):
     arr = [ X_1, X_2, ..., X_n]
 
     where each X_i is a list of images
-    
-    :param arr: 
-    :param title_list: 
-    :param pmin: 
-    :param pmax: 
-    :param imshow_kwargs: 
-    :return: 
+
+    :param arr:
+    :param title_list:
+    :param pmin:
+    :param pmax:
+    :param imshow_kwargs:
+    :return:
     """
 
 
