@@ -13,10 +13,27 @@ from .utils import Path, normalize_mi_ma, _raise, consume, compose, shuffle_inpl
 ## Transforms (to be added later)
 
 class Transform(namedtuple('Transform',('name','generator','size'))):
-    """TODO"""
+    """Extension of :obj:`namedtuple` with three fields: `name`, `generator`, and `size`.
+
+    name : str
+        Name of the applied transformation.
+    generator : function that returns a generator
+        Function that takes a generator as input and itself returns a generator; input and returned
+        generator have the same structure as that of :obj:`InputData`.
+        The purpose of the returned generator is to augment the images provided by the input generator
+        through additional transformations.
+        It is important that the returned generator also includes every input tuple unchanged.
+    size : int
+        Number of transformations applied to every image (obtained from the input generator).
+    """
 
     def identity():
-        """TODO"""
+        """
+        Returns
+        -------
+        Transform
+            Identity transformation that passes every input through unchanged.
+        """
         def _gen(inputs):
             for d in inputs:
                 yield d
@@ -36,7 +53,19 @@ class Transform(namedtuple('Transform',('name','generator','size'))):
 ## Input data
 
 class InputData(namedtuple('InputData',('generator','size','description'))):
-    """TODO"""
+    """:obj:`namedtuple` with three fields: `generator`, `size`, and `description`.
+
+    generator : function that returns a generator
+        Function without arguments that returns a generator that yields tuples `(x,y,mask)`,
+        where `x` is a source image (e.g., with low SNR) with `y` being the corresponding target image
+        (e.g., with high SNR); `mask` can either be `None` or a boolean array that denotes which
+        pixels are eligible to extracted in :obj:`create_patches`. Note that `x`, `y`, and `mask`
+        must all be of type :obj:`np.ndarray` with the same shape.
+    size : int
+        Number of tuples that the `generator` will yield.
+    description : str
+        Textual description of the input data.
+    """
 
 def get_tiff_pairs_from_folders(basepath,source_dirs,target_dir='GT',pattern='*.tif*'):
     """Get pairs of corresponding TIFF images read from folders.
@@ -58,7 +87,7 @@ def get_tiff_pairs_from_folders(basepath,source_dirs,target_dir='GT',pattern='*.
     -------
     InputData
         `InputData` object, whose `generator` is used to yield all matching TIFF pairs.
-        **Important**: the generator will return a tuple `(x,y,mask)`, where `x` is from
+        The generator will return a tuple `(x,y,mask)`, where `x` is from
         `source_dirs` and `y` is the corresponding image from the `target_dir`; `mask` is
         set to `None`.
 
@@ -152,7 +181,7 @@ def no_background_patches(threshold=0.4, percentile=99.9):
 
 ## Sample patches
 
-def sample_patches_from_multiple_stacks(datas, patch_size, n_samples, datas_mask=None, patch_filter=None, verbose=False):
+def _sample_patches_from_multiple_stacks(datas, patch_size, n_samples, datas_mask=None, patch_filter=None, verbose=False):
     """ TODO: sample matching patches of size `patch_size` from all arrays in `datas` """
 
     # TODO: some of these checks are already required in 'create_patches'
@@ -225,7 +254,25 @@ def _memory_check(n_required_memory_bytes, thresh_free_frac=0.5, thresh_abs_byte
             print('Warning: will use at least %.0f MB of memory.\n' % (n_required_memory_bytes/1024**2), file=sys.stderr, flush=True)
 
 def sample_percentiles(pmin=(1,3), pmax=(99.5,99.9)):
-    """ TODO """
+    """Sample percentile values from a uniform distribution.
+
+    Parameters
+    ----------
+    pmin : tuple
+        Tuple of two values that denotes the interval for sampling low percentiles.
+    pmax : tuple
+        Tuple of two values that denotes the interval for sampling high percentiles.
+
+    Returns
+    -------
+    function without arguments that returns a `tuple`
+        Returns `(pl,ph)` where `pl` (`ph`) is a sampled low (high) percentile.
+
+    Raises
+    ------
+    ValueError
+        If `pmin` of `pmax` are unsuitable.
+    """
     _valid_low_high_percentiles(pmin) or _raise(ValueError(pmin))
     _valid_low_high_percentiles(pmax) or _raise(ValueError(pmax))
     pmin[1] < pmax[0] or _raise(ValueError())
@@ -259,7 +306,7 @@ def create_patches (
     patch_filter : function, optional
         Function to determine for each image pair which patches are eligible to be extracted.
         See :obj:`no_background_patches`.
-    percentiles : tuple of two ints, or function that returns tuple of two ints
+    percentiles : tuple of ints, optional
         A tuple (`pmin`, `pmax`) or a function that returns such a tuple, where the extracted patches
         are (affinely) normalized in such that a value of 0 (1) corresponds to the `pmin`-th (`pmax`-th) percentile
         of the raw image. We recommend to sample from a range of percentile values (see :obj:`sample_percentiles`).
@@ -279,7 +326,7 @@ def create_patches (
     Examples
     --------
     >>> input_data = get_tiff_pairs_from_folders(basepath='data', source_dirs=['source1','source2'], target_dir='GT')
-    >>> X, Y = create_patches(input_data, patch_size=(32,128,128), n_samples=16)
+    >>> X, Y = create_patches(input_data, patch_size=(32,128,128), n_patches_per_image=16)
 
     Raises
     ------
@@ -340,7 +387,7 @@ def create_patches (
         pmins, pmaxs = zip(*(norm_percentiles() for _ in range(n_patches_per_image)))
         percentile_axes = None if channel is None else tuple((d for d in range(x.ndim) if d != channel))
 
-        _Y,_X = sample_patches_from_multiple_stacks((y,x), patch_size, n_patches_per_image, mask, patch_filter)
+        _Y,_X = _sample_patches_from_multiple_stacks((y,x), patch_size, n_patches_per_image, mask, patch_filter)
 
         X[s] = normalize_mi_ma(_X, np.percentile(x,pmins,axis=percentile_axes,keepdims=True),
                                    np.percentile(x,pmaxs,axis=percentile_axes,keepdims=True))
