@@ -27,20 +27,16 @@ def limit_gpu_memory(fraction, allow_growth=False):
     ----------
     fraction : float
         Limit TF to use only a fraction (value between 0 and 1) of the available GPU memory.
-        Reduced memory allocation can be disabled if fraction is set to `None`.
+        Reduced memory allocation can be disabled if fraction is set to ``None``.
     allow_growth : bool, optional
-        If `False` (default), TF will allocate all designated (see `fraction`) memory all at once.
-        If `True`, TF will allocate memory as needed up to the limit imposed by `fraction`; this may
+        If ``False`` (default), TF will allocate all designated (see `fraction`) memory all at once.
+        If ``True``, TF will allocate memory as needed up to the limit imposed by `fraction`; this may
         incur a performance penalty due to memory fragmentation.
-
-    Returns
-    -------
-    None
 
     Raises
     ------
     ValueError
-        If `fraction` is not None or a float value between 0 and 1.
+        If `fraction` is not ``None`` or a float value between 0 and 1.
     NotImplementedError
         If TensorFlow is not used as the backend.
     """
@@ -48,8 +44,6 @@ def limit_gpu_memory(fraction, allow_growth=False):
     fraction is None or (np.isscalar(fraction) and 0<=fraction<=1) or _raise(ValueError('fraction must be between 0 and 1.'))
 
     if is_tf_back():
-        # assert is_tf_dim()
-
         if K.tensorflow_backend._SESSION is None:
             config = tf.ConfigProto()
             if fraction is not None:
@@ -81,10 +75,6 @@ def export_SavedModel(model, outpath, format='zip'):
         Path of the file/folder that the model will exported to.
     format : str, optional
         Can be 'dir' to export as a directory or 'zip' (default) to export as a ZIP file.
-
-    Returns
-    -------
-    None
 
     Raises
     ------

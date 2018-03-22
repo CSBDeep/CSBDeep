@@ -19,7 +19,7 @@ class Transform(namedtuple('Transform',('name','generator','size'))):
     ----------
     name : str
         Name of the applied transformation.
-    generator : function that returns a generator
+    generator : function
         Function that takes a generator as input and itself returns a generator; input and returned
         generator have the same structure as that of :class:`RawData`.
         The purpose of the returned generator is to augment the images provided by the input generator
@@ -59,7 +59,7 @@ class RawData(namedtuple('RawData',('generator','size','description'))):
 
     Parameters
     ----------
-    generator : function that returns a generator
+    generator : function
         Function without arguments that returns a generator that yields tuples `(x,y,mask)`,
         where `x` is a source image (e.g., with low SNR) with `y` being the corresponding target image
         (e.g., with high SNR); `mask` can either be `None` or a boolean array that denotes which
@@ -90,7 +90,7 @@ def get_tiff_pairs_from_folders(basepath,source_dirs,target_dir='GT',pattern='*.
     Returns
     -------
     RawData
-        `RawData` object, whose `generator` is used to yield all matching TIFF pairs.
+        :obj:`RawData` object, whose `generator` is used to yield all matching TIFF pairs.
         The generator will return a tuple `(x,y,mask)`, where `x` is from
         `source_dirs` and `y` is the corresponding image from the `target_dir`; `mask` is
         set to `None`.
@@ -100,7 +100,7 @@ def get_tiff_pairs_from_folders(basepath,source_dirs,target_dir='GT',pattern='*.
     FileNotFoundError
         If an image found in `target_dir` does not exist in all `source_dirs`.
     ValueError
-        If corresponding images do not have the same size (raised by returned :class:`RawData.generator`).
+        If corresponding images do not have the same size (raised by returned :func:`RawData.generator`).
 
     Example
     --------
@@ -118,8 +118,8 @@ def get_tiff_pairs_from_folders(basepath,source_dirs,target_dir='GT',pattern='*.
 
     >>> data = get_tiff_pairs_from_folders(basepath='data', source_dirs=['source1','source2'], target_dir='GT')
     >>> n_images = data.size
-    >>> for source_x, target_y, mask in data.generator:
-    >>>     ...
+    >>> for source_x, target_y, mask in data.generator():
+    ...     pass
     """
 
     p = Path(basepath)
@@ -146,7 +146,7 @@ def get_tiff_pairs_from_folders(basepath,source_dirs,target_dir='GT',pattern='*.
 ## Patch filter
 
 def no_background_patches(threshold=0.4, percentile=99.9):
-    """Returns a patch filter to be used for :func:`create_patches` to determine for each image pair which patches
+    """Returns a patch filter to be used by :func:`create_patches` to determine for each image pair which patches
     are eligible for sampling. The purpose is to only sample patches from "interesting" regions of the raw image that
     actually contain some non-background signal. To that end, a maximum filter is applied to the target image
     to find the largest values in a region.
@@ -163,10 +163,15 @@ def no_background_patches(threshold=0.4, percentile=99.9):
     Returns
     -------
     function
-        Function that takes an image pair (y,x) and the patch size as arguments and
+        Function that takes an image pair `(y,x)` and the patch size as arguments and
         returns a binary mask of the same size as the image (to denote the locations
         eligible for sampling for :func:`create_patches`). At least one pixel of the
-        binary mask must be True, otherwise there are no patches to sample.
+        binary mask must be ``True``, otherwise there are no patches to sample.
+
+    Raises
+    ------
+    ValueError
+        Illegal arguments.
     """
 
     (np.isscalar(percentile) and 0 <= percentile <= 100) or _raise(ValueError())
@@ -269,13 +274,13 @@ def sample_percentiles(pmin=(1,3), pmax=(99.5,99.9)):
 
     Returns
     -------
-    function without arguments that returns a `tuple`
-        Returns `(pl,ph)` where `pl` (`ph`) is a sampled low (high) percentile.
+    function
+        Function without arguments that returns `(pl,ph)`, where `pl` (`ph`) is a sampled low (high) percentile.
 
     Raises
     ------
     ValueError
-        If `pmin` or `pmax` are unsuitable.
+        Illegal arguments.
     """
     _valid_low_high_percentiles(pmin) or _raise(ValueError(pmin))
     _valid_low_high_percentiles(pmax) or _raise(ValueError(pmax))
@@ -305,8 +310,8 @@ def create_patches (
         Must be compatible with the number of dimensions (2D/3D) and the shape of the raw images.
     n_patches_per_image : int
         Number of patches to be sampled/extracted from each raw image pair (after transformations, see below).
-    transforms : list of :class:`Transform`, optional
-        List of `Transform` objects that apply additional transformations to the raw images.
+    transforms : list or tuple, optional
+        List of :class:`Transform` objects that apply additional transformations to the raw images.
         This can be used to augment the set of raw images (e.g., by including rotations).
     patch_filter : function, optional
         Function to determine for each image pair which patches are eligible to be extracted
@@ -324,8 +329,8 @@ def create_patches (
 
     Returns
     -------
-    `tuple` of :class:`numpy.ndarray`
-        Returns a pair (`X`, `Y`) of arrays with the normalized extracted patches from all (transformed) raw images.
+    tuple
+        Returns a pair (`X`, `Y`) of :class:`numpy.ndarray` arrays with the normalized extracted patches from all (transformed) raw images.
         `X` is the array of patches extracted from source images with `Y` being the array of corresponding target patches.
 
     Raises
@@ -337,6 +342,13 @@ def create_patches (
     --------
     >>> raw_data = get_tiff_pairs_from_folders(basepath='data', source_dirs=['source1','source2'], target_dir='GT')
     >>> X, Y = create_patches(raw_data, patch_size=(32,128,128), n_patches_per_image=16)
+
+    Todo
+    ----
+    - Is :func:`create_patches` a good name?
+    - rename ``percentiles`` to ``norm_percentiles``
+    - add option to do absolute min/max normalization instead of percentiles of raw image
+      (most general: function that gets raw image as input and returns min/max for normalization)
     """
 
     ## percentiles

@@ -23,8 +23,6 @@ from being extracted, since they do not contain interesting structures.
 
 .. autofunction:: csbdeep.datagen.get_tiff_pairs_from_folders
 .. autofunction:: csbdeep.datagen.create_patches
-.. todo::
-    Is :func:`csbdeep.datagen.create_patches` a good name?
 
 .. autofunction:: csbdeep.datagen.no_background_patches
 .. autofunction:: csbdeep.datagen.sample_percentiles
@@ -33,7 +31,7 @@ Advanced topics
 ---------------
 
 Custom data loaders
-###################
++++++++++++++++++++
 
 If you cannot or do not want to put your raw images in a folder structure
 as required by :func:`csbdeep.datagen.get_tiff_pairs_from_folders`, you
@@ -44,7 +42,7 @@ corresponding raw images in the required format for :func:`csbdeep.datagen.creat
     :members:
 
 Data augmention
-###############
++++++++++++++++
 
 Instead of recording raw images where structures of interest appear in all
 possible appearance variations, it can be easier to augment the raw dataset
