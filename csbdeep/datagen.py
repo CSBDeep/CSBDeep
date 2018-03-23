@@ -287,17 +287,63 @@ def sample_percentiles(pmin=(1,3), pmax=(99.5,99.9)):
     pmin[1] < pmax[0] or _raise(ValueError())
     return lambda: (np.random.uniform(*pmin), np.random.uniform(*pmax))
 
+
+def norm_percentiles(percentiles=sample_percentiles()):
+    """Normalize extracted patches based on percentiles from corresponding raw image.
+
+    Parameters
+    ----------
+    percentiles : tuple, optional
+        A tuple (`pmin`, `pmax`) or a function that returns such a tuple, where the extracted patches
+        are (affinely) normalized in such that a value of 0 (1) corresponds to the `pmin`-th (`pmax`-th) percentile
+        of the raw image (default: :func:`sample_percentiles`).
+
+    Return
+    ------
+    function
+        Function that does percentile-based normalization to be used in :func:`create_patches`.
+
+    Raises
+    ------
+    ValueError
+        Illegal arguments.
+    Todo
+    ----
+    Percentile pmin=0 always used for y. How to explain?
+    """
+
+    if callable(percentiles):
+        _tmp = percentiles()
+        _valid_low_high_percentiles(_tmp) or _raise(ValueError(_tmp))
+        get_percentiles = percentiles
+    else:
+        _valid_low_high_percentiles(percentiles) or _raise(ValueError(percentiles))
+        get_percentiles = lambda: percentiles
+
+    def _normalize(patches_x,patches_y, x,y,mask,channel):
+        pmins, pmaxs = zip(*(get_percentiles() for _ in patches_x))
+        percentile_axes = None if channel is None else tuple((d for d in range(x.ndim) if d != channel))
+        patches_x_norm = normalize_mi_ma(patches_x, np.percentile(x,pmins,axis=percentile_axes,keepdims=True),
+                                                    np.percentile(x,pmaxs,axis=percentile_axes,keepdims=True))
+        patches_y_norm = normalize_mi_ma(patches_y, np.min(y),
+                                                    np.percentile(y,pmaxs,axis=percentile_axes,keepdims=True))
+        return patches_x_norm, patches_y_norm
+
+    return _normalize
+
+
+
+
 def create_patches (
         raw_data,
         patch_size,
         n_patches_per_image,
         transforms = None,
         patch_filter = no_background_patches(),
-        percentiles = sample_percentiles(),
+        normalization = norm_percentiles(),
         channel = None,
         shuffle = True,
         verbose = True,
-        # TODO: option to save patches to disk memmapped?
     ):
     """Create normalized training data to be used for neural network training.
 
@@ -313,13 +359,14 @@ def create_patches (
     transforms : list or tuple, optional
         List of :class:`Transform` objects that apply additional transformations to the raw images.
         This can be used to augment the set of raw images (e.g., by including rotations).
+        Set to ``None`` to disable. Default: ``None``.
     patch_filter : function, optional
         Function to determine for each image pair which patches are eligible to be extracted
-        (default: :func:`no_background_patches`).
-    percentiles : tuple, optional
-        A tuple (`pmin`, `pmax`) or a function that returns such a tuple, where the extracted patches
-        are (affinely) normalized in such that a value of 0 (1) corresponds to the `pmin`-th (`pmax`-th) percentile
-        of the raw image (default: :func:`sample_percentiles`).
+        (default: :func:`no_background_patches`). Set to ``None`` to disable.
+    normalization : function, optional
+        Function that takes arguments `(patches_x, patches_y, x, y, mask, channel)`, whose purpose is to
+        normalize the patches (`patches_x`, `patches_y`) extracted from the associated raw images
+        (`x`, `y`, with `mask`; see :class:`RawData`). Default: :func:`norm_percentiles`.
     channel : int, optional
         Index of channel for multi-channel images, to enable that each channel is normalized independently.
     shuffle : bool, optional
@@ -330,8 +377,10 @@ def create_patches (
     Returns
     -------
     tuple
-        Returns a pair (`X`, `Y`) of :class:`numpy.ndarray` arrays with the normalized extracted patches from all (transformed) raw images.
+        Returns a pair (`X`, `Y`) of :class:`numpy.ndarray` with the normalized extracted patches from all (transformed) raw images.
         `X` is the array of patches extracted from source images with `Y` being the array of corresponding target patches.
+        The shape of `X` and `Y` is as follows: `(n_total_patches, n_channels, ...)`.
+        For single-channel images (`channel` = ``None``), `n_channels` = 1.
 
     Raises
     ------
@@ -346,19 +395,9 @@ def create_patches (
     Todo
     ----
     - Is :func:`create_patches` a good name?
-    - rename ``percentiles`` to ``norm_percentiles``
-    - add option to do absolute min/max normalization instead of percentiles of raw image
-      (most general: function that gets raw image as input and returns min/max for normalization)
+    - Save created patches directly to disk using :class:`numpy.memmap` or similar?
+      Would allow to work with large data that doesn't fit in memory.
     """
-
-    ## percentiles
-    if callable(percentiles):
-        _p_example = percentiles()
-        _valid_low_high_percentiles(_p_example) or _raise(ValueError(_p_example))
-        norm_percentiles = percentiles
-    else:
-        _valid_low_high_percentiles(percentiles) or _raise(ValueError(percentiles))
-        norm_percentiles = lambda: percentiles
 
     ## images and transforms
     if transforms is None or len(transforms)==0:
@@ -400,18 +439,19 @@ def create_patches (
         (channel is None or (isinstance(channel,int) and 0<=channel<x.ndim)) or _raise(ValueError())
         channel is None or patch_size[channel]==x.shape[channel] or _raise(ValueError('extracted patches must contain all channels.'))
 
-        s = slice(i*n_patches_per_image,(i+1)*n_patches_per_image)
-        pmins, pmaxs = zip(*(norm_percentiles() for _ in range(n_patches_per_image)))
-        percentile_axes = None if channel is None else tuple((d for d in range(x.ndim) if d != channel))
-
         _Y,_X = sample_patches_from_multiple_stacks((y,x), patch_size, n_patches_per_image, mask, patch_filter)
 
-        X[s] = normalize_mi_ma(_X, np.percentile(x,pmins,axis=percentile_axes,keepdims=True),
-                                   np.percentile(x,pmaxs,axis=percentile_axes,keepdims=True))
-        Y[s] = normalize_mi_ma(_Y, np.min(y),
-                                   np.percentile(y,pmaxs,axis=percentile_axes,keepdims=True))
+        s = slice(i*n_patches_per_image,(i+1)*n_patches_per_image)
+        X[s], Y[s] = normalization(_X,_Y, x,y,mask,channel)
 
     if shuffle:
         shuffle_inplace(X,Y)
+
+    if channel is None:
+        X = np.expand_dims(X,1)
+        Y = np.expand_dims(Y,1)
+    else:
+        X = np.moveaxis(X, 1+channel, 1)
+        Y = np.moveaxis(Y, 1+channel, 1)
 
     return X,Y

@@ -19,16 +19,23 @@ If not specified otherwise, patches which are purely background are also exclude
 from being extracted, since they do not contain interesting structures.
 
 .. todo::
-   Training data generation currently only for real/real data.
+   Training data generation like this will not work for:
+       - surface projection → how to accommodate in :func:`csbdeep.datagen.create_patches`?
+       - isotropic reconstruction → use different function
 
 .. autofunction:: csbdeep.datagen.get_tiff_pairs_from_folders
 .. autofunction:: csbdeep.datagen.create_patches
 
 .. autofunction:: csbdeep.datagen.no_background_patches
+.. autofunction:: csbdeep.datagen.norm_percentiles
 .. autofunction:: csbdeep.datagen.sample_percentiles
 
 Advanced topics
 ---------------
+
+.. todo::
+    - Normalization
+    - Patch filter
 
 Custom data loaders
 +++++++++++++++++++
