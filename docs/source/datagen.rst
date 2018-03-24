@@ -20,8 +20,8 @@ from being extracted, since they do not contain interesting structures.
 
 .. todo::
    Training data generation like this will not work for:
-       - surface projection → how to accommodate in :func:`csbdeep.datagen.create_patches`?
-       - isotropic reconstruction → use different function
+       - surface projection → accommodate in :func:`csbdeep.datagen.create_patches`
+       - isotropic reconstruction → provide different function
 
 .. autofunction:: csbdeep.datagen.get_tiff_pairs_from_folders
 .. autofunction:: csbdeep.datagen.create_patches

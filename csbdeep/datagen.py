@@ -85,7 +85,7 @@ def get_tiff_pairs_from_folders(basepath,source_dirs,target_dir='GT',pattern='*.
     target_dir : str
         Folder name relative to `basepath` that contains the target images (e.g., with high SNR).
     pattern : str
-        Glob pattern to match the desired TIFF images.
+        Glob-style pattern to match the desired TIFF images.
 
     Returns
     -------

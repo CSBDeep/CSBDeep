@@ -8,6 +8,9 @@ import keras.backend as K
 from .blocks import unet_block
 import re
 
+from .utils import _raise
+import warnings
+
 
 def net_model(input_shape,
               last_activation,
@@ -55,8 +58,8 @@ def net_model(input_shape,
 
 
 
-def common_model(n_dim=2, n_depth=1, kern_size=3, n_first=16, n_channel_out=1, residual=True, prob_out=False):
-    """Construct a common CARE neural net based on U-Net [1]_ to be used for image restoration/enhancement.
+def common_model(n_dim=2, n_depth=1, kern_size=3, n_first=16, n_channel_out=1, residual=True, prob_out=False, last_activation='linear'):
+    """Construct a common CARE neural net based on U-Net [1]_ and residual learning [2]_ to be used for image restoration/enhancement.
 
     Parameters
     ----------
@@ -76,6 +79,8 @@ def common_model(n_dim=2, n_depth=1, kern_size=3, n_first=16, n_channel_out=1, r
     prob_out : bool
         standard regression (False) or probabilistic prediction (True)
         if True, model will predict two values for each input pixel (mean and positive scale value)
+    last_activation : str
+        name of activation function for the final output layer
 
     Returns
     -------
@@ -89,14 +94,15 @@ def common_model(n_dim=2, n_depth=1, kern_size=3, n_first=16, n_channel_out=1, r
     References
     ----------
     .. [1] Olaf Ronneberger, Philipp Fischer, Thomas Brox, *U-Net: Convolutional Networks for Biomedical Image Segmentation*, MICCAI 2015
+    .. [2] Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun. *Deep Residual Learning for Image Recognition*, CVPR 2016
     """
     def _build_this(input_shape):
-        return net_model(input_shape, "relu", n_depth, n_first, (kern_size,)*n_dim, pool_size=(2,)*n_dim, n_channel_out=n_channel_out, residual=residual, prob_out=prob_out)
+        return net_model(input_shape, last_activation, n_depth, n_first, (kern_size,)*n_dim, pool_size=(2,)*n_dim, n_channel_out=n_channel_out, residual=residual, prob_out=prob_out)
     return _build_this
 
 
 
-modelname = re.compile("^(?P<model>resunet|unet)(?P<n_dim>\d)(?P<prob_out>p)?_(?P<n_depth>\d+)_(?P<kern_size>\d+)_(?P<n_first>\d+)(_(?P<n_channel_out>\d+)out)?$")
+modelname = re.compile("^(?P<model>resunet|unet)(?P<n_dim>\d)(?P<prob_out>p)?_(?P<n_depth>\d+)_(?P<kern_size>\d+)_(?P<n_first>\d+)(_(?P<n_channel_out>\d+)out)?(_(?P<last_activation>.+)-last)?$")
 def common_model_by_name(model):
     """Shorthand notation for equivalent use of :func:`common_model`.
 
@@ -104,7 +110,7 @@ def common_model_by_name(model):
     ----------
     model : str
         define model to be created via string, which is parsed as a regular expression:
-        `^(?P<model>resunet|unet)(?P<n_dim>\d)(?P<prob_out>p)?_(?P<n_depth>\d+)_(?P<kern_size>\d+)_(?P<n_first>\d+)(_(?P<n_channel_out>\d+)out)?$`
+        `^(?P<model>resunet|unet)(?P<n_dim>\d)(?P<prob_out>p)?_(?P<n_depth>\d+)_(?P<kern_size>\d+)_(?P<n_first>\d+)(_(?P<n_channel_out>\d+)out)?(_(?P<last_activation>.+)-last)?$`
 
     Returns
     -------
@@ -123,11 +129,15 @@ def common_model_by_name(model):
     """
     m = modelname.fullmatch(model)
     if m is None:
-        raise ValueError("model '%s' unknown, must follow pattern '%s'" % (model, modelname.pattern))
+        raise ValueError("model name '%s' unknown, must follow pattern '%s'" % (model, modelname.pattern))
+    # from pprint import pprint
+    # pprint(m.groupdict())
     options = {k:int(m.group(k)) for k in ['n_depth','n_first','kern_size']}
     options['prob_out'] = m.group('prob_out') is not None
     options['residual'] = {'unet': False, 'resunet': True}[m.group('model')]
     options['n_dim'] = int(m.group('n_dim'))
     options['n_channel_out'] = 1 if m.group('n_channel_out') is None else int(m.group('n_channel_out'))
+    if m.group('last_activation') is not None:
+        options['last_activation'] = m.group('last_activation')
 
     return common_model(**options)

@@ -16,19 +16,19 @@ def loss_laplace(mean=True, eps=1e-3): # FIXME: add 1e-3 in model itself instead
     R = _mean_or_not(mean)
     C = np.log(2.0) # FIXME: in the supplement, we have dropped C, ie. C = 0
     if K.image_data_format() == 'channels_last':
-        def nll_laplace(y_true, y_pred):
+        def nll(y_true, y_pred):
             n     = K.shape(y_true)[-1]
             mu    = y_pred[...,:n]
             sigma = y_pred[...,n:] + eps
             return R(K.abs((mu-y_true)/sigma) + K.log(sigma) + C)
-        return nll_laplace
+        return nll
     else:
-        def nll_laplace(y_true, y_pred):
+        def nll(y_true, y_pred):
             n     = K.shape(y_true)[1]
             mu    = y_pred[:,:n,...]
             sigma = y_pred[:,n:,...] + eps
             return R(K.abs((mu-y_true)/sigma) + K.log(sigma) + C)
-        return nll_laplace
+        return nll
 
 
 def loss_mae(mean=True):
