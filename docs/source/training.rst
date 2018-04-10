@@ -1,21 +1,20 @@
 Training CARE networks
 ======================
 
-.. todo::
-    Work in progress...
-
+.. image:: https://i.imgflip.com/275svf.jpg
 
 Defining a network
 ------------------
 
-Model = Network
+Note that a CARE network is referred to as `model` here.
 
 .. autofunction:: csbdeep.nets.common_model
 .. autofunction:: csbdeep.nets.common_model_by_name
 
-If not enough, use :func:`csbdeep.nets.net_model` or build your own.
+.. If not enough, use :func:`csbdeep.nets.net_model` or build your own.
 
 .. .. autofunction:: csbdeep.nets.net_model
+
 .. .. automodule:: csbdeep.nets
 ..    :members:
 .. .. automodule:: csbdeep.blocks
@@ -24,6 +23,9 @@ If not enough, use :func:`csbdeep.nets.net_model` or build your own.
 
 Training a network
 ------------------
+
+See :doc:`/datagen` for data generation.
+
 
 Preparations
 ++++++++++++

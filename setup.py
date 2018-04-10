@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 
 setup(name='csbdeep',
-      version="0.1",
+      version="0.1.0",
       author='CSBDeep Team',
       author_email='...',
       license='BSD 3-Clause License',
@@ -14,6 +14,8 @@ setup(name='csbdeep',
                         "tifffile",
                         "six",
                         "pathlib2;python_version<'3'",
+                        "numpy",
+                        "matplotlib",
                         # "tensorflow-gpu>=1.2.0",
                         # "pandas>=0.20.1",
                         ],

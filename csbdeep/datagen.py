@@ -368,7 +368,8 @@ def create_patches (
         normalize the patches (`patches_x`, `patches_y`) extracted from the associated raw images
         (`x`, `y`, with `mask`; see :class:`RawData`). Default: :func:`norm_percentiles`.
     channel : int, optional
-        Index of channel for multi-channel images, to enable that each channel is normalized independently.
+        Index of channel for multi-channel images; set to ``None`` for single-channel images where
+        raw images do not explicitly contain a channel dimension.
     shuffle : bool, optional
         Randomly shuffle all extracted patches.
     verbose : bool, optional
