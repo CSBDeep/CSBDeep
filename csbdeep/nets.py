@@ -1,7 +1,7 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
 from six.moves import range, zip, map, reduce, filter
 
-from keras.layers import Input, Conv2D, Conv3D, Activation
+from keras.layers import Input, Conv2D, Conv3D, Activation, Lambda
 from keras.models import Model
 from keras.layers.merge import Add, Concatenate
 import keras.backend as K
@@ -10,6 +10,7 @@ import re
 
 from .utils import _raise
 import warnings
+import numpy as np
 
 
 def net_model(input_shape,
@@ -24,7 +25,8 @@ def net_model(input_shape,
               pool_size=(2,2,2),
               n_channel_out=1,
               residual=False,
-              prob_out=False):
+              prob_out=False,
+              eps_scale=1e-3):
     """ TODO """
 
     if last_activation is None:
@@ -52,6 +54,7 @@ def net_model(input_shape,
 
     if prob_out:
         scale = conv(n_channel_out, (1,)*n_dim, activation='softplus')(unet)
+        scale = Lambda(lambda x: x+np.float32(eps_scale))(scale)
         final = Concatenate(axis=channel_axis)([final,scale])
 
     return Model(inputs=input, outputs=final)
@@ -104,7 +107,7 @@ def common_model(n_dim=2, n_depth=1, kern_size=3, n_first=16, n_channel_out=1, r
 
 modelname = re.compile("^(?P<model>resunet|unet)(?P<n_dim>\d)(?P<prob_out>p)?_(?P<n_depth>\d+)_(?P<kern_size>\d+)_(?P<n_first>\d+)(_(?P<n_channel_out>\d+)out)?(_(?P<last_activation>.+)-last)?$")
 def common_model_by_name(model):
-    """Shorthand notation for equivalent use of :func:`common_model`.
+    r"""Shorthand notation for equivalent use of :func:`common_model`.
 
     Parameters
     ----------

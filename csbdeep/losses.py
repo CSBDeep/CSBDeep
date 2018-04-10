@@ -12,21 +12,21 @@ def _mean_or_not(mean):
     return (lambda x: K.mean(x,axis=-1)) if mean else (lambda x: x)
 
 
-def loss_laplace(mean=True, eps=1e-3): # FIXME: add 1e-3 in model itself instead of loss (would also cause change in Fiji/KNIME code)
+def loss_laplace(mean=True): # FIXME: added 1e-3 in model itself instead of here -> need to change in Fiji/KNIME code
     R = _mean_or_not(mean)
     C = np.log(2.0) # FIXME: in the supplement, we have dropped C, ie. C = 0
     if K.image_data_format() == 'channels_last':
         def nll(y_true, y_pred):
             n     = K.shape(y_true)[-1]
             mu    = y_pred[...,:n]
-            sigma = y_pred[...,n:] + eps
+            sigma = y_pred[...,n:]
             return R(K.abs((mu-y_true)/sigma) + K.log(sigma) + C)
         return nll
     else:
         def nll(y_true, y_pred):
             n     = K.shape(y_true)[1]
             mu    = y_pred[:,:n,...]
-            sigma = y_pred[:,n:,...] + eps
+            sigma = y_pred[:,n:,...]
             return R(K.abs((mu-y_true)/sigma) + K.log(sigma) + C)
         return nll
 
