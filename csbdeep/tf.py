@@ -118,7 +118,7 @@ def export_SavedModel(model, outpath, format='zip'):
 
 
 
-class MyTensorBoard(Callback):
+class CARETensorBoard(Callback):
     """ TODO """
     def __init__(self, log_dir='./logs',
                  freq=1,
@@ -128,7 +128,7 @@ class MyTensorBoard(Callback):
                  write_graph=False,
                  prefix_with_timestamp=True,
                  write_images=False):
-        super(MyTensorBoard, self).__init__()
+        super(CARETensorBoard, self).__init__()
         if K.backend() != 'tensorflow':
             raise RuntimeError('TensorBoard callback only works '
                                'with the TensorFlow backend.')

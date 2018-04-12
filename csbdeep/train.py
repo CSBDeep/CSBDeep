@@ -9,6 +9,7 @@ import os, sys
 
 import keras.backend as K
 from keras.callbacks import Callback, TerminateOnNaN
+from keras.utils import Sequence
 
 
 class ParameterDecayCallback(Callback):
@@ -91,3 +92,21 @@ def prepare_model(model, optimizer, loss, metrics=('mse','mae'),
 
     return callbacks
 
+
+class DataWrapper(Sequence):
+
+    def __init__(self, X, Y, batch_size):
+        self.X, self.Y = X, Y
+        self.batch_size = batch_size
+        self.perm = np.random.permutation(len(self.X))
+
+    def __len__(self):
+        return int(np.ceil(len(self.X) / float(self.batch_size)))
+
+    def on_epoch_end(self):
+        self.perm = np.random.permutation(len(self.X))
+
+    def __getitem__(self, i):
+        idx = slice(i*self.batch_size,(i+1)*self.batch_size)
+        idx = self.perm[idx]
+        return self.X[idx], self.Y[idx]

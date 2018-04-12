@@ -1,19 +1,24 @@
 Training CARE networks
 ======================
 
-.. image:: https://i.imgflip.com/275svf.jpg
+.. .. image:: https://i.imgflip.com/275svf.jpg
 
 Defining a network
 ------------------
 
 Note that a CARE network is referred to as `model` here.
 
-.. autofunction:: csbdeep.nets.common_model
-.. autofunction:: csbdeep.nets.common_model_by_name
+.. automodule:: csbdeep.models
+    :members:
 
-.. If not enough, use :func:`csbdeep.nets.net_model` or build your own.
+------
 
-.. .. autofunction:: csbdeep.nets.net_model
+.. autofunction:: csbdeep.nets.common_unet
+.. autofunction:: csbdeep.nets.common_unet_by_name
+
+.. If not enough, use :func:`csbdeep.nets.custom_unet` or build your own.
+
+.. .. autofunction:: csbdeep.nets.custom_unet
 
 .. .. automodule:: csbdeep.nets
 ..    :members:
@@ -38,7 +43,7 @@ Preparations
 .. autofunction:: csbdeep.tf.limit_gpu_memory
 .. autofunction:: csbdeep.train.load_data
 .. autofunction:: csbdeep.train.prepare_model
-.. autofunction:: csbdeep.tf.MyTensorBoard
+.. autofunction:: csbdeep.tf.CARETensorBoard
 
 
 Train

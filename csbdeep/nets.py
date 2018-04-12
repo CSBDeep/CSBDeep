@@ -13,20 +13,20 @@ import warnings
 import numpy as np
 
 
-def net_model(input_shape,
-              last_activation,
-              n_depth=2,
-              n_filter_base=16,
-              kernel_size=(3,3,3),
-              n_conv_per_depth=2,
-              activation="relu",
-              batch_norm=False,
-              dropout=0.0,
-              pool_size=(2,2,2),
-              n_channel_out=1,
-              residual=False,
-              prob_out=False,
-              eps_scale=1e-3):
+def custom_unet(input_shape,
+                last_activation,
+                n_depth=2,
+                n_filter_base=16,
+                kernel_size=(3,3,3),
+                n_conv_per_depth=2,
+                activation="relu",
+                batch_norm=False,
+                dropout=0.0,
+                pool_size=(2,2,2),
+                n_channel_out=1,
+                residual=False,
+                prob_out=False,
+                eps_scale=1e-3):
     """ TODO """
 
     if last_activation is None:
@@ -61,7 +61,7 @@ def net_model(input_shape,
 
 
 
-def common_model(n_dim=2, n_depth=1, kern_size=3, n_first=16, n_channel_out=1, residual=True, prob_out=False, last_activation='linear'):
+def common_unet(n_dim=2, n_depth=1, kern_size=3, n_first=16, n_channel_out=1, residual=True, prob_out=False, last_activation='linear'):
     """Construct a common CARE neural net based on U-Net [1]_ and residual learning [2]_ to be used for image restoration/enhancement.
 
     Parameters
@@ -92,7 +92,7 @@ def common_model(n_dim=2, n_depth=1, kern_size=3, n_first=16, n_channel_out=1, r
 
     Example
     -------
-    >>> model = common_model(2, 1,3,16, 1, True, False)(input_shape)
+    >>> model = common_unet(2, 1,3,16, 1, True, False)(input_shape)
 
     References
     ----------
@@ -100,14 +100,14 @@ def common_model(n_dim=2, n_depth=1, kern_size=3, n_first=16, n_channel_out=1, r
     .. [2] Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun. *Deep Residual Learning for Image Recognition*, CVPR 2016
     """
     def _build_this(input_shape):
-        return net_model(input_shape, last_activation, n_depth, n_first, (kern_size,)*n_dim, pool_size=(2,)*n_dim, n_channel_out=n_channel_out, residual=residual, prob_out=prob_out)
+        return custom_unet(input_shape, last_activation, n_depth, n_first, (kern_size,)*n_dim, pool_size=(2,)*n_dim, n_channel_out=n_channel_out, residual=residual, prob_out=prob_out)
     return _build_this
 
 
 
 modelname = re.compile("^(?P<model>resunet|unet)(?P<n_dim>\d)(?P<prob_out>p)?_(?P<n_depth>\d+)_(?P<kern_size>\d+)_(?P<n_first>\d+)(_(?P<n_channel_out>\d+)out)?(_(?P<last_activation>.+)-last)?$")
-def common_model_by_name(model):
-    r"""Shorthand notation for equivalent use of :func:`common_model`.
+def common_unet_by_name(model):
+    r"""Shorthand notation for equivalent use of :func:`common_unet`.
 
     Parameters
     ----------
@@ -118,7 +118,7 @@ def common_model_by_name(model):
     Returns
     -------
     function
-        Calls :func:`common_model` with the respective parameters.
+        Calls :func:`common_unet` with the respective parameters.
 
     Raises
     ------
@@ -127,8 +127,13 @@ def common_model_by_name(model):
 
     Example
     -------
-    >>> model = common_model_by_name('resunet2_1_3_16_1out')(input_shape)
-    >>> # equivalent to: model = common_model(2, 1,3,16, 1, True, False)(input_shape)
+    >>> model = common_unet_by_name('resunet2_1_3_16_1out')(input_shape)
+    >>> # equivalent to: model = common_unet(2, 1,3,16, 1, True, False)(input_shape)
+
+    Todo
+    ----
+    Backslashes in docstring for regexp not rendered correctly.
+
     """
     m = modelname.fullmatch(model)
     if m is None:
@@ -143,4 +148,4 @@ def common_model_by_name(model):
     if m.group('last_activation') is not None:
         options['last_activation'] = m.group('last_activation')
 
-    return common_model(**options)
+    return common_unet(**options)
