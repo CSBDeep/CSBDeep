@@ -3,77 +3,65 @@ Training CARE networks
 
 .. .. image:: https://i.imgflip.com/275svf.jpg
 
-Defining a network
-------------------
+Given suitable training data (see :doc:`datagen`), we can define
+and train a CARE network (referred to as *model*) to restore the source data.
+To that end, we first need to specify all the options of the model
+by creating a configuration object via :class:`csbdeep.models.Config`.
+Note that we provide sensible default configuration options that should
+work in many cases. However, you can overwrite them via
+`keyword arguments <https://docs.python.org/3/glossary.html#term-argument>`_.
 
-Note that a CARE network is referred to as `model` here.
+The CARE model is instantiated via :class:`csbdeep.models.CARE`
+and can be trained with the :func:`csbdeep.models.CARE.train` method.
+After training, the learned model can be exported via
+:func:`csbdeep.models.CARE.export_TF` to be used with our
+`Fiji Plugin <https://github.com/CSBDeep/CSBDeep/wiki/Your-Model-in-Fiji>`_.
 
-.. automodule:: csbdeep.models
+**Example**
+
+>>> from csbdeep.tf import limit_gpu_memory
+>>> from csbdeep.train import load_data
+>>> from csbdeep.models import Config, CARE
+>>> limit_gpu_memory(fraction=0.75)
+>>> (X,Y), data_val = load_data('my_data.npz', validation_split=0.1)
+>>> config = Config(3, probabilistic=True, unet_n_depth=3)
+>>> model = CARE(config, 'my_model')
+>>> model.train(X,Y, validation_data=data_val)
+>>> model.export_TF()
+
+.. autoclass:: csbdeep.models.Config
+    :members:
+.. autoclass:: csbdeep.models.CARE
     :members:
 
-------
-
+.. autofunction:: csbdeep.train.load_data
 .. autofunction:: csbdeep.nets.common_unet
-.. autofunction:: csbdeep.nets.common_unet_by_name
+.. autofunction:: csbdeep.train.prepare_model
+.. autofunction:: csbdeep.tf.export_SavedModel
+.. autofunction:: csbdeep.tf.limit_gpu_memory
+.. .. autofunction:: csbdeep.tf.CARETensorBoard
 
-.. If not enough, use :func:`csbdeep.nets.custom_unet` or build your own.
-
-.. .. autofunction:: csbdeep.nets.custom_unet
-
+.. ------
+.. .. automodule:: csbdeep.models
+..     :members:
 .. .. automodule:: csbdeep.nets
 ..    :members:
 .. .. automodule:: csbdeep.blocks
 ..    :members:
-
-
-Training a network
-------------------
-
-See :doc:`/datagen` for data generation.
-
-
-Preparations
-++++++++++++
-
-- Load data
-- Optimizer
-- Compile
-- Callbacks
-
-.. autofunction:: csbdeep.tf.limit_gpu_memory
-.. autofunction:: csbdeep.train.load_data
-.. autofunction:: csbdeep.train.prepare_model
-.. autofunction:: csbdeep.tf.CARETensorBoard
-
-
-Train
-+++++
-
-Takes time...
-
-.. note::
-    - ``Probabilistic`` may take a bit longer to train.
-
-
-Export
-++++++
-.. autofunction:: csbdeep.tf.export_SavedModel
-
-
 .. .. automodule:: csbdeep.train
 ..    :members:
 .. .. automodule:: csbdeep.losses
 ..    :members:
+.. ------
 
 
-
-Advanced topics
----------------
-
-.. todo::
-    - ``ReLU`` as last activation → use :func:`csbdeep.train.prepare_model` with (``loss_bg_thresh``, ``loss_bg_thresh``, ``Y``) and :class:`csbdeep.train.ParameterDecayCallback` callback.
-
-
-.. note::
-    In principle, we can support other backends than TensorFlow for training, but currently not implemented.
-    Futhermore, we use some TF-specific functions, which are in ``csbdeep.tf``.
+.. Advanced topics
+.. ---------------
+..
+.. .. todo::
+..     - ``ReLU`` as last activation → use :func:`csbdeep.train.prepare_model` with (``loss_bg_thresh``, ``loss_bg_thresh``, ``Y``) and :class:`.. csbdeep.train.ParameterDecayCallback` callback...
+..
+..
+.. .. note::
+..     In principle, we can support other backends than TensorFlow for training, but currently not implemented.
+..     Futhermore, we use some TF-specific functions, which are in ``csbdeep.tf``.

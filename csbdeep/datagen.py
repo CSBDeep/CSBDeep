@@ -288,7 +288,7 @@ def sample_percentiles(pmin=(1,3), pmax=(99.5,99.9)):
     return lambda: (np.random.uniform(*pmin), np.random.uniform(*pmax))
 
 
-def norm_percentiles(percentiles=sample_percentiles()):
+def norm_percentiles(percentiles=sample_percentiles(), relu_last=False):
     """Normalize extracted patches based on percentiles from corresponding raw image.
 
     Parameters
@@ -297,6 +297,9 @@ def norm_percentiles(percentiles=sample_percentiles()):
         A tuple (`pmin`, `pmax`) or a function that returns such a tuple, where the extracted patches
         are (affinely) normalized in such that a value of 0 (1) corresponds to the `pmin`-th (`pmax`-th) percentile
         of the raw image (default: :func:`sample_percentiles`).
+    relu_last : bool, optional
+        Flag to indicate whether the last activation of the CARE network is/will be using
+        a ReLU activation function (default: ``False``)
 
     Return
     ------
@@ -307,11 +310,12 @@ def norm_percentiles(percentiles=sample_percentiles()):
     ------
     ValueError
         Illegal arguments.
+
     Todo
     ----
-    Percentile pmin=0 always used for y. How to explain?
-    """
+    ``relu_last`` flag problematic/inelegant.
 
+    """
     if callable(percentiles):
         _tmp = percentiles()
         _valid_low_high_percentiles(_tmp) or _raise(ValueError(_tmp))
@@ -323,10 +327,11 @@ def norm_percentiles(percentiles=sample_percentiles()):
     def _normalize(patches_x,patches_y, x,y,mask,channel):
         pmins, pmaxs = zip(*(get_percentiles() for _ in patches_x))
         percentile_axes = None if channel is None else tuple((d for d in range(x.ndim) if d != channel))
-        patches_x_norm = normalize_mi_ma(patches_x, np.percentile(x,pmins,axis=percentile_axes,keepdims=True),
-                                                    np.percentile(x,pmaxs,axis=percentile_axes,keepdims=True))
-        patches_y_norm = normalize_mi_ma(patches_y, np.min(y),
-                                                    np.percentile(y,pmaxs,axis=percentile_axes,keepdims=True))
+        _perc = lambda a,p: np.percentile(a,p,axis=percentile_axes,keepdims=True)
+        patches_x_norm = normalize_mi_ma(patches_x, _perc(x,pmins), _perc(x,pmaxs))
+        if relu_last:
+            pmins = np.zeros_like(pmins)
+        patches_y_norm = normalize_mi_ma(patches_y, _perc(y,pmins), _perc(y,pmaxs))
         return patches_x_norm, patches_y_norm
 
     return _normalize
@@ -377,8 +382,8 @@ def create_patches (
 
     Returns
     -------
-    tuple
-        Returns a pair (`X`, `Y`) of :class:`numpy.ndarray` with the normalized extracted patches from all (transformed) raw images.
+    tuple(:class:`numpy.ndarray`, :class:`numpy.ndarray`)
+        Returns a pair (`X`, `Y`) of arrays with the normalized extracted patches from all (transformed) raw images.
         `X` is the array of patches extracted from source images with `Y` being the array of corresponding target patches.
         The shape of `X` and `Y` is as follows: `(n_total_patches, n_channels, ...)`.
         For single-channel images (`channel` = ``None``), `n_channels` = 1.
@@ -389,7 +394,7 @@ def create_patches (
         Various reasons.
 
     Example
-    --------
+    -------
     >>> raw_data = get_tiff_pairs_from_folders(basepath='data', source_dirs=['source1','source2'], target_dir='GT')
     >>> X, Y = create_patches(raw_data, patch_size=(32,128,128), n_patches_per_image=16)
 
@@ -398,8 +403,8 @@ def create_patches (
     - Is :func:`create_patches` a good name?
     - Save created patches directly to disk using :class:`numpy.memmap` or similar?
       Would allow to work with large data that doesn't fit in memory.
-    """
 
+    """
     ## images and transforms
     if transforms is None or len(transforms)==0:
         transforms = (Transform.identity(),)

@@ -34,6 +34,7 @@ extensions = [
     'sphinx.ext.imgmath',
     'sphinx.ext.intersphinx',
     'sphinx.ext.todo',
+    # 'sphinx.ext.doctest',
     'sphinx.ext.viewcode',
     # 'sphinx.ext.linkcode',
 ]

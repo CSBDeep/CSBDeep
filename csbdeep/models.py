@@ -31,6 +31,10 @@ class Config(argparse.Namespace):
     kwargs : dict
         Overwrite (or add) configuration attributes (see below).
 
+    Example
+    -------
+    >>> config = Config(2, probabilistic=True, unet_n_depth=3)
+
     Attributes
     ----------
     unet_residual : bool
@@ -109,6 +113,10 @@ class CARE(object):
         Model name. Uses a timestamp if set to ``None`` (default).
     outdir : str
         Output directory that contains (or will contain) a folder with the given model name.
+
+    Example
+    -------
+    >>> model = CARE(config,'my_model')
     """
 
     def __init__(self, config, name=None, outdir='.'):
@@ -173,6 +181,7 @@ class CARE(object):
             If ``None`` (default), uses ``Adam`` with the learning rate specified in ``config``.
         kwargs : dict
             Additional arguments for :func:`csbdeep.train.prepare_model`.
+
         """
         if optimizer is None:
             from keras.optimizers import Adam
