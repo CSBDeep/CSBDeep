@@ -53,8 +53,7 @@ Data augmention
 
 Instead of recording raw images where structures of interest appear in all
 possible appearance variations, it can be easier to augment the raw dataset
-by included some of those variations that can be easily synthesized. A typical example are
-axis-aligned rotations if structures of interest can appear at arbitrary rotations.
+by including some of those variations that can be easily synthesized. Typical examples are axis-aligned rotations if structures of interest can appear at arbitrary rotations.
 To that end, a :obj:`csbdeep.datagen.Transform` object can be used to specify such transformations
 to augment the raw dataset.
 We currently haven't implemented any transformations, but plan to at least
