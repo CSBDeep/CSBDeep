@@ -151,9 +151,10 @@ class CARE(object):
                 config_dict = load_json(config_file)
                 self.config = Config(**config_dict)
         else:
+            if self.logdir.exists():
+                warnings.warn('output path for model already exists, files may be overwritten: %s' % str(self.logdir.resolve()))
             self.logdir.mkdir(parents=True, exist_ok=True)
             save_json(vars(self.config), config_file)
-            warnings.warn('output path for model already exists, files may be overwritten: %s' % str(self.logdir.resolve()))
 
 
     def _build(self):
@@ -269,6 +270,9 @@ class CARE(object):
         if channel is None:
             self.config.n_channel_in == 1 or _raise(ValueError())
         else:
+            -img.ndim <= channel < img.ndim or _raise(ValueError())
+            if channel < 0:
+                channel %= img.ndim
             self.config.n_channel_in == img.shape[channel] or _raise(ValueError())
 
         n_channel_predicted = self.config.n_channel_out * (2 if self.config.probabilistic else 1)

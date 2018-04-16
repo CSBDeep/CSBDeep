@@ -9,7 +9,7 @@ import numpy as np
 
 from itertools import product
 
-class Resizer(object):
+class Normalizer(object):
     """Abstract base class."""
 
     def before(self, img, channel):
@@ -21,7 +21,7 @@ class Resizer(object):
         raise NotImplementedError()
 
 
-class PercentileNormalizer(Resizer):
+class PercentileNormalizer(Normalizer):
     """TODO."""
 
     def __init__(self, pmin, pmax, do_after=True, **kwargs):
@@ -40,6 +40,7 @@ class PercentileNormalizer(Resizer):
 
     def after(self, mean, scale):
         """TODO."""
+        assert self.do_after
         alpha = self.ma - self.mi
         beta  = self.mi
         return alpha*mean+beta, alpha*scale if scale is not None else None
