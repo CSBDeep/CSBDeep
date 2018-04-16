@@ -4,12 +4,14 @@ from six.moves import range, zip, map, reduce, filter
 import argparse
 import datetime
 
-from .utils import _raise, consume, Path
+from .utils import _raise, consume, Path, load_json, save_json, normalize_mi_ma, from_tensor, to_tensor, tensor_num_channels
 import warnings
 import numpy as np
 # from collections import namedtuple
+import tensorflow as tf
 
 from . import nets, train
+from .predict import tiled_prediction, PadAndCropResizer
 
 
 class Config(argparse.Namespace):
@@ -68,6 +70,7 @@ class Config(argparse.Namespace):
     """
 
     def __init__(self, n_dim, n_channel_in=1, n_channel_out=1, probabilistic=False, **kwargs):
+        """See class docstring."""
         n_dim in (2,3) or _raise(ValueError())
 
         self.n_dim                 = n_dim
@@ -107,38 +110,50 @@ class CARE(object):
 
     Parameters
     ----------
-    config : :class:`csbdeep.models.Config`
-        Configuration for CARE network.
+    config : :class:`csbdeep.models.Config` or None
+        Configuration for CARE network. Will be saved to disk as JSON (``config.json``).
+        If set to ``None``, will be loaded from disk (must exist).
     name : str or None
         Model name. Uses a timestamp if set to ``None`` (default).
     outdir : str
         Output directory that contains (or will contain) a folder with the given model name.
 
+    Raises
+    ------
+    FileNotFoundError
+        If ``config=None`` and config cannot be loaded from disk.
+
     Example
     -------
-    >>> model = CARE(config,'my_model')
+    >>> model = CARE(config, 'my_model')
     """
 
     def __init__(self, config, name=None, outdir='.'):
-        """TODO."""
+        """See class docstring."""
         self.config = config
         self.outdir = Path(outdir)
         self.name = name
-        self.keras_model = self._build()
-        self._model_prepared = False
         self._set_logdir()
+        self._model_prepared = False
+        self.keras_model = self._build()
 
 
     def _set_logdir(self):
-        # if not self.outdir.exists():
-        #     self.outdir.mkdir(parents=True, exist_ok=True)
-        # self.outdir.is_dir() or _raise(FileNotFoundError())
         if self.name is None:
             self.name = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S.%f")
         self.logdir = self.outdir / self.name
-        # self.logdir.mkdir(parents=True, exist_ok=True)
-        # print(self.outdir)
-        # print(self.logdir)
+
+        config_file =  self.logdir / 'config.json'
+        if self.config is None:
+            if not config_file.exists():
+                raise FileNotFoundError("config file doesn't exist: %s" % str(config_file.resolve()))
+            else:
+                config_dict = load_json(config_file)
+                self.config = Config(**config_dict)
+        else:
+            self.logdir.mkdir(parents=True, exist_ok=True)
+            save_json(vars(self.config), config_file)
+            warnings.warn('output path for model already exists, files may be overwritten: %s' % str(self.logdir.resolve()))
 
 
     def _build(self):
@@ -223,8 +238,8 @@ class CARE(object):
         if not self._model_prepared:
             self.prepare_for_training()
 
-        if self.logdir.exists():
-            warnings.warn('output path for model already exists, files may be overwritten during training: %s' % str(self.logdir.resolve()))
+        # if self.logdir.exists():
+        #     warnings.warn('output path for model already exists, files may be overwritten during training: %s' % str(self.logdir.resolve()))
 
         if epochs is None:
             epochs = self.config.train_epochs
@@ -249,6 +264,68 @@ class CARE(object):
         print("\nModel exported in TensorFlow's SavedModel format:\n%s" % str(fout.resolve()))
 
 
-    def predict(self, img, normalization, n_tiles):
-        """Not implemented yet."""
-        raise NotImplementedError()
+    def predict(self, img, normalizer, resizer=PadAndCropResizer(), channel=None, n_tiles=1, **kwargs):
+        """TODO."""
+        if channel is None:
+            self.config.n_channel_in == 1 or _raise(ValueError())
+        else:
+            self.config.n_channel_in == img.shape[channel] or _raise(ValueError())
+
+        n_channel_predicted = self.config.n_channel_out * (2 if self.config.probabilistic else 1)
+
+        # resize: make divisible by power of 2 to allow downsampling steps in unet
+        div_n = 2 ** self.config.unet_n_depth
+        x = resizer.before(img,div_n,channel)
+
+        # normalize
+        x = normalizer.before(x,channel)
+
+        # prediction function
+        def _predict(x):
+            return from_tensor(self.keras_model.predict(to_tensor(x,channel=channel),**kwargs),channel=0)
+
+        done = False
+        while not done:
+            try:
+                if n_tiles == 1:
+                    x = _predict(x)
+                else:
+                    if channel is None:
+                        shape_out = (n_channel_predicted,) + x.shape
+                    else:
+                        shape_out = (n_channel_predicted,) + tuple((s for i,s in enumerate(x.shape) if i != channel))
+
+                    x = tiled_prediction(_predict, x, shape_out, channel=channel, n_tiles=n_tiles)
+                done = True
+            except tf.errors.ResourceExhaustedError:
+                n_tiles = max(4, 2*n_tiles)
+                print('Out of memory, retrying with n_tiles = %d' % n_tiles)
+
+        x.shape[0] == n_channel_predicted or _raise(ValueError())
+
+        x = resizer.after(x,channel=0)
+
+        # separate mean and scale
+        if self.config.probabilistic:
+            _n = n_channel_predicted // 2
+            mean, scale = x[:_n], x[_n:]
+        else:
+            mean, scale = x, None
+
+        if channel is not None:
+            # move output channel to same dimension as in input image
+            mean = np.moveaxis(mean, 0, channel)
+            if self.config.probabilistic:
+                scale = np.moveaxis(scale, 0, channel)
+        else:
+            # remove dummy channel dimension altogether
+            if self.config.n_channel_out == 1:
+                mean = mean[0]
+                if self.config.probabilistic:
+                    scale = scale[0]
+
+        if normalizer.do_after:
+            self.config.n_channel_in == self.config.n_channel_out or _raise(ValueError())
+            mean, scale = normalizer.after(mean, scale)
+
+        return mean, scale

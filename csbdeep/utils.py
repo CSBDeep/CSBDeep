@@ -1,12 +1,12 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
 from six.moves import range, zip, map, reduce, filter
 
-# import os, sys
+import os
 import numpy as np
 # import keras.backend as K
 # from collections import namedtuple
 # import argparse
-# import json, six
+import json
 # import keras.models
 # from tqdm import tqdm_notebook, tqdm as tqdm_terminal
 
@@ -56,29 +56,28 @@ def moveaxis_if_tf(X):
         X = np.moveaxis(X, 1, -1)
     return X
 
-# def to_tensor(x):
-#     # print('to_tensor', x.shape)
-#     return moveaxis_if_tf(x[np.newaxis, np.newaxis])
 
-# def from_tensor(x,channel=None):
-#     # print('from_tensor', x.shape)
-#     if channel is None:
-#         channel = 0 if tensor_num_channels(x) == 1 else slice(None)
-#     if isinstance(channel,slice):
-#         return x[0,...,channel] if IS_TF_DIM else moveaxis_if_tf(x[0,channel,...])
-#     else:
-#         return x[0,...,channel] if IS_TF_DIM else x[0,channel,...]
+def to_tensor(x,channel=None):
+    if channel is None:
+        return moveaxis_if_tf(x[np.newaxis, np.newaxis])
+    else:
+        x = np.moveaxis(x,channel,0)
+        return moveaxis_if_tf(x[np.newaxis])
 
-# def tensor_num_channels(x):
-#     return x.shape[-1] if IS_TF_DIM else x.shape[1]
+def from_tensor(x,channel=0):
+    return np.moveaxis(x[0], (-1 if is_tf_dim() else 1), channel)
 
-# def load_json(path,fname):
-#     with open(os.path.join(path,fname),'r') as f:
-#         return json.load(f)
+def tensor_num_channels(x):
+    return x.shape[-1 if is_tf_dim() else 1]
 
-# def save_json(data,path,fname,**kwargs):
-#     with open(os.path.join(path,fname),'w') as f:
-#         f.write(json.dumps(data,**kwargs))
+
+def load_json(fpath):
+    with open(fpath,'r') as f:
+        return json.load(f)
+
+def save_json(data,fpath,**kwargs):
+    with open(fpath,'w') as f:
+        f.write(json.dumps(data,**kwargs))
 
 
 def normalize(x, pmin=3, pmax=99.8, axis=None, clip=False, eps=1e-20, dtype=np.float32):
