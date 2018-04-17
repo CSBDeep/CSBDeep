@@ -9,54 +9,152 @@ import numpy as np
 
 from itertools import product
 
-class Normalizer(object):
-    """Abstract base class."""
+from six import add_metaclass
+from abc import ABCMeta, abstractmethod, abstractproperty
 
+@add_metaclass(ABCMeta)
+class Normalizer():
+    """Abstract base class for normalization methods."""
+
+    @abstractmethod
     def before(self, img, channel):
-        """Stub."""
-        raise NotImplementedError()
+        """Normalization of the raw input image (method stub).
 
+        Parameters
+        ----------
+        img : :class:`numpy.ndarray`
+            Raw input image.
+        channel : int or None
+            Indicates channel dimension (can be ``None``).
+
+        Returns
+        -------
+        :class:`numpy.ndarray`
+            Normalized input image with suitable values for neural network input.
+        """
+        pass
+
+    @abstractmethod
     def after(self, mean, scale):
-        """Stub."""
-        raise NotImplementedError()
+        """Possible adjustment of predicted restored image (method stub).
+
+        Parameters
+        ----------
+        mean : :class:`numpy.ndarray`
+            Predicted restored image or per-pixel ``mean`` of Laplace distributions
+            for probabilistic model.
+        scale: :class:`numpy.ndarray` or None
+            Per-pixel ``scale`` of Laplace distributions for probabilistic model (``None`` otherwise.)
+
+        Returns
+        -------
+        :class:`numpy.ndarray`
+            Adjusted restored image.
+        """
+        pass
+
+    @abstractproperty
+    def do_after(self):
+        """bool : Flag to indicate whether :func:`after` should be called."""
+        pass
 
 
 class PercentileNormalizer(Normalizer):
-    """TODO."""
+    """Percentile-based image normalization.
+
+    Parameters
+    ----------
+    pmin : float
+        Low percentile.
+    pmax : float
+        High percentile.
+    do_after : bool
+        Flag to indicate whether to undo normalization.
+    kwargs : dict
+        Keyword arguments for :func:`csbdeep.utils.normalize_mi_ma`.
+    """
 
     def __init__(self, pmin, pmax, do_after=True, **kwargs):
         """TODO."""
         self.pmin = pmin
         self.pmax = pmax
-        self.do_after = do_after
+        self._do_after = do_after
         self.kwargs = kwargs
 
     def before(self, img, channel):
-        """TODO."""
+        """Percentile-based normalization of raw input image.
+
+        See :func:`csbdeep.predict.Normalizer.before` for parameter descriptions.
+        Note that percentiles are computed individually for each channel
+        if `channel` is not ``None``.
+        """
         axes = None if channel is None else tuple((d for d in range(img.ndim) if d != channel))
         self.mi = np.percentile(img,self.pmin,axis=axes,keepdims=True)
         self.ma = np.percentile(img,self.pmax,axis=axes,keepdims=True)
         return normalize_mi_ma(img, self.mi, self.ma, **self.kwargs)
 
     def after(self, mean, scale):
-        """TODO."""
+        """Undo percentile-based normalization to map restored image to similar range as input image.
+
+        See :func:`csbdeep.predict.Normalizer.before` for parameter descriptions.
+        """
+
         assert self.do_after
         alpha = self.ma - self.mi
         beta  = self.mi
         return alpha*mean+beta, alpha*scale if scale is not None else None
 
+    @property
+    def do_after(self):
+        """``do_after`` parameter from constructor."""
+        return self._do_after
 
 
-class Resizer(object):
-    """Abstract base class."""
 
+@add_metaclass(ABCMeta)
+class Resizer():
+    """Abstract base class for resizing methods."""
+
+    @abstractmethod
     def before(self, x, div_n, channel):
-        """Stub."""
-        raise NotImplementedError()
+        """Resizing of the raw input image (method stub).
 
+        Parameters
+        ----------
+        x : :class:`numpy.ndarray`
+            Raw input image.
+        div_n : int
+            Resized image must be evenly divisible by this value.
+        channel : int or None
+            Indicates channel dimension (can be ``None``).
+            Channel dimension will not be resized.
+
+        Returns
+        -------
+        :class:`numpy.ndarray`
+            Resized input image.
+        """
+        pass
+
+    @abstractmethod
     def after(self, x, channel):
-        """Stub."""
-        raise NotImplementedError()
+        """Resizing of the restored image (method stub).
+
+        Parameters
+        ----------
+        x : :class:`numpy.ndarray`
+            Raw input image.
+        channel : int or None
+            Indicates channel dimension (can be ``None``).
+            Channel dimension will not be resized.
+
+        Returns
+        -------
+        :class:`numpy.ndarray`
+            Resized restored image image.
+        """
+
+        pass
 
 
 class CropResizer(Resizer):
@@ -80,7 +178,20 @@ class CropResizer(Resizer):
 
 
 class PadAndCropResizer(Resizer):
-    """TODO."""
+    """Resize image by padding and cropping.
+
+    If necessary, input image is padded before prediction
+    and restored image is cropped back to size of input image
+    after prediction.
+
+    Parameters
+    ----------
+    mode : str
+        Parameter ``mode`` of :func:`numpy.pad` that
+        controls how the image is padded.
+    kwargs : dict
+        Keyword arguments for :func:`numpy.pad`.
+    """
 
     def __init__(self, mode='reflect', **kwargs):
         """TODO."""
@@ -88,7 +199,10 @@ class PadAndCropResizer(Resizer):
         self.kwargs = kwargs
 
     def before(self, x, div_n, channel):
-        """TODO."""
+        """Pad input image.
+
+        See :func:`csbdeep.predict.Resizer.before` for parameter descriptions.
+        """
         def _split(v):
             a = v // 2
             return a, v-a
@@ -99,7 +213,10 @@ class PadAndCropResizer(Resizer):
         return x_pad
 
     def after(self, x, channel):
-        """TODO."""
+        """Crop restored image to retain size of input image.
+
+        See :func:`csbdeep.predict.Resizer.after` for parameter descriptions.
+        """
         crop = [slice(p[0], -p[1] if p[1]>0 else None) for p in self.pad]
         if channel is not None:
             crop.insert(channel,slice(None))

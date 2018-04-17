@@ -7,6 +7,8 @@
 *.h5
 *.zip
 *.log
+*.tfevents.*
+config.json
 _tensorboard/
 logs
 data

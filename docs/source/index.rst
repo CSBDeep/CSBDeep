@@ -29,8 +29,13 @@ They can be found in the subfolder ``notebooks``:
    Defining a CARE network and training it based on the data created in the first step.
    More documentation available at :doc:`training`.
 
+#. `prediction.ipynb`_:
+   Loading a trained CARE network and applying it to a raw image.
+   More documentation available at :doc:`predict`.
+
 .. _`datagen.ipynb`: https://github.com/mpicbg-csbd/CSBDeep_code/blob/master/notebooks/datagen.ipynb
 .. _`training.ipynb`: https://github.com/mpicbg-csbd/CSBDeep_code/blob/master/notebooks/training.ipynb
+.. _`prediction.ipynb`: https://github.com/mpicbg-csbd/CSBDeep_code/blob/master/notebooks/prediction.ipynb
 
 Table of contents
 -----------------
@@ -41,6 +46,7 @@ Table of contents
    install
    datagen
    training
+   predict
    .. utils
 
 .. .. image:: https://memegenerator.net/img/instances/81561610/work-in-progress.jpg

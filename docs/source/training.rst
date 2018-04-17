@@ -32,7 +32,7 @@ After training, the learned model can be exported via
 .. autoclass:: csbdeep.models.Config
     :members:
 .. autoclass:: csbdeep.models.CARE
-    :members:
+    :members: export_TF, prepare_for_training, train
 
 .. autofunction:: csbdeep.train.load_data
 .. autofunction:: csbdeep.nets.common_unet

@@ -118,6 +118,17 @@ class CARE(object):
     outdir : str
         Output directory that contains (or will contain) a folder with the given model name.
 
+    Attributes
+    ----------
+    config : :class:`csbdeep.models.Config`
+        Configuration of CARE network, as provided during instantiation.
+    keras_model : `Keras model <https://keras.io/getting-started/functional-api-guide/>`_
+        Keras neural network model.
+    name : str
+        Model's name.
+    logdir : :class:`pathlib.Path`
+        Path to model's folder (which stores configuration, weights, etc.)
+
     Raises
     ------
     FileNotFoundError
@@ -235,6 +246,11 @@ class CARE(object):
         steps_per_epoch : int
             Optional argument to use instead of the value from ``config``.
 
+        Returns
+        -------
+        ``History`` object
+            See `Keras training history <https://keras.io/models/model/#fit>`_.
+
         """
         if not self._model_prepared:
             self.prepare_for_training()
@@ -265,8 +281,42 @@ class CARE(object):
         print("\nModel exported in TensorFlow's SavedModel format:\n%s" % str(fout.resolve()))
 
 
-    def predict(self, img, normalizer, resizer=PadAndCropResizer(), channel=None, n_tiles=1, **kwargs):
-        """TODO."""
+    def predict(self, img, normalizer, resizer=PadAndCropResizer(), channel=None, n_tiles=1, tile_pad=32):
+        """Apply neural network to raw image to predict restored image.
+
+        Parameters
+        ----------
+        img : :class:`numpy.ndarray`
+            Raw input image, with image dimensions expected in the same order as in data for training.
+            If applicable, only the channel dimension can be anywhere.
+        normalizer : :class:`csbdeep.predict.Normalizer`
+            Normalization of input image before prediction and (potentially) transformation back after prediction.
+        resizer : :class:`csbdeep.predict.Resizer`
+            If necessary, input image is resized to enable neural network prediction and result is (possibly)
+            resized to yield original image size.
+        channel : int or None
+            Index of channel dimension of raw input image. Defaults to ``None``, assuming
+            a single-channel input image where without an explicit channel dimension.
+        n_tiles : int
+            Out of memory (OOM) errors can occur if the input image is too large.
+            To avoid this problem, the input image is broken up into (overlapping) tiles
+            that can then be processed independently and re-assembled to yield the restored image.
+            This parameter denotes the number of tiles. Note that if the number of tiles is too low,
+            it is adaptively increased until OOM errors are avoided, albeit at the expense of runtime.
+        tile_pad : int
+            Amount of pixels to pad overlapping tiles (if ``n_tiles > 1``).
+
+        Returns
+        -------
+        tuple(:class:`numpy.ndarray`, :class:`numpy.ndarray` or None)
+            If model is probabilistic, returns a tuple `(mean, scale)` that defines the parameters
+            of per-pixel Laplace distributions. Otherwise, returns the restored image via a tuple `(restored,None)`
+
+        Todo
+        ----
+        Role of ``tile_pad``?
+
+        """
         if channel is None:
             self.config.n_channel_in == 1 or _raise(ValueError())
         else:
@@ -286,7 +336,7 @@ class CARE(object):
 
         # prediction function
         def _predict(x):
-            return from_tensor(self.keras_model.predict(to_tensor(x,channel=channel),**kwargs),channel=0)
+            return from_tensor(self.keras_model.predict(to_tensor(x,channel=channel)),channel=0)
 
         done = False
         while not done:
@@ -299,7 +349,7 @@ class CARE(object):
                     else:
                         shape_out = (n_channel_predicted,) + tuple((s for i,s in enumerate(x.shape) if i != channel))
 
-                    x = tiled_prediction(_predict, x, shape_out, channel=channel, n_tiles=n_tiles)
+                    x = tiled_prediction(_predict, x, shape_out, channel, n_tiles=n_tiles, pad=tile_pad, block_multiple=div_n)
                 done = True
             except tf.errors.ResourceExhaustedError:
                 n_tiles = max(4, 2*n_tiles)
