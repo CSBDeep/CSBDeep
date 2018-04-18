@@ -9,7 +9,7 @@ for more information with links to our manuscript and supplementary material.
 
 .. note::
     This is an early version of the software.
-    It currently only supports CARE networks for direct image restoration/enhancement, i.e.
+    It currently only (fully) supports CARE networks for direct image restoration/enhancement, i.e.
     surface extraction/projection and isotropic reconstruction are not available yet.
     Furthermore, the necessary training data can only be generated from aligned
     raw images (e.g. low- and high-SNR). Creating training data via simulation is

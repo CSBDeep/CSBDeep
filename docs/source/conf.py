@@ -121,6 +121,8 @@ todo_include_todos = True
 
 intersphinx_mapping = {'python': ('https://docs.python.org/3', None),
                        'numpy': ('https://docs.scipy.org/doc/numpy/', None),
+                       'scipy': ('https://docs.scipy.org/doc/scipy/reference/', None),
+                       'matplotlib': ('https://matplotlib.org/', None),
                        # 'keras': ('https://keras.io/', None), # doesn't work for keras
                        }
 

@@ -12,6 +12,7 @@ from itertools import product
 from six import add_metaclass
 from abc import ABCMeta, abstractmethod, abstractproperty
 
+
 @add_metaclass(ABCMeta)
 class Normalizer():
     """Abstract base class for normalization methods."""
@@ -116,7 +117,7 @@ class Resizer():
     """Abstract base class for resizing methods."""
 
     @abstractmethod
-    def before(self, x, div_n, channel):
+    def before(self, x, div_n, exclude):
         """Resizing of the raw input image (method stub).
 
         Parameters
@@ -125,9 +126,9 @@ class Resizer():
             Raw input image.
         div_n : int
             Resized image must be evenly divisible by this value.
-        channel : int or None
-            Indicates channel dimension (can be ``None``).
-            Channel dimension will not be resized.
+        exclude : int or list(int) or None
+            Indicates axes to exclude (can be ``None``),
+            e.g. channel dimension.
 
         Returns
         -------
@@ -137,44 +138,36 @@ class Resizer():
         pass
 
     @abstractmethod
-    def after(self, x, channel):
+    def after(self, x, exclude):
         """Resizing of the restored image (method stub).
 
         Parameters
         ----------
         x : :class:`numpy.ndarray`
             Raw input image.
-        channel : int or None
-            Indicates channel dimension (can be ``None``).
-            Channel dimension will not be resized.
+        exclude : int or list(int) or None
+            Indicates axes to exclude (can be ``None``),
+            e.g. channel dimension.
+            Afert ignoring the exlcudes axes,
+            note that the shape of x must be same as in :func:`before`.
 
         Returns
         -------
         :class:`numpy.ndarray`
             Resized restored image image.
         """
-
         pass
 
 
-class CropResizer(Resizer):
-    """TODO."""
-
-    def before(self, x, div_n, channel):
-        """TODO."""
-        if np.isscalar(div_n):
-            div_n = x.ndim * [div_n]
-        if channel is not None:
-            div_n[channel] = 1
-        len(div_n) == x.ndim or _raise(ValueError())
-        all((s>=i>=1 for s,i in zip(x.shape,div_n))) or _raise(ValueError())
-        if all((i==1 for i in div_n)):
-            return x
-        return x[tuple((slice(0,(s//i)*i) for s,i in zip(x.shape,div_n)))]
-
-    def after(self, x, channel):
-        """TODO."""
-        return x
+    def _normalize_exclude(self, exclude, n_dim):
+        """Return normalized list of excluded axes."""
+        if exclude is None:
+            return []
+        exclude_list = [exclude] if np.isscalar(exclude) else list(exclude)
+        exclude_list = [d%n_dim for d in exclude_list]
+        len(exclude_list) == len(np.unique(exclude_list)) or _raise(ValueError())
+        all(( isinstance(d,int) and 0<=d<n_dim for d in exclude_list )) or _raise(ValueError())
+        return exclude_list
 
 
 class PadAndCropResizer(Resizer):
@@ -198,7 +191,7 @@ class PadAndCropResizer(Resizer):
         self.mode = mode
         self.kwargs = kwargs
 
-    def before(self, x, div_n, channel):
+    def before(self, x, div_n, exclude):
         """Pad input image.
 
         See :func:`csbdeep.predict.Resizer.before` for parameter descriptions.
@@ -206,24 +199,44 @@ class PadAndCropResizer(Resizer):
         def _split(v):
             a = v // 2
             return a, v-a
-        self.pad = [_split((div_n-s%div_n)%div_n) if i!=channel else (0,0) for i,s in enumerate(x.shape)]
+        exclude = self._normalize_exclude(exclude, x.ndim)
+        self.pad = [_split((div_n-s%div_n)%div_n) if (i not in exclude) else (0,0) for i,s in enumerate(x.shape)]
+        # print(self.pad)
         x_pad = np.pad(x, self.pad, mode=self.mode, **self.kwargs)
-        if channel is not None:
-            del self.pad[channel]
+        for i in exclude:
+            del self.pad[i]
         return x_pad
 
-    def after(self, x, channel):
+    def after(self, x, exclude):
         """Crop restored image to retain size of input image.
 
         See :func:`csbdeep.predict.Resizer.after` for parameter descriptions.
         """
         crop = [slice(p[0], -p[1] if p[1]>0 else None) for p in self.pad]
-        if channel is not None:
-            crop.insert(channel,slice(None))
+        for i in self._normalize_exclude(exclude, x.ndim):
+            crop.insert(i,slice(None))
         len(crop) == x.ndim or _raise(ValueError())
         return x[crop]
 
 
+# class CropResizer(Resizer):
+#     """TODO."""
+
+#     def before(self, x, div_n, exclude):
+#         """TODO."""
+#         if np.isscalar(div_n):
+#             div_n = x.ndim * [div_n]
+#         len(div_n) == x.ndim or _raise(ValueError())
+#         for i in self._normalize_exclude(exclude, x.ndim):
+#             div_n[i] = 1
+#         all((s>=i>=1 for s,i in zip(x.shape,div_n))) or _raise(ValueError())
+#         if all((i==1 for i in div_n)):
+#             return x
+#         return x[tuple((slice(0,(s//i)*i) for s,i in zip(x.shape,div_n)))]
+
+#     def after(self, x, exclude):
+#         """TODO."""
+#         return x
 
 
 

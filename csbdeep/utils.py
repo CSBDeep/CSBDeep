@@ -128,3 +128,26 @@ def shuffle_inplace(*arrs):
     for a in arrs:
         rng.set_state(state)
         rng.shuffle(a)
+
+
+
+def rotate(arr, k=1, axis=1, copy=True):
+    """Rotate by 90 degrees around the first 2 axis."""
+    if copy:
+        arr = arr.copy()
+
+    k = k % 4
+
+    arr = np.rollaxis(arr, axis, arr.ndim)
+
+    if k == 0:
+        res = arr
+    elif k == 1:
+        res = arr[::-1].swapaxes(0, 1)
+    elif k == 2:
+        res = arr[::-1, ::-1]
+    else:
+        res = arr.swapaxes(0, 1)[::-1]
+
+    res = np.rollaxis(res, -1, axis)
+    return res

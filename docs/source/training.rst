@@ -65,3 +65,10 @@ After training, the learned model can be exported via
 .. .. note::
 ..     In principle, we can support other backends than TensorFlow for training, but currently not implemented.
 ..     Futhermore, we use some TF-specific functions, which are in ``csbdeep.tf``.
+
+
+Isotropic reconstruction
+------------------------
+
+.. autoclass:: csbdeep.models.IsotropicCARE
+    :members: predict

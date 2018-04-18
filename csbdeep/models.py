@@ -4,7 +4,7 @@ from six.moves import range, zip, map, reduce, filter
 import argparse
 import datetime
 
-from .utils import _raise, consume, Path, load_json, save_json, normalize_mi_ma, from_tensor, to_tensor, tensor_num_channels
+from .utils import _raise, consume, Path, load_json, save_json, from_tensor, to_tensor, is_tf_dim, rotate
 import warnings
 import numpy as np
 # from collections import namedtuple
@@ -105,8 +105,8 @@ class CARE(object):
     """Standard CARE network for image restoration and enhancement.
 
     Uses a convolutional neural network created by :func:`csbdeep.nets.common_unet`.
-    Note that isotropic reconstruction and manifold extraction/projection are not supported here.
-
+    Note that isotropic reconstruction and manifold extraction/projection are not supported here
+    (see :class:`csbdeep.models.IsotropicCARE`).
 
     Parameters
     ----------
@@ -327,12 +327,12 @@ class CARE(object):
 
         n_channel_predicted = self.config.n_channel_out * (2 if self.config.probabilistic else 1)
 
+        # normalize
+        x = normalizer.before(img,channel)
+
         # resize: make divisible by power of 2 to allow downsampling steps in unet
         div_n = 2 ** self.config.unet_n_depth
-        x = resizer.before(img,div_n,channel)
-
-        # normalize
-        x = normalizer.before(x,channel)
+        x = resizer.before(x,div_n,channel)
 
         # prediction function
         def _predict(x):
@@ -357,11 +357,11 @@ class CARE(object):
 
         x.shape[0] == n_channel_predicted or _raise(ValueError())
 
-        x = resizer.after(x,channel=0)
+        x = resizer.after(x,exclude=0)
 
         # separate mean and scale
         if self.config.probabilistic:
-            _n = n_channel_predicted // 2
+            _n = self.config.n_channel_out
             mean, scale = x[:_n], x[_n:]
         else:
             mean, scale = x, None
@@ -377,6 +377,149 @@ class CARE(object):
                 mean = mean[0]
                 if self.config.probabilistic:
                     scale = scale[0]
+
+        if normalizer.do_after:
+            self.config.n_channel_in == self.config.n_channel_out or _raise(ValueError())
+            mean, scale = normalizer.after(mean, scale)
+
+        return mean, scale
+
+
+
+class IsotropicCARE(CARE):
+    """CARE network for isotropic image reconstruction.
+
+    Extends :class:`csbdeep.models.CARE` by replacing :func:`predict` to do isotropic reconstruction.
+    """
+
+    def predict(self, img, factor, normalizer, resizer=PadAndCropResizer(), z=0, channel=None, batch_size=8):
+        """Apply neural network to raw image to restore isotropic resolution.
+
+        Parameters
+        ----------
+        img : :class:`numpy.ndarray`
+            Raw input image, with image dimensions expected in the same order as in data for training.
+            If applicable, only the z and channel dimensions can be anywhere.
+        factor : int
+            Upsampling factor for z dimension. It is important that this is chosen in correspondence
+            to the subsampling factor used during training data generation.
+        normalizer : :class:`csbdeep.predict.Normalizer`
+            Normalization of input image before prediction and (potentially) transformation back after prediction.
+        resizer : :class:`csbdeep.predict.Resizer`
+            If necessary, input image is resized to enable neural network prediction and result is (possibly)
+            resized to yield original image size.
+        z : int
+            Index of z dimension of raw input image.
+        channel : int or None
+            Index of channel dimension of raw input image. Defaults to ``None``, assuming
+            a single-channel input image where without an explicit channel dimension.
+        batch_size : int
+            Number of image slices that are processed together by the neural network.
+            Reduce this value if out of memory errors occur.
+
+        Returns
+        -------
+        tuple(:class:`numpy.ndarray`, :class:`numpy.ndarray` or None)
+            If model is probabilistic, returns a tuple `(mean, scale)` that defines the parameters
+            of per-pixel Laplace distributions. Otherwise, returns the restored image via a tuple `(restored,None)`
+
+        Todo
+        ----
+        - :func:`scipy.ndimage.interpolation.zoom` differs from :func:`gputools.scale`. Important?
+
+        """
+        # todo: adjust to work with other image data formats
+        is_tf_dim() or _raise(NotImplementedError())
+
+        if channel is None:
+            self.config.n_channel_in == 1 or _raise(ValueError())
+        else:
+            -img.ndim <= channel < img.ndim or _raise(ValueError())
+            if channel < 0:
+                channel %= img.ndim
+            self.config.n_channel_in == img.shape[channel] or _raise(ValueError())
+
+        np.isscalar(factor) and factor > 0 or _raise(ValueError())
+        channel != z or _raise(ValueError())
+
+        n_channel_predicted = self.config.n_channel_out * (2 if self.config.probabilistic else 1)
+
+        # try gputools for fast scaling function, fallback to scipy
+        # problem with gputools: GPU memory can be fully used by tensorflow
+        try:
+            # raise ImportError
+            from gputools import scale as _scale
+            def scale_z(arr,factor):
+                # gputools.scale can only do 3D arrays
+                return np.stack([_scale(_arr,(factor,1,1),interpolation='linear') for _arr in arr])
+        except ImportError:
+            from scipy.ndimage.interpolation import zoom
+            def scale_z(arr,factor):
+                return zoom(arr,(1,factor,1,1),order=1,prefilter=False)
+
+        # normalize
+        x = normalizer.before(img,channel)
+
+        # move channel and z to front of image
+        if channel is None:
+            x = np.expand_dims(x,-1)
+            _channel = -1
+        else:
+            _channel = channel
+        x = np.moveaxis(x,[_channel,z],[0,1])
+
+        # scale z dimension up (second dimension)
+        x_scaled = scale_z(x,factor)
+
+        # resize: make (x,y,z) image dimensions divisible by power of 2 to allow downsampling steps in unet
+        div_n = 2 ** self.config.unet_n_depth
+        x_scaled = resizer.before(x_scaled,div_n,exclude=0)
+
+        # move channel to the end
+        x_scaled = np.moveaxis(x_scaled,0,-1)
+
+        # u1: first rotation and prediction
+        x_rot1   = rotate(x_scaled, axis=1, copy=False)
+        u_rot1   = self.keras_model.predict(x_rot1, batch_size=batch_size, verbose=0)
+        u1       = rotate(u_rot1, -1, axis=1, copy=False)
+
+        # u2: second rotation and prediction
+        x_rot2   = rotate(rotate(x_scaled, axis=2, copy=False), axis=0, copy=False)
+        u_rot2   = self.keras_model.predict(x_rot2, batch_size=batch_size, verbose=0)
+        u2       = rotate(rotate(u_rot2, -1, axis=0, copy=False), -1, axis=2, copy=False)
+
+        u_rot1.shape[-1] == n_channel_predicted or _raise(ValueError())
+        u_rot2.shape[-1] == n_channel_predicted or _raise(ValueError())
+
+        # move channel to the front and resize after prediction
+        u1 = np.moveaxis(u1, -1, 0)
+        u2 = np.moveaxis(u2, -1, 0)
+        u1 = resizer.after(u1,exclude=0)
+        u2 = resizer.after(u2,exclude=0)
+
+        # combine u1 & u2 and separate mean and scale
+        avg = lambda u1,u2: np.sqrt(np.maximum(u1,0)*np.maximum(u2,0)) # geometric mean
+        # avg = lambda u1,u2: (u1+u2)/2 # arithmetic mean
+        if self.config.probabilistic:
+            _n    = self.config.n_channel_out
+            mean  =        avg(u1[:_n],u1[:_n])
+            scale = np.maximum(u1[_n:],u2[_n:])
+        else:
+            mean, scale = avg(u1,u2), None
+
+        if channel is None:
+            # remove dummy channel dimension altogether
+            if self.config.n_channel_out == 1:
+                mean = mean[0]
+                if self.config.probabilistic:
+                    scale = scale[0]
+
+        # move z (and channel) to same dimension as in input image
+        _from = 0 if channel is None else [0,      1]
+        _to   = z if channel is None else [channel,z]
+        mean = np.moveaxis(mean, _from, _to)
+        if self.config.probabilistic:
+            scale = np.moveaxis(scale, _from, _to)
 
         if normalizer.do_after:
             self.config.n_channel_in == self.config.n_channel_out or _raise(ValueError())
