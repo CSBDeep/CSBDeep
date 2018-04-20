@@ -272,27 +272,27 @@ class PadAndCropResizer(Resizer):
 
 
 
-def tiled_prediction(predict_function,x,shape_out,channel=None,n_tiles=4,pad=2**5,block_multiple=2**5):
+def tiled_prediction(predict_function,x,shape_out,channel,n_tiles,block_size):
     """TODO."""
     # from gputools.utils import tile_iterator
-
 
     # largest_axis = np.argmax(x.shape)
     # largest axis that is not the channel dimension
     largest_axis = [i for i in np.argsort(x.shape) if i != channel][-1]
-    largest_size = x.shape[largest_axis]
+    # largest_size = x.shape[largest_axis]
 
-    blocksize_ideal    = largest_size / n_tiles
-    blocksize_possible = int(np.ceil(blocksize_ideal/block_multiple) * block_multiple)
+    # blocksize_ideal    = largest_size / n_tiles
+    # blocksize_possible = int(np.ceil(blocksize_ideal/block_multiple) * block_multiple)
 
-    blocksizes = list(x.shape)
-    padsizes   = [0]*x.ndim
-    blocksizes[largest_axis] = blocksize_possible
-    padsizes[largest_axis]   = pad
+    # blocksizes = list(x.shape)
+    # padsizes   = [0]*x.ndim
+    # blocksizes[largest_axis] = blocksize_possible
+    # padsizes[largest_axis]   = pad
 
     dst = np.empty(shape_out, dtype=x.dtype)
 
-    for padded_tile, s_dst, s_src in tile_iterator(x, blocksize=blocksizes, padsize=padsizes, mode='reflect'):
+    # for padded_tile, s_dst, s_src in tile_iterator(x, blocksize=blocksizes, padsize=padsizes, mode='reflect'):
+    for padded_tile, s_src, s_dst in tile_iterator(x,axis=largest_axis,n_tiles=n_tiles,block_size=block_size):
         # remove channel dimension from slices (they disappeared/moved to first dim within predict_function)
         s_src = (slice(None),) + tuple((s for i,s in enumerate(s_src) if i != channel))
         s_dst = (slice(None),) + tuple((s for i,s in enumerate(s_dst) if i != channel))
@@ -305,85 +305,160 @@ def tiled_prediction(predict_function,x,shape_out,channel=None,n_tiles=4,pad=2**
     return dst
 
 
-def tile_iterator(im, blocksize=(64,64), padsize=(64,64), mode="constant", verbose=False):
-    """Tile iterator (from gputools).
 
-    iterates over padded tiles of an ND image
-    while keeping track of the slice positions
-
-    Example:
-    --------
-    im = np.zeros((200,200))
-    res = np.empty_like(im)
-
-    for padded_tile, s_src, s_dest in tile_iterator(im,
-                              blocksize=(128, 128),
-                              padsize = (64,64),
-                              mode = "wrap"):
-
-        #do something with the tile, e.g. a convolution
-        res_padded = np.mean(padded_tile)*np.ones_like(padded_tile)
-
-        # reassemble the result at the correct position
-        res[s_src] = res_padded[s_dest]
-
-
+def tile_iterator(x,axis,n_tiles,block_size,n_block_overlap=6):
+    """Tile iterator for one dimension of array x.
 
     Parameters
     ----------
-    im: ndarray
-        the input data (arbitrary dimension)
-    blocksize:
-        the dimension of the blocks to split into
-        e.g. (nz, ny, nx) for a 3d image
-    padsize:
-        the size of left and right pad for each dimension
-    mode:
-        padding mode, like numpy.pad
-        e.g. "wrap", "constant"...
-
-    Returns
-    -------
-        tile, slice_src, slice_dest
-
-        tile[slice_dest] is the tile in im[slice_src]
+    x : numpy.ndarray
+        Input array
+    axis : int
+        Axis which sould be tiled, all other axis not tiled.
+    n_tiles : int
+        Number of tiles for axis of x
+    block_size : int
+        axis of x is assumed to be ebenly divisible by block_size
+        all tiles are aligned with the block_size
+    n_block_overlap : int
+        tiles will overlap a this many blocks
 
     """
-    if not(im.ndim == len(blocksize) ==len(padsize)):
-        raise ValueError("im.ndim (%s) != len(blocksize) (%s) != len(padsize) (%s)"
-                         %(im.ndim , len(blocksize) , len(padsize)))
+    n = x.shape[axis]
 
-    subgrids = tuple([int(np.ceil(1.*n/b)) for n,b in zip(im.shape, blocksize)])
+    n % block_size == 0 or _raise(ValueError("'x' must be evenly divisible by 'block_size' along 'axis'"))
+    n_blocks = n // block_size
+    1 <= n_tiles <= n_blocks or _raise(ValueError("invalid 'n_tiles' (must be between %s and %s)" % (1,n_blocks)))
+
+    s = n_blocks // n_tiles # tile size
+    r = n_blocks %  n_tiles # blocks remainder
+    assert n_tiles * s + r == n_blocks
+
+    # list of sizes for each tile
+    tile_sizes = s*np.ones(n_tiles,int)
+    # distribute remaning blocks to tiles at beginning and end
+    if r > 0:
+        tile_sizes[:r//2]      += 1
+        tile_sizes[-(r-r//2):] += 1
+
+    # (pre,post) offsets for each tile
+    off = [(n_block_overlap if i > 0 else 0, n_block_overlap if i < n_tiles-1 else 0) for i in range(n_tiles)]
+
+    # tile_starts = np.concatenate(([0],np.cumsum(tile_sizes[:-1])))
+    # print([(_st-_pre,_st+_sz+_post) for (_st,_sz,(_pre,_post)) in zip(tile_starts,tile_sizes,off)])
+
+    def _valid():
+        start = 0
+        for i in range(n_tiles):
+            off_pre, off_post = off[i]
+            if (start-off_pre < 0) or (start+tile_sizes[i]+off_post > n_blocks):
+                return False
+            start += tile_sizes[i]
+        return True
+
+    _valid() or _raise(ValueError("'n_tiles' (%d) too large, try reducing it" % n_tiles))
 
 
-    #if the image dimension are not divible by the blocksize, pad it accordingly
-    pad_mismatch = tuple([(s*b-n) for n,s, b in zip(im.shape,subgrids,blocksize)])
-
-    if verbose:
-        print("tile padding... ")
-
-    im_pad = np.pad(im,[(p,p+pm) for pm,p in zip(pad_mismatch,padsize)], mode = mode)
-
-    # iterates over cartesian product of subgrids
-    for i,index in enumerate(product(*[range(sg) for sg in subgrids])):
-        # the slices
-        # if verbose:
-        #     print("tile %s/%s"%(i+1,np.prod(subgrids)))
-
-        # dest[s_output] is where we will write to
-        s_input = tuple([slice(i*b,(i+1)*b) for i,b in zip(index, blocksize)])
+    def to_slice(t):
+        sl = [slice(None) for _ in x.shape]
+        sl[axis] = slice(t[0]*block_size, t[1]*block_size if t[1]!=0 else None)
+        return tuple(sl)
 
 
+    start = 0
+    for i in range(n_tiles):
+        off_pre, off_post = off[i]
 
-        s_output = tuple([slice(p,-p-pm*(i==s-1)) for pm,p,i,s in zip(pad_mismatch,padsize, index, subgrids)])
+        tile_in   = (start-off_pre,start+tile_sizes[i]+off_post)  # src in input image     / tile
+        tile_out  = (start,start+tile_sizes[i])                   # dst in output image    / s_dst
+        tile_crop = (off_pre,-off_post)                           # crop of src for output / s_src
+
+        yield x[to_slice(tile_in)], to_slice(tile_crop), to_slice(tile_out)
+        start += tile_sizes[i]
 
 
-        s_output = tuple([slice(p,b+p-pm*(i==s-1)) for b,pm,p,i,s in zip(blocksize,pad_mismatch,padsize, index, subgrids)])
+
+# def tile_iterator_gputools(im, blocksize=(64,64), padsize=(64,64), mode="constant", verbose=False):
+#     """Tile iterator (from gputools).
+
+#     iterates over padded tiles of an ND image
+#     while keeping track of the slice positions
+
+#     Example:
+#     --------
+#     im = np.zeros((200,200))
+#     res = np.empty_like(im)
+
+#     for padded_tile, s_src, s_dest in tile_iterator(im,
+#                               blocksize=(128, 128),
+#                               padsize = (64,64),
+#                               mode = "wrap"):
+
+#         #do something with the tile, e.g. a convolution
+#         res_padded = np.mean(padded_tile)*np.ones_like(padded_tile)
+
+#         # reassemble the result at the correct position
+#         res[s_src] = res_padded[s_dest]
 
 
-        s_padinput = tuple([slice(i*b,(i+1)*b+2*p) for i,b,p in zip(index, blocksize, padsize)])
-        padded_block = im_pad[s_padinput]
 
-        # print im.shape, padded_block.shape, s_output
+#     Parameters
+#     ----------
+#     im: ndarray
+#         the input data (arbitrary dimension)
+#     blocksize:
+#         the dimension of the blocks to split into
+#         e.g. (nz, ny, nx) for a 3d image
+#     padsize:
+#         the size of left and right pad for each dimension
+#     mode:
+#         padding mode, like numpy.pad
+#         e.g. "wrap", "constant"...
 
-        yield padded_block, s_input, s_output
+#     Returns
+#     -------
+#         tile, slice_src, slice_dest
+
+#         tile[slice_dest] is the tile in im[slice_src]
+
+#     """
+#     if not(im.ndim == len(blocksize) ==len(padsize)):
+#         raise ValueError("im.ndim (%s) != len(blocksize) (%s) != len(padsize) (%s)"
+#                          %(im.ndim , len(blocksize) , len(padsize)))
+
+#     subgrids = tuple([int(np.ceil(1.*n/b)) for n,b in zip(im.shape, blocksize)])
+
+
+#     #if the image dimension are not divible by the blocksize, pad it accordingly
+#     pad_mismatch = tuple([(s*b-n) for n,s, b in zip(im.shape,subgrids,blocksize)])
+
+#     if verbose:
+#         print("tile padding... ")
+
+#     mode = 'constant'
+
+#     im_pad = np.pad(im,[(p,p+pm) for pm,p in zip(pad_mismatch,padsize)], mode = mode, constant_values=0)
+
+#     # iterates over cartesian product of subgrids
+#     for i,index in enumerate(product(*[range(sg) for sg in subgrids])):
+#         # the slices
+#         # if verbose:
+#         #     print("tile %s/%s"%(i+1,np.prod(subgrids)))
+
+#         # dest[s_output] is where we will write to
+#         s_input = tuple([slice(i*b,(i+1)*b) for i,b in zip(index, blocksize)])
+
+
+
+#         s_output = tuple([slice(p,-p-pm*(i==s-1)) for pm,p,i,s in zip(pad_mismatch,padsize, index, subgrids)])
+
+
+#         s_output = tuple([slice(p,b+p-pm*(i==s-1)) for b,pm,p,i,s in zip(blocksize,pad_mismatch,padsize, index, subgrids)])
+
+
+#         s_padinput = tuple([slice(i*b,(i+1)*b+2*p) for i,b,p in zip(index, blocksize, padsize)])
+#         padded_block = im_pad[s_padinput]
+
+#         # print im.shape, padded_block.shape, s_output
+
+#         yield padded_block, s_input, s_output

@@ -148,49 +148,46 @@ def test_model_predict_tiled():
     or similar result as compared to predicting
     the whole image at once.
     """
-    # configs = config_generator(
-    #     n_dim                 = [2,3],
-    #     n_channel_in          = [1,2],
-    #     n_channel_out         = [1,2],
-    #     probabilistic         = [False,True],
-    #     # unet_residual         = [False,True],
-    #     unet_n_depth          = [2],
+    configs = config_generator(
+        n_dim                 = [2,3],
+        n_channel_in          = [1,2],
+        n_channel_out         = [1],
+        probabilistic         = [False],
+        # unet_residual         = [False,True],
+        unet_n_depth          = [1,2,3],
 
-    #     unet_kern_size        = [3],
-    #     unet_n_first          = [4],
-    #     unet_last_activation  = ['linear'],
-    #     # unet_input_shape      = [(None, None, 1)],
-    # )
-    # with tempfile.TemporaryDirectory() as tmpdir:
-    #     normalizer, resizer = NoNormalizer(), NoResizer()
+        unet_kern_size        = [3],
+        unet_n_first          = [4],
+        unet_last_activation  = ['linear'],
+        # unet_input_shape      = [(None, None, 1)],
+    )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        normalizer, resizer = NoNormalizer(), NoResizer()
 
-    #     for config in filter(lambda c: c.is_valid(), configs):
-    #         K.clear_session()
-    #         model = CARE(config,outdir=tmpdir)
+        for config in filter(lambda c: c.is_valid(), configs):
+            K.clear_session()
+            model = CARE(config,outdir=tmpdir)
 
-    #         def _predict(imdims,channel):
-    #             img = np.random.uniform(size=imdims)
-    #             # print(img.shape)
-    #             mean, scale = model.predict(img, normalizer, resizer, channel=channel, n_tiles=1)
-    #             mean_tiled, scale_tiled = model.predict(img, normalizer, resizer, channel=channel, n_tiles=3, tile_pad=32)
-    #             assert mean.shape == mean_tiled.shape
-    #             if config.probabilistic:
-    #                 assert scale.shape == scale_tiled.shape
+            def _predict(imdims,channel,n_tiles):
+                img = np.random.uniform(size=imdims)
+                # print(img.shape)
+                mean,       scale       = model.predict(img, normalizer, resizer, channel=channel, n_tiles=1)
+                mean_tiled, scale_tiled = model.predict(img, normalizer, resizer, channel=channel, n_tiles=n_tiles)
+                assert mean.shape == mean_tiled.shape
+                if config.probabilistic:
+                    assert scale.shape == scale_tiled.shape
+                error_max = np.max(np.abs(mean-mean_tiled))
+                assert error_max < 1e-6
+                # return mean, mean_tiled
 
-    #             return mean, mean_tiled
+            imdims = list(np.random.randint(150,160,size=config.n_dim))
+            div_n = 2**config.unet_n_depth
+            imdims = [(d//div_n)*div_n for d in imdims]
 
-
-
-    #         imdims = list(np.random.randint(20,40,size=config.n_dim))
-    #         div_n = 2**config.unet_n_depth
-    #         imdims = [(d//div_n)*div_n for d in imdims]
-
-    #         if config.n_channel_in == 1:
-    #             return _predict(imdims,channel=None)
-
-    #         channel = np.random.randint(0,config.n_dim)
-    #         imdims.insert(channel,config.n_channel_in)
-    #         return _predict(imdims,channel=channel)
+            imdims.insert(0,config.n_channel_in)
+            # return _predict(imdims,channel=0,n_tiles=2)
+            for n_tiles in (2,3):
+                _predict(imdims,channel=0,n_tiles=n_tiles)
 
 
 def test_exceptions():

@@ -328,7 +328,7 @@ class CARE(object):
         print("\nModel exported in TensorFlow's SavedModel format:\n%s" % str(fout.resolve()))
 
 
-    def predict(self, img, normalizer, resizer=PadAndCropResizer(), channel=None, n_tiles=1, tile_pad=32):
+    def predict(self, img, normalizer, resizer=PadAndCropResizer(), channel=None, n_tiles=1):
         """Apply neural network to raw image to predict restored image.
 
         Parameters
@@ -350,18 +350,12 @@ class CARE(object):
             that can then be processed independently and re-assembled to yield the restored image.
             This parameter denotes the number of tiles. Note that if the number of tiles is too low,
             it is adaptively increased until OOM errors are avoided, albeit at the expense of runtime.
-        tile_pad : int
-            Amount of pixels to pad overlapping tiles (if ``n_tiles > 1``).
 
         Returns
         -------
         tuple(:class:`numpy.ndarray`, :class:`numpy.ndarray` or None)
             If model is probabilistic, returns a tuple `(mean, scale)` that defines the parameters
             of per-pixel Laplace distributions. Otherwise, returns the restored image via a tuple `(restored,None)`
-
-        Todo
-        ----
-        Role of ``tile_pad``?
 
         """
         if channel is None:
@@ -384,13 +378,6 @@ class CARE(object):
         div_n = 2 ** self.config.unet_n_depth
         x = resizer.before(x,div_n,channel)
 
-        # for tiled_prediction: div_n + 2*tile_pad must be divisible by div_n
-        def _adjust_tile_pad(tile_pad):
-            _tile_pad = int(np.ceil((2*tile_pad)/div_n) * div_n) // 2
-            if tile_pad != _tile_pad:
-                warnings.warn("increasing 'tile_pad' from %d to %d (must be divisible by %d)" % (tile_pad, _tile_pad, div_n//2))
-            return _tile_pad
-
         # prediction function
         def _predict(x):
             return from_tensor(self.keras_model.predict(to_tensor(x,channel=channel)),channel=0)
@@ -405,8 +392,7 @@ class CARE(object):
                         shape_out = (n_channel_predicted,) + x.shape
                     else:
                         shape_out = (n_channel_predicted,) + tuple((s for i,s in enumerate(x.shape) if i != channel))
-                    tile_pad = _adjust_tile_pad(tile_pad)
-                    x = tiled_prediction(_predict, x, shape_out, channel, n_tiles=n_tiles, pad=tile_pad, block_multiple=div_n)
+                    x = tiled_prediction(_predict, x, shape_out, channel, n_tiles=n_tiles, block_size=div_n)
                 done = True
             except tf.errors.ResourceExhaustedError:
                 n_tiles = max(4, 2*n_tiles)
