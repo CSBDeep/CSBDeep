@@ -9,11 +9,12 @@ for more information with links to our manuscript and supplementary material.
 
 .. note::
     This is an early version of the software.
-    It currently only (fully) supports CARE networks for direct image restoration/enhancement, i.e.
-    surface extraction/projection and isotropic reconstruction are not available yet.
-    Furthermore, the necessary training data can only be generated from aligned
-    raw images (e.g. low- and high-SNR). Creating training data via simulation is
-    currently not implemented.
+    It currently only supports CARE networks for direct image
+    restoration/enhancement and isotropic reconstruction, i.e. surface
+    extraction/projection is not available yet. Furthermore, the necessary
+    training data can only be generated from aligned raw images (e.g. low- and
+    high-SNR). Creating training data for isotropic reconstruction or via
+    simulation is currently not implemented.
 
 
 After :doc:`installation </install>` of the Python package,
@@ -32,6 +33,10 @@ They can be found in the subfolder ``notebooks``:
 #. `prediction.ipynb`_:
    Loading a trained CARE network and applying it to a raw image.
    More documentation available at :doc:`predict`.
+
+Notebooks that demonstrate CARE networks for isotropic reconstruction
+can be found in ``notebooks/isotropic``
+(cf. `repository <https://github.com/mpicbg-csbd/CSBDeep_code/blob/master/notebooks/isotropic>`_).
 
 .. _`datagen.ipynb`: https://github.com/mpicbg-csbd/CSBDeep_code/blob/master/notebooks/datagen.ipynb
 .. _`training.ipynb`: https://github.com/mpicbg-csbd/CSBDeep_code/blob/master/notebooks/training.ipynb

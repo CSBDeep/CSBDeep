@@ -60,6 +60,24 @@ class Normalizer():
         pass
 
 
+class NoNormalizer(Normalizer):
+    """Dummy normalizer that does nothing."""
+
+    def __init__(self, do_after=False):
+        self._do_after = do_after
+
+    def before(self, img, channel):
+        return img
+
+    def after(self, mean, scale):
+        assert self.do_after
+        return mean, scale
+
+    @property
+    def do_after(self):
+        return self._do_after
+
+
 class PercentileNormalizer(Normalizer):
     """Percentile-based image normalization.
 
@@ -99,7 +117,6 @@ class PercentileNormalizer(Normalizer):
 
         See :func:`csbdeep.predict.Normalizer.before` for parameter descriptions.
         """
-
         assert self.do_after
         alpha = self.ma - self.mi
         beta  = self.mi
@@ -168,6 +185,21 @@ class Resizer():
         len(exclude_list) == len(np.unique(exclude_list)) or _raise(ValueError())
         all(( isinstance(d,int) and 0<=d<n_dim for d in exclude_list )) or _raise(ValueError())
         return exclude_list
+
+
+class NoResizer(Resizer):
+    """Dummy resizer that does not resize the image, only verifies that the size is correct."""
+
+    def before(self, x, div_n, exclude):
+        exclude = self._normalize_exclude(exclude, x.ndim)
+        consume ((
+            (s%div_n==0) or _raise(ValueError('%d (axis %d) is not divisible by %d.' % (s,i,div_n)))
+            for i,s in enumerate(x.shape) if (i not in exclude)
+        ))
+        return x
+
+    def after(self, x, exclude):
+        return x
 
 
 class PadAndCropResizer(Resizer):

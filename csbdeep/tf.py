@@ -185,10 +185,12 @@ class CARETensorBoard(Callback):
             if self.prob_out:
                 # first half of output channels is mean, second half scale
                 # assert n_channels_in*2 == n_channels_out
-                if n_channels_in*2 != n_channels_out:
-                    raise ValueError('prob_out: must be two output channels for every input channel')
+                # if n_channels_in*2 != n_channels_out:
+                #     raise ValueError('prob_out: must be two output channels for every input channel')
+                if n_channels_out % 2 != 0:
+                    raise ValueError()
 
-                sep = n_channels_in
+                sep = n_channels_out // 2
             else:
                 sep = n_channels_out
 
