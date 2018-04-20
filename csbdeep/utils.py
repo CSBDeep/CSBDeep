@@ -49,12 +49,13 @@ def is_tf_back():
 # def get_dir_for_file(fname=sys.argv[0]):
 #     return os.path.dirname(os.path.realpath(fname))
 
-def moveaxis_if_tf(X):
+def moveaxis_if_tf(X,reverse=False):
     if X is None:
         return None
-    if is_tf_dim():
-        X = np.moveaxis(X, 1, -1)
-    return X
+    if reverse:
+        return np.moveaxis(X, -1, 1) if not is_tf_dim() else X
+    else:
+        return np.moveaxis(X, 1, -1) if     is_tf_dim() else X
 
 
 def to_tensor(x,channel=None):

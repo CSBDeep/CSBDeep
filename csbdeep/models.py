@@ -11,7 +11,7 @@ import numpy as np
 import tensorflow as tf
 
 from . import nets, train
-from .predict import tiled_prediction, PadAndCropResizer
+from .predict import tiled_prediction, PadAndCropResizer, Resizer, Normalizer
 
 
 class Config(argparse.Namespace):
@@ -97,7 +97,47 @@ class Config(argparse.Namespace):
         for k in kwargs:
             setattr(self, k, kwargs[k])
 
-        # TODO: param checks
+
+    def is_valid(self):
+        """Check if configuration is valid.
+
+        Returns
+        -------
+        bool
+            Flag that indicates whether the current configuration values are valid.
+        """
+        def _is_int(v,low=None,high=None):
+            return (
+                isinstance(v,int) and
+                (True if low is None else low <= v) and
+                (True if high is None else v <= high)
+            )
+        # TODO: make nicer and terminate early on False
+        _v  = True
+        _v &= self.n_dim in (2,3)
+        _v &= _is_int(self.n_channel_in,1)
+        _v &= _is_int(self.n_channel_out,1)
+        _v &= isinstance(self.probabilistic,bool)
+        _v &= (isinstance(self.unet_residual,bool) and
+               (not self.unet_residual or (self.n_channel_in==self.n_channel_out)))
+        _v &= _is_int(self.unet_n_depth,1)
+        _v &= _is_int(self.unet_kern_size,1)
+        _v &= _is_int(self.unet_n_first,1)
+        _v &= self.unet_last_activation in ('linear','relu')
+        _v &= (isinstance(self.unet_input_shape,tuple) and
+               (len(self.unet_input_shape)==self.n_dim+1) and
+               (self.unet_input_shape[-1]==self.n_channel_in) and
+               all((d is None or (_is_int(d) and d%(2**self.unet_n_depth)==0) for d in self.unet_input_shape[:-1])))
+        _v &= ((    self.probabilistic and self.train_loss == 'laplace'   ) or
+               (not self.probabilistic and self.train_loss in ('mse','mae')))
+        _v &= _is_int(self.train_epochs,1)
+        _v &= _is_int(self.train_steps_per_epoch,1)
+        _v &= np.isscalar(self.train_learning_rate) and self.train_learning_rate > 0
+        _v &= _is_int(self.train_batch_size,1)
+        _v &= isinstance(self.train_tensorboard,bool)
+        _v &= self.train_checkpoint is None or isinstance(self.train_checkpoint,str)
+        _v &= self.train_reduce_lr  is None or isinstance(self.train_reduce_lr,dict)
+        return _v
 
 
 
@@ -111,12 +151,24 @@ class CARE(object):
     Parameters
     ----------
     config : :class:`csbdeep.models.Config` or None
-        Configuration for CARE network. Will be saved to disk as JSON (``config.json``).
+        Valid configuration of CARE network (see :func:`Config.is_valid`).
+        Will be saved to disk as JSON (``config.json``).
         If set to ``None``, will be loaded from disk (must exist).
     name : str or None
         Model name. Uses a timestamp if set to ``None`` (default).
     outdir : str
         Output directory that contains (or will contain) a folder with the given model name.
+
+    Raises
+    ------
+    FileNotFoundError
+        If ``config=None`` and config cannot be loaded from disk.
+    ValueError
+        Illegal arguments, including invalid configuration.
+
+    Example
+    -------
+    >>> model = CARE(config, 'my_model')
 
     Attributes
     ----------
@@ -128,19 +180,14 @@ class CARE(object):
         Model's name.
     logdir : :class:`pathlib.Path`
         Path to model's folder (which stores configuration, weights, etc.)
-
-    Raises
-    ------
-    FileNotFoundError
-        If ``config=None`` and config cannot be loaded from disk.
-
-    Example
-    -------
-    >>> model = CARE(config, 'my_model')
     """
 
     def __init__(self, config, name=None, outdir='.'):
         """See class docstring."""
+        (config is None or (isinstance(config,Config) and config.is_valid())
+            or _raise(ValueError('Invalid configuration: %s' % str(config))))
+        name is None or isinstance(name,str) or _raise(ValueError())
+        isinstance(outdir,(str,Path)) or _raise(ValueError())
         self.config = config
         self.outdir = Path(outdir)
         self.name = name
@@ -327,12 +374,22 @@ class CARE(object):
 
         n_channel_predicted = self.config.n_channel_out * (2 if self.config.probabilistic else 1)
 
+        isinstance(resizer,Resizer) or _raise(ValueError())
+        isinstance(normalizer,Normalizer) or _raise(ValueError())
+
         # normalize
         x = normalizer.before(img,channel)
 
         # resize: make divisible by power of 2 to allow downsampling steps in unet
         div_n = 2 ** self.config.unet_n_depth
         x = resizer.before(x,div_n,channel)
+
+        # for tiled_prediction: div_n + 2*tile_pad must be divisible by div_n
+        def _adjust_tile_pad(tile_pad):
+            _tile_pad = int(np.ceil((2*tile_pad)/div_n) * div_n) // 2
+            if tile_pad != _tile_pad:
+                warnings.warn("increasing 'tile_pad' from %d to %d (must be divisible by %d)" % (tile_pad, _tile_pad, div_n//2))
+            return _tile_pad
 
         # prediction function
         def _predict(x):
@@ -348,7 +405,7 @@ class CARE(object):
                         shape_out = (n_channel_predicted,) + x.shape
                     else:
                         shape_out = (n_channel_predicted,) + tuple((s for i,s in enumerate(x.shape) if i != channel))
-
+                    tile_pad = _adjust_tile_pad(tile_pad)
                     x = tiled_prediction(_predict, x, shape_out, channel, n_tiles=n_tiles, pad=tile_pad, block_multiple=div_n)
                 done = True
             except tf.errors.ResourceExhaustedError:
@@ -443,6 +500,9 @@ class IsotropicCARE(CARE):
         channel != z or _raise(ValueError())
 
         n_channel_predicted = self.config.n_channel_out * (2 if self.config.probabilistic else 1)
+
+        isinstance(resizer,Resizer) or _raise(ValueError())
+        isinstance(normalizer,Normalizer) or _raise(ValueError())
 
         # try gputools for fast scaling function, fallback to scipy
         # problem with gputools: GPU memory can be fully used by tensorflow

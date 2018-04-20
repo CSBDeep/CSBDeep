@@ -175,7 +175,7 @@ def no_background_patches(threshold=0.4, percentile=99.9):
     """
 
     (np.isscalar(percentile) and 0 <= percentile <= 100) or _raise(ValueError())
-    (np.isscalar(threshold)  and 0 <= threshold  <= 1)   or _raise(ValueError())
+    (np.isscalar(threshold)  and 0 <= threshold  <=   1) or _raise(ValueError())
 
     from scipy.ndimage.filters import maximum_filter
     def _filter(datas, patch_size, dtype=np.float32):

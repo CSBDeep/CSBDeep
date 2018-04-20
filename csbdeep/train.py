@@ -1,7 +1,7 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
 from six.moves import range, zip, map, reduce, filter
 
-from .utils import moveaxis_if_tf
+from .utils import moveaxis_if_tf, _raise
 from .losses import loss_laplace, loss_mse, loss_mae, loss_thresh_weighted_decay
 
 import numpy as np
@@ -58,6 +58,10 @@ def load_data(data,validation_split=0,n_images=None):
 def prepare_model(model, optimizer, loss, metrics=('mse','mae'),
                   loss_bg_thresh=0, loss_bg_decay=0.06, Y=None):
     """ TODO """
+
+    from keras.optimizers import Optimizer
+    isinstance(optimizer,Optimizer) or _raise(ValueError())
+
 
     loss_standard   = eval('loss_%s()'%loss)
     _metrics        = [eval('loss_%s()'%m) for m in metrics]
