@@ -328,7 +328,11 @@ def tile_iterator(x,axis,n_tiles,block_size,n_block_overlap=6):
 
     n % block_size == 0 or _raise(ValueError("'x' must be evenly divisible by 'block_size' along 'axis'"))
     n_blocks = n // block_size
-    1 <= n_tiles <= n_blocks or _raise(ValueError("invalid 'n_tiles' (must be between %s and %s)" % (1,n_blocks)))
+
+    n_tiles_valid = int(np.clip(n_tiles,1,n_blocks))
+    if n_tiles != n_tiles_valid:
+        warnings.warn("invalid value (%d) for 'n_tiles', changing to %d" % (n_tiles,n_tiles_valid))
+        n_tiles = n_tiles_valid
 
     s = n_blocks // n_tiles # tile size
     r = n_blocks %  n_tiles # blocks remainder
@@ -347,27 +351,23 @@ def tile_iterator(x,axis,n_tiles,block_size,n_block_overlap=6):
     # tile_starts = np.concatenate(([0],np.cumsum(tile_sizes[:-1])))
     # print([(_st-_pre,_st+_sz+_post) for (_st,_sz,(_pre,_post)) in zip(tile_starts,tile_sizes,off)])
 
-    def _valid():
-        start = 0
-        for i in range(n_tiles):
-            off_pre, off_post = off[i]
-            if (start-off_pre < 0) or (start+tile_sizes[i]+off_post > n_blocks):
-                return False
-            start += tile_sizes[i]
-        return True
-
-    _valid() or _raise(ValueError("'n_tiles' (%d) too large, try reducing it" % n_tiles))
-
-
     def to_slice(t):
         sl = [slice(None) for _ in x.shape]
-        sl[axis] = slice(t[0]*block_size, t[1]*block_size if t[1]!=0 else None)
+        sl[axis] = slice(
+            t[0]*block_size,
+            t[1]*block_size if t[1]!=0 else None)
         return tuple(sl)
-
 
     start = 0
     for i in range(n_tiles):
         off_pre, off_post = off[i]
+
+        # tile starts before block 0 -> adjust off_pre
+        if start-off_pre < 0:
+            off_pre = start
+        # tile end after last block -> adjust off_post
+        if start+tile_sizes[i]+off_post > n_blocks:
+            off_post = n_blocks-start-tile_sizes[i]
 
         tile_in   = (start-off_pre,start+tile_sizes[i]+off_post)  # src in input image     / tile
         tile_out  = (start,start+tile_sizes[i])                   # dst in output image    / s_dst

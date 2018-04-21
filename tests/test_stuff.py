@@ -180,14 +180,20 @@ def test_model_predict_tiled():
                 assert error_max < 1e-6
                 # return mean, mean_tiled
 
-            imdims = list(np.random.randint(150,160,size=config.n_dim))
+            imdims = list(np.random.randint(50,70,size=config.n_dim))
             div_n = 2**config.unet_n_depth
             imdims = [(d//div_n)*div_n for d in imdims]
 
+            n_blocks = np.max(imdims) // div_n
             imdims.insert(0,config.n_channel_in)
             # return _predict(imdims,channel=0,n_tiles=2)
-            for n_tiles in (2,3):
-                _predict(imdims,channel=0,n_tiles=n_tiles)
+
+            for n_tiles in (0,2,5,10,n_blocks+1):
+                if 0 < n_tiles <= n_blocks:
+                    _predict(imdims,channel=0,n_tiles=n_tiles)
+                else:
+                    with pytest.warns(UserWarning):
+                        _predict(imdims,channel=0,n_tiles=n_tiles)
 
 
 def test_exceptions():
