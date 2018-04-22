@@ -4,14 +4,14 @@ from six.moves import range, zip, map, reduce, filter
 import argparse
 import datetime
 
-from .utils import _raise, consume, Path, load_json, save_json, from_tensor, to_tensor, is_tf_dim, rotate
+from .utils import _raise, consume, Path, load_json, save_json, is_tf_dim, rotate
 import warnings
 import numpy as np
 # from collections import namedtuple
 import tensorflow as tf
 
 from . import nets, train
-from .predict import tiled_prediction, PadAndCropResizer, Resizer, Normalizer
+from .predict import predict_direct, predict_tiled, Normalizer, Resizer, PadAndCropResizer
 
 
 class Config(argparse.Namespace):
@@ -378,21 +378,13 @@ class CARE(object):
         div_n = 2 ** self.config.unet_n_depth
         x = resizer.before(x,div_n,channel)
 
-        # prediction function
-        def _predict(x):
-            return from_tensor(self.keras_model.predict(to_tensor(x,channel=channel)),channel=0)
-
         done = False
         while not done:
             try:
                 if n_tiles == 1:
-                    x = _predict(x)
+                    x = predict_direct(self.keras_model,x,channel_in=channel,channel_out=0)
                 else:
-                    if channel is None:
-                        shape_out = (n_channel_predicted,) + x.shape
-                    else:
-                        shape_out = (n_channel_predicted,) + tuple((s for i,s in enumerate(x.shape) if i != channel))
-                    x = tiled_prediction(_predict, x, shape_out, channel, n_tiles=n_tiles, block_size=div_n)
+                    x = predict_tiled(self.keras_model,x,channel_in=channel,channel_out=0,n_tiles=n_tiles,block_size=div_n)
                 done = True
             except tf.errors.ResourceExhaustedError:
                 n_tiles = max(4, 2*n_tiles)

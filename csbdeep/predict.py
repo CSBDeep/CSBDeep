@@ -2,7 +2,7 @@ from __future__ import print_function, unicode_literals, absolute_import, divisi
 from six.moves import range, zip, map, reduce, filter
 
 
-from .utils import _raise, consume, normalize_mi_ma, from_tensor, to_tensor, tensor_num_channels
+from .utils import _raise, consume, normalize_mi_ma, from_tensor, to_tensor, tensor_num_channels, is_tf_dim
 import warnings
 import numpy as np
 
@@ -270,37 +270,38 @@ class PadAndCropResizer(Resizer):
 #         """TODO."""
 #         return x
 
-
-
-def tiled_prediction(predict_function,x,shape_out,channel,n_tiles,block_size):
+def predict_direct(keras_model,x,channel_in=None,channel_out=0,**kwargs):
     """TODO."""
-    # from gputools.utils import tile_iterator
+    return from_tensor(keras_model.predict(to_tensor(x,channel=channel_in),**kwargs),channel=channel_out)
 
-    # largest_axis = np.argmax(x.shape)
-    # largest axis that is not the channel dimension
-    largest_axis = [i for i in np.argsort(x.shape) if i != channel][-1]
-    # largest_size = x.shape[largest_axis]
 
-    # blocksize_ideal    = largest_size / n_tiles
-    # blocksize_possible = int(np.ceil(blocksize_ideal/block_multiple) * block_multiple)
+def predict_tiled(keras_model,x,n_tiles,block_size,axis=None,channel_in=None,channel_out=0,**kwargs):
+    """TODO."""
 
-    # blocksizes = list(x.shape)
-    # padsizes   = [0]*x.ndim
-    # blocksizes[largest_axis] = blocksize_possible
-    # padsizes[largest_axis]   = pad
+    def _remove_and_insert(x,a):
+        # remove element at channel_in and insert a at channel_out
+        lst = list(x)
+        del lst[channel_in]
+        lst.insert(channel_out,a)
+        return tuple(lst)
 
-    dst = np.empty(shape_out, dtype=x.dtype)
+    if axis is None:
+        # largest axis (that is not channel_in)
+        axis = [i for i in np.argsort(x.shape) if i != channel_in][-1]
 
-    # for padded_tile, s_dst, s_src in tile_iterator(x, blocksize=blocksizes, padsize=padsizes, mode='reflect'):
-    for padded_tile, s_src, s_dst in tile_iterator(x,axis=largest_axis,n_tiles=n_tiles,block_size=block_size):
-        # remove channel dimension from slices (they disappeared/moved to first dim within predict_function)
-        s_src = (slice(None),) + tuple((s for i,s in enumerate(s_src) if i != channel))
-        s_dst = (slice(None),) + tuple((s for i,s in enumerate(s_dst) if i != channel))
+    dst = None
+    for tile, s_src, s_dst in tile_iterator(x,axis=axis,n_tiles=n_tiles,block_size=block_size):
 
-        # print(s_dst)
-        # print(x.shape, s_dst)
+        pred = predict_direct(keras_model,tile,channel_in=channel_in,channel_out=channel_out)
 
-        dst[s_dst] = predict_function(padded_tile)[s_src]
+        if dst is None:
+            dst_shape = _remove_and_insert(x.shape, pred.shape[channel_out])
+            dst = np.empty(dst_shape, dtype=x.dtype)
+
+        s_src = _remove_and_insert(s_src, slice(None))
+        s_dst = _remove_and_insert(s_dst, slice(None))
+
+        dst[s_dst] = pred[s_src]
 
     return dst
 
