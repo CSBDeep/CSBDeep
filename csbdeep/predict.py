@@ -272,9 +272,10 @@ class PadAndCropResizer(Resizer):
 
 
 
-def predict_direct(keras_model,x,channel_in=None,channel_out=0,**kwargs):
+def predict_direct(keras_model,x,channel_in=None,channel_out=0,single_sample=True,**kwargs):
     """TODO."""
-    return from_tensor(keras_model.predict(to_tensor(x,channel=channel_in),**kwargs),channel=channel_out)
+    return from_tensor(keras_model.predict(to_tensor(x,channel=channel_in,single_sample=single_sample),**kwargs),
+                       channel=channel_out,single_sample=single_sample)
 
 
 

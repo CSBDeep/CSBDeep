@@ -58,15 +58,19 @@ def moveaxis_if_tf(X,reverse=False):
         return np.moveaxis(X, 1, -1) if     is_tf_dim() else X
 
 
-def to_tensor(x,channel=None):
+def to_tensor(x,channel=None,single_sample=True):
+    if single_sample:
+        x = x[np.newaxis]
     if channel is None:
-        return moveaxis_if_tf(x[np.newaxis, np.newaxis])
+        return moveaxis_if_tf(np.expand_dims(x,1))
     else:
-        x = np.moveaxis(x,channel,0)
-        return moveaxis_if_tf(x[np.newaxis])
+        return moveaxis_if_tf(np.moveaxis(x,channel,1))
 
-def from_tensor(x,channel=0):
-    return np.moveaxis(x[0], (-1 if is_tf_dim() else 1), channel)
+def from_tensor(x,channel=0,single_sample=True):
+    return np.moveaxis(
+        x[0] if single_sample else x,
+        -1 if is_tf_dim() else 1,
+        channel)
 
 def tensor_num_channels(x):
     return x.shape[-1 if is_tf_dim() else 1]

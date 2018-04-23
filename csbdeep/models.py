@@ -489,6 +489,45 @@ class IsotropicCARE(CARE):
 
         Returns
         -------
+        :class:`numpy.ndarray`
+            Returns the restored image. If the model is probabilistic, this denotes the `mean` parameter of
+            the predicted per-pixel Laplace distributions (i.e., the expected restored image).
+
+        Todo
+        ----
+        - :func:`scipy.ndimage.interpolation.zoom` differs from :func:`gputools.scale`. Important?
+
+        """
+        return self._predict_mean_and_scale(img, factor, normalizer, resizer, z, channel, batch_size)[0]
+
+
+    def _predict_mean_and_scale(self, img, factor, normalizer, resizer, z=0, channel=None, batch_size=8):
+        """Apply neural network to raw image to restore isotropic resolution.
+
+        Parameters
+        ----------
+        img : :class:`numpy.ndarray`
+            Raw input image, with image dimensions expected in the same order as in data for training.
+            If applicable, only the z and channel dimensions can be anywhere.
+        factor : int
+            Upsampling factor for z dimension. It is important that this is chosen in correspondence
+            to the subsampling factor used during training data generation.
+        normalizer : :class:`csbdeep.predict.Normalizer`
+            Normalization of input image before prediction and (potentially) transformation back after prediction.
+        resizer : :class:`csbdeep.predict.Resizer`
+            If necessary, input image is resized to enable neural network prediction and result is (possibly)
+            resized to yield original image size.
+        z : int
+            Index of z dimension of raw input image.
+        channel : int or None
+            Index of channel dimension of raw input image. Defaults to ``None``, assuming
+            a single-channel input image where without an explicit channel dimension.
+        batch_size : int
+            Number of image slices that are processed together by the neural network.
+            Reduce this value if out of memory errors occur.
+
+        Returns
+        -------
         tuple(:class:`numpy.ndarray`, :class:`numpy.ndarray` or None)
             If model is probabilistic, returns a tuple `(mean, scale)` that defines the parameters
             of per-pixel Laplace distributions. Otherwise, returns the restored image via a tuple `(restored,None)`
@@ -498,9 +537,6 @@ class IsotropicCARE(CARE):
         - :func:`scipy.ndimage.interpolation.zoom` differs from :func:`gputools.scale`. Important?
 
         """
-        # todo: adjust to work with other image data formats
-        is_tf_dim() or _raise(NotImplementedError())
-
         if channel is None:
             self.config.n_channel_in == 1 or _raise(ValueError())
         else:
@@ -553,12 +589,14 @@ class IsotropicCARE(CARE):
 
         # u1: first rotation and prediction
         x_rot1   = rotate(x_scaled, axis=1, copy=False)
-        u_rot1   = self.keras_model.predict(x_rot1, batch_size=batch_size, verbose=0)
+        u_rot1   = predict_direct(self.keras_model, x_rot1, channel_in=-1, channel_out=-1, single_sample=False,
+                                  batch_size=batch_size, verbose=0)
         u1       = rotate(u_rot1, -1, axis=1, copy=False)
 
         # u2: second rotation and prediction
         x_rot2   = rotate(rotate(x_scaled, axis=2, copy=False), axis=0, copy=False)
-        u_rot2   = self.keras_model.predict(x_rot2, batch_size=batch_size, verbose=0)
+        u_rot2   = predict_direct(self.keras_model, x_rot2, channel_in=-1, channel_out=-1, single_sample=False,
+                                  batch_size=batch_size, verbose=0)
         u2       = rotate(rotate(u_rot2, -1, axis=0, copy=False), -1, axis=2, copy=False)
 
         u_rot1.shape[-1] == n_channel_predicted or _raise(ValueError())
