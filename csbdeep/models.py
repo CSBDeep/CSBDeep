@@ -11,7 +11,7 @@ import numpy as np
 import tensorflow as tf
 
 from . import nets, train
-from .predict import predict_direct, predict_tiled, Normalizer, Resizer, PadAndCropResizer
+from .predict import predict_direct, predict_tiled, tile_overlap, Normalizer, Resizer, PadAndCropResizer
 
 
 class Config(argparse.Namespace):
@@ -384,7 +384,9 @@ class CARE(object):
                 if n_tiles == 1:
                     x = predict_direct(self.keras_model,x,channel_in=channel,channel_out=0)
                 else:
-                    x = predict_tiled(self.keras_model,x,channel_in=channel,channel_out=0,n_tiles=n_tiles,block_size=div_n)
+                    overlap = tile_overlap(self.config.unet_n_depth, self.config.unet_kern_size)
+                    x = predict_tiled(self.keras_model,x,channel_in=channel,channel_out=0,
+                                      n_tiles=n_tiles,block_size=div_n,tile_overlap=overlap)
                 done = True
             except tf.errors.ResourceExhaustedError:
                 n_tiles = max(4, 2*n_tiles)

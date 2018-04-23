@@ -275,24 +275,38 @@ def predict_direct(keras_model,x,channel_in=None,channel_out=0,**kwargs):
     return from_tensor(keras_model.predict(to_tensor(x,channel=channel_in),**kwargs),channel=channel_out)
 
 
-def predict_tiled(keras_model,x,n_tiles,block_size,axis=None,channel_in=None,channel_out=0,**kwargs):
+def predict_tiled(keras_model,x,n_tiles,block_size,tile_overlap,channel_in=None,channel_out=0,**kwargs):
     """TODO."""
 
     def _remove_and_insert(x,a):
         # remove element at channel_in and insert a at channel_out
         lst = list(x)
-        del lst[channel_in]
+        if channel_in is not None:
+            del lst[channel_in]
         lst.insert(channel_out,a)
         return tuple(lst)
 
-    if axis is None:
-        # largest axis (that is not channel_in)
-        axis = [i for i in np.argsort(x.shape) if i != channel_in][-1]
+    # largest axis (that is not channel_in)
+    axis = [i for i in np.argsort(x.shape) if i != channel_in][-1]
+
+    if isinstance(n_tiles,(list,tuple)):
+        0 < len(n_tiles) <= x.ndim-(0 if channel_in is None else 1) or _raise(ValueError())
+        n_tiles, n_tiles_remaining = n_tiles[0], n_tiles[1:]
+    else:
+        n_tiles_remaining = []
+
+    n_block_overlap = int(np.ceil(tile_overlap / block_size))
+    # n_block_overlap += -1
+    # n_block_overlap = 10
+    # print(tile_overlap,n_block_overlap)
 
     dst = None
-    for tile, s_src, s_dst in tile_iterator(x,axis=axis,n_tiles=n_tiles,block_size=block_size):
+    for tile, s_src, s_dst in tile_iterator(x,axis=axis,n_tiles=n_tiles,block_size=block_size,n_block_overlap=n_block_overlap):
 
-        pred = predict_direct(keras_model,tile,channel_in=channel_in,channel_out=channel_out)
+        if len(n_tiles_remaining) == 0:
+            pred = predict_direct(keras_model,tile,channel_in=channel_in,channel_out=channel_out,**kwargs)
+        else:
+            pred = predict_tiled(keras_model,tile,n_tiles_remaining,block_size,tile_overlap,channel_in=channel_in,channel_out=channel_out,**kwargs)
 
         if dst is None:
             dst_shape = _remove_and_insert(x.shape, pred.shape[channel_out])
@@ -307,7 +321,7 @@ def predict_tiled(keras_model,x,n_tiles,block_size,axis=None,channel_in=None,cha
 
 
 
-def tile_iterator(x,axis,n_tiles,block_size,n_block_overlap=6):
+def tile_iterator(x,axis,n_tiles,block_size,n_block_overlap):
     """Tile iterator for one dimension of array x.
 
     Parameters
@@ -346,6 +360,10 @@ def tile_iterator(x,axis,n_tiles,block_size,n_block_overlap=6):
         tile_sizes[:r//2]      += 1
         tile_sizes[-(r-r//2):] += 1
 
+    # n_block_overlap = int(np.ceil(92 / block_size))
+    # n_block_overlap -= 1
+    # print(n_block_overlap)
+
     # (pre,post) offsets for each tile
     off = [(n_block_overlap if i > 0 else 0, n_block_overlap if i < n_tiles-1 else 0) for i in range(n_tiles)]
 
@@ -376,6 +394,19 @@ def tile_iterator(x,axis,n_tiles,block_size,n_block_overlap=6):
 
         yield x[to_slice(tile_in)], to_slice(tile_crop), to_slice(tile_out)
         start += tile_sizes[i]
+
+
+def tile_overlap(n_depth, kern_size):
+    rf = {(1, 3):   9, (1, 5):  17, (1, 7): 25,
+          (2, 3):  22, (2, 5):  43, (2, 7): 62,
+          (3, 3):  46, (3, 5):  92, (3, 7): 138,
+          (4, 3):  94, (4, 5): 188, (4, 7): 282,
+          (5, 3): 190, (5, 5): 380, (5, 7): 570}
+    try:
+        return rf[n_depth, kern_size]
+    except KeyError:
+        raise ValueError('tile_overlap value for n_depth=%d and kern_size=%d not available.' % (n_depth, kern_size))
+
 
 
 
