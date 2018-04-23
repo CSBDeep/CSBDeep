@@ -116,7 +116,7 @@ def test_model_predict():
             def _predict(imdims,channel):
                 img = rng.uniform(size=imdims)
                 # print(img.shape)
-                mean, scale = model.predict(img, normalizer, resizer, channel=channel)
+                mean, scale = model._predict_mean_and_scale(img, normalizer, resizer, channel=channel)
                 if config.probabilistic:
                     assert mean.shape == scale.shape
                 else:
@@ -174,14 +174,14 @@ def test_model_predict_tiled():
             def _predict(imdims,channel,n_tiles):
                 img = rng.uniform(size=imdims)
                 # print(img.shape)
-                mean,       scale       = model.predict(img, normalizer, resizer, channel=channel, n_tiles=1)
-                mean_tiled, scale_tiled = model.predict(img, normalizer, resizer, channel=channel, n_tiles=n_tiles)
+                mean,       scale       = model._predict_mean_and_scale(img, normalizer, resizer, channel=channel, n_tiles=1)
+                mean_tiled, scale_tiled = model._predict_mean_and_scale(img, normalizer, resizer, channel=channel, n_tiles=n_tiles)
                 assert mean.shape == mean_tiled.shape
                 if config.probabilistic:
                     assert scale.shape == scale_tiled.shape
                 error_max = np.max(np.abs(mean-mean_tiled))
                 # print('n, k, err = {0}, {1}x{1}, {2}'.format(model.config.unet_n_depth, model.config.unet_kern_size, error_max))
-                assert error_max < 1e-4
+                assert error_max < 1e-3
                 return mean, mean_tiled
 
             imdims = list(rng.randint(100,130,size=config.n_dim))

@@ -353,6 +353,39 @@ class CARE(object):
 
         Returns
         -------
+        :class:`numpy.ndarray`
+            Returns the restored image. If the model is probabilistic, this denotes the `mean` parameter of
+            the predicted per-pixel Laplace distributions (i.e., the expected restored image).
+
+        """
+        return self._predict_mean_and_scale(img, normalizer, resizer, channel, n_tiles)[0]
+
+
+    def _predict_mean_and_scale(self, img, normalizer, resizer, channel=None, n_tiles=1):
+        """Apply neural network to raw image to predict restored image.
+
+        Parameters
+        ----------
+        img : :class:`numpy.ndarray`
+            Raw input image, with image dimensions expected in the same order as in data for training.
+            If applicable, only the channel dimension can be anywhere.
+        normalizer : :class:`csbdeep.predict.Normalizer`
+            Normalization of input image before prediction and (potentially) transformation back after prediction.
+        resizer : :class:`csbdeep.predict.Resizer`
+            If necessary, input image is resized to enable neural network prediction and result is (possibly)
+            resized to yield original image size.
+        channel : int or None
+            Index of channel dimension of raw input image. Defaults to ``None``, assuming
+            a single-channel input image where without an explicit channel dimension.
+        n_tiles : int
+            Out of memory (OOM) errors can occur if the input image is too large.
+            To avoid this problem, the input image is broken up into (overlapping) tiles
+            that can then be processed independently and re-assembled to yield the restored image.
+            This parameter denotes the number of tiles. Note that if the number of tiles is too low,
+            it is adaptively increased until OOM errors are avoided, albeit at the expense of runtime.
+
+        Returns
+        -------
         tuple(:class:`numpy.ndarray`, :class:`numpy.ndarray` or None)
             If model is probabilistic, returns a tuple `(mean, scale)` that defines the parameters
             of per-pixel Laplace distributions. Otherwise, returns the restored image via a tuple `(restored,None)`
