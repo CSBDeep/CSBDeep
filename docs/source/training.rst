@@ -70,5 +70,9 @@ After training, the learned model can be exported via
 Isotropic reconstruction
 ------------------------
 
+Training a CARE network for isotropic reconstruction
+(:class:`csbdeep.models.IsotropicCARE`) does not differ from that of a
+standard CARE model. What changes is the way in which the training data is
+generated (not available yet.)
+
 .. autoclass:: csbdeep.models.IsotropicCARE
-    :members: predict

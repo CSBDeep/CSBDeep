@@ -36,13 +36,17 @@ retained.
 >>> x = imread('my_image.tif')
 >>> normalizer = PercentileNormalizer(3,99.8)
 >>> resizer = PadAndCropResizer()
->>> mean, scale = model.predict(x, normalizer, resizer)
+>>> restored = model.predict(x, normalizer, resizer)
 
 .. .. automethod:: csbdeep.models.CARE.predict
 .. autoclass:: csbdeep.models.CARE
     :members: predict, load_weights
 
 .. .. autofunction:: csbdeep.predict.tiled_prediction
+
+
+.. autoclass:: csbdeep.models.IsotropicCARE
+    :members: predict
 
 
 Normalization
