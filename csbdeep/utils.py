@@ -156,3 +156,15 @@ def rotate(arr, k=1, axis=1, copy=True):
 
     res = np.rollaxis(res, -1, axis)
     return res
+
+
+def download_and_extract_zip_file(url, provides=None, targetdir='.'):
+    if provides is None or not all(map(os.path.exists,provides)):
+        import zipfile
+        from six.moves.urllib.request import urlretrieve
+        try:
+            filepath, http_msg = urlretrieve(url)
+            with zipfile.ZipFile(filepath,'r') as zipfile:
+                zipfile.extractall(targetdir)
+        finally:
+            os.unlink(filepath)

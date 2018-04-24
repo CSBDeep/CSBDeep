@@ -12,6 +12,7 @@ import tensorflow as tf
 
 from . import nets, train
 from .predict import predict_direct, predict_tiled, tile_overlap, Normalizer, Resizer, PadAndCropResizer
+from .probability import ProbabilisticPrediction
 
 
 class Config(argparse.Namespace):
@@ -361,6 +362,27 @@ class CARE(object):
         return self._predict_mean_and_scale(img, normalizer, resizer, channel, n_tiles)[0]
 
 
+    def predict_probabilistic(self, img, normalizer, resizer=PadAndCropResizer(), channel=None, n_tiles=1):
+        """Apply neural network to raw image to predict probability distribution for restored image.
+
+        See :func:`predict` for parameter explanations.
+
+        Returns
+        -------
+        :class:`csbdeep.probability.ProbabilisticPrediction`
+            Returns the probability distribution of the restored image.
+
+        Raises
+        ------
+        ValueError
+            If this is not a probabilistic model.
+
+        """
+        self.config.probabilistic or _raise(ValueError('This is not a probabilistic model.'))
+        mean, scale = self._predict_mean_and_scale(img, normalizer, resizer, channel, n_tiles)
+        return ProbabilisticPrediction(mean, scale)
+
+
     def _predict_mean_and_scale(self, img, normalizer, resizer, channel=None, n_tiles=1):
         """Apply neural network to raw image to predict restored image.
 
@@ -459,7 +481,8 @@ class CARE(object):
 class IsotropicCARE(CARE):
     """CARE network for isotropic image reconstruction.
 
-    Extends :class:`csbdeep.models.CARE` by replacing :func:`predict` to do isotropic reconstruction.
+    Extends :class:`csbdeep.models.CARE` by replacing prediction
+    (:func:`predict`, :func:`predict_probabilistic`) to do isotropic reconstruction.
     """
 
     def predict(self, img, factor, normalizer, resizer=PadAndCropResizer(), z=0, channel=None, batch_size=8):
@@ -499,6 +522,27 @@ class IsotropicCARE(CARE):
 
         """
         return self._predict_mean_and_scale(img, factor, normalizer, resizer, z, channel, batch_size)[0]
+
+
+    def predict_probabilistic(self, img, factor, normalizer, resizer=PadAndCropResizer(), z=0, channel=None, batch_size=8):
+        """Apply neural network to raw image to predict probability distribution for isotropic restored image.
+
+        See :func:`predict` for parameter explanations.
+
+        Returns
+        -------
+        :class:`csbdeep.probability.ProbabilisticPrediction`
+            Returns the probability distribution of the restored image.
+
+        Raises
+        ------
+        ValueError
+            If this is not a probabilistic model.
+
+        """
+        self.config.probabilistic or _raise(ValueError('This is not a probabilistic model.'))
+        mean, scale = self._predict_mean_and_scale(img, factor, normalizer, resizer, z, channel, batch_size)
+        return ProbabilisticPrediction(mean, scale)
 
 
     def _predict_mean_and_scale(self, img, factor, normalizer, resizer, z=0, channel=None, batch_size=8):

@@ -40,13 +40,13 @@ retained.
 
 .. .. automethod:: csbdeep.models.CARE.predict
 .. autoclass:: csbdeep.models.CARE
-    :members: predict, load_weights
+    :members: predict, predict_probabilistic, load_weights
 
 .. .. autofunction:: csbdeep.predict.tiled_prediction
 
 
 .. autoclass:: csbdeep.models.IsotropicCARE
-    :members: predict
+    :members: predict, predict_probabilistic
 
 
 Normalization
