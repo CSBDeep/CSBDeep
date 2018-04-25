@@ -21,7 +21,6 @@ from being extracted, since they do not contain interesting structures.
 .. todo::
    Training data generation like this will not work for:
        - surface projection → accommodate in :func:`csbdeep.datagen.create_patches`
-       - isotropic reconstruction → provide different function
 
 .. autofunction:: csbdeep.datagen.get_tiff_pairs_from_folders
 .. autofunction:: csbdeep.datagen.create_patches
@@ -29,6 +28,16 @@ from being extracted, since they do not contain interesting structures.
 .. autofunction:: csbdeep.datagen.no_background_patches
 .. autofunction:: csbdeep.datagen.norm_percentiles
 .. autofunction:: csbdeep.datagen.sample_percentiles
+
+Isotropic reconstruction
+------------------------
+
+We provided the function :func:`csbdeep.datagen.anisotropic_distortions`
+that returns a :obj:`csbdeep.datagen.Transform` object to be used
+for creating training data for isotropic reconstruction networks.
+See `Data augmention`_ to learn about transforms.
+
+.. autofunction:: csbdeep.datagen.anisotropic_distortions
 
 Advanced topics
 ---------------

@@ -254,6 +254,11 @@ def test_iso_care():
     """
     typical use of isotropic CARE
     """
+    # check that created training patches are registered as best as possible
+    # from skimage.feature import register_translation
+    # shifts = register_translation(u,x_norm_pad)[0]
+    # # assert np.all(shifts==0)
+
 
 def test_image_scaling():
     """

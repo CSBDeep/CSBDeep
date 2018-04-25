@@ -4,7 +4,7 @@ from six.moves import range, zip, map, reduce, filter
 import numpy as np
 from tifffile import imread
 from collections import namedtuple
-import sys
+import sys, warnings
 
 from tqdm import tqdm
 from .utils import Path, normalize_mi_ma, _raise, consume, compose, shuffle_inplace
@@ -124,6 +124,7 @@ def get_tiff_pairs_from_folders(basepath,source_dirs,target_dir='GT',pattern='*.
 
     p = Path(basepath)
     image_names = [f.name for f in (p/target_dir).glob(pattern)]
+    len(image_names) > 0 or _raise(FileNotFoundError("'target_dir' doesn't exist or didn't find any images in it."))
     consume ((
         (p/s/n).exists() or _raise(FileNotFoundError(p/s/n))
         for s in source_dirs for n in image_names
@@ -182,6 +183,8 @@ def no_background_patches(threshold=0.4, percentile=99.9):
         image = datas[0]
         if dtype is not None:
             image = image.astype(dtype)
+        # make max filter patch_size smaller to avoid only few non-bg pixel close to image border
+        patch_size = [(p//2 if p>1 else p) for p in patch_size]
         filtered = maximum_filter(image, patch_size, mode='constant')
         return filtered > threshold * np.percentile(image,percentile)
     return _filter
@@ -339,7 +342,7 @@ def norm_percentiles(percentiles=sample_percentiles(), relu_last=False):
 
 
 
-def create_patches (
+def create_patches(
         raw_data,
         patch_size,
         n_patches_per_image,
@@ -461,3 +464,246 @@ def create_patches (
         Y = np.moveaxis(Y, 1+channel, 1)
 
     return X,Y
+
+
+
+def anisotropic_distortions(
+        subsample,
+        psf,
+        z              = 0,
+        channel        = None,
+        poisson_noise  = False,
+        gauss_sigma    = 0,
+        crop_threshold = 0.2,
+    ):
+    """Simulate anisotropic distortions along z.
+
+    Modify x and y dimensions to mimic the distortions that occur due to
+    low resolution along z. Note that the modified image is finally upscaled
+    to obtain the same resolution as the unmodified input image.
+
+    Parameters
+    ----------
+    subsample : list
+        List of subsampling factors to apply tothe image.
+        Each factor should be a tuple of subsampling factors of the x and y dimensions
+        (in the order as they appear in the raw image dimensions).
+    psf : :class:`numpy.ndarray` or None
+        Point spread function (PSF) that is supposed to mimic blurring
+        of the microscope due to reduced axial resolution.
+        Must be compatible with the number of dimensions (2D/3D) and the shape of the raw images.
+    z : int
+        Index of z dimension.
+    channel : int, optional
+        Index of channel for multi-channel images; set to ``None`` for single-channel images where
+        raw images do not explicitly contain a channel dimension.
+    poisson_noise : bool
+        Flag to indicate whether Poisson noise should be added to the image.
+    gauss_sigma : int
+        Standard deviation of white Gaussian noise to be added to the image (after Poisson).
+    crop_threshold : float
+        The subsample factors must evenly divide the raw image dimensions to prevent
+        potential image misalignement. If this is not the case the subsample factors are
+        modified and the raw image will be cropped up to a fraction indiced by `crop_threshold`.
+
+    Returns
+    -------
+    Transform
+        Returns a :class:`Transform` object to be used with :func:`create_patches` to
+        create training data for an isotropic reconstruction CARE network.
+
+    Raises
+    ------
+    ValueError
+        Various reasons.
+
+    """
+    zoom_order = 1
+
+    isinstance(subsample,(tuple,list)) or _raise(ValueError('subsample must be list of tuples'))
+    subsample_list = subsample
+
+    0 < crop_threshold < 1 or _raise(ValueError())
+
+    channel is None or isinstance(channel,int) or _raise(ValueError())
+    isinstance(z,int) or _raise(ValueError())
+    psf is None or isinstance(psf,np.ndarray) or _raise(ValueError())
+
+
+
+
+
+    def _normalize_data(data,undo=False):
+        """Move channel and z to front of image."""
+        if undo:
+            if channel is None:
+                return np.moveaxis(data[0],0,z)
+            else:
+                return np.moveaxis(data,[0,1],[channel,z])
+        else:
+            if channel is None:
+                return np.moveaxis(np.expand_dims(data,-1), [-1,z],[0,1])
+            else:
+                return np.moveaxis(data,[channel,z],[0,1])
+
+    def _scale_down_up(data,subsample):
+        from scipy.ndimage.interpolation import zoom
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            return zoom(zoom(data, (1,1,1./subsample[0],1./subsample[1]), order=0),
+                                   (1,1,   subsample[0],   subsample[1]), order=zoom_order)
+
+    # def _subsample_shape(shape):
+    #     """
+    #     returns the shape of the result when down and upsampling an array of shape shape
+    #     """
+    #     from scipy.version import full_version as scipy_version
+    #     from distutils.version import LooseVersion
+    #     if LooseVersion(scipy_version) >= LooseVersion('0.13.0'):
+    #         disc = lambda v: int(round(v))
+    #     else:
+    #         disc = lambda v: int(v)
+    #     return shape[:2] + tuple( disc(disc(n/s)*s) for s,n in zip(subsample,shape[2:]) )
+
+    # def _resize_to_shape(x, shape, mode='constant'):
+    #     diff = np.array(shape) - np.array(x.shape)
+    #     # first shrink
+    #     slices = tuple(slice(d//2,-(d-d//2)) if d>0 else slice(None,None) for d in -diff)
+    #     x = x[slices]
+    #     if x.shape == shape:
+    #         return x
+    #     # then pad
+    #     return np.pad(x, [(  int(np.ceil(d/2.)),
+    #                        d-int(np.ceil(d/2.))) if d>0 else (0,0) for d in diff], mode=mode)
+
+    # def _crop_xy_border(x,b=5):
+    #     return x[...,b:-b,b:-b] if b > 0 else x
+
+    def adjust_subsample(d,s,c):
+        """length d, subsample s, tolerated crop loss fraction c"""
+        from fractions import Fraction
+
+        def crop_size(n_digits,frac):
+            _s = round(s,n_digits)
+            _div = frac.denominator
+            s_multiple_max = np.floor(d/_s)
+            s_multiple = (s_multiple_max//_div)*_div
+            # print(n_digits, _s,_div,s_multiple)
+            size = s_multiple * _s
+            assert np.allclose(size,round(size))
+            return size
+
+        def decimals(v,n_digits=None):
+            if n_digits is not None:
+                v = round(v,n_digits)
+            s = str(v)
+            assert '.' in s
+            decimals = s[1+s.find('.'):]
+            return int(decimals), len(decimals)
+
+        s = float(s)
+        dec, n_digits = decimals(s)
+        frac = Fraction(dec,10**n_digits)
+        # a multiple of s that is also an integer number must be
+        # divisible by the denominator of the fraction that represents the decimal points
+
+        # round off decimals points if needed
+        while n_digits > 0 and (d-crop_size(n_digits,frac))/d > c:
+            n_digits -= 1
+            frac = Fraction(decimals(s,n_digits)[0], 10**n_digits)
+
+        size = crop_size(n_digits,frac)
+        if size == 0 or (d-size)/d > c:
+            raise ValueError("subsample factor %g too large (crop_threshold=%g)" % (s,c))
+
+        return round(s,n_digits), int(round(crop_size(n_digits,frac)))
+
+
+    def _make_divisible_by_subsample(x,sizes):
+        def _split_slice(v):
+            return slice(None) if v==0 else slice(v//2,-(v-v//2))
+        slices = (slice(None),slice(None)) + tuple(
+            # # it's late... there must be a (much) simpler way to do this!
+            # _split_slice(d-next(int(np.round(s*i)) for i in range(int(np.floor(d/s)),1,-1) if np.allclose(np.round(i*s),i*s)))
+            _split_slice(d-sz)
+            for sz,d in zip(sizes,x.shape[2:])
+        )
+        return x[slices]
+
+
+    def _generator(inputs):
+        for img,y,mask in inputs:
+
+            if not (y is None or np.all(img==y)):
+                warnings.warn('ignoring y.')
+            if mask is not None:
+                warnings.warn('ignoring mask.')
+            del y, mask
+
+            # tmp
+            # print(img.shape)
+            img = img[...,:256,:256]
+
+            _img, _x = img, img.astype(np.float32, copy=False)
+
+            if psf is not None:
+                _x.ndim == psf.ndim or _raise(ValueError('image and psf must have the same number of dimensions.'))
+                # print("blurring with psf")
+                from scipy.signal import fftconvolve
+                _x = fftconvolve(_x, psf, mode='same')
+
+
+            for _subsample in subsample_list:
+                if not isinstance(_subsample,(tuple,list)):
+                    _subsample = (1, _subsample)
+                assert len(_subsample) == 2
+
+                # start with non-subsampled images
+                img, x = _img, _x
+
+                if bool(poisson_noise):
+                    # print("apply poisson noise")
+                    x = np.random.poisson(np.maximum(0,x).astype(np.int)).astype(np.float32)
+
+                if gauss_sigma > 0:
+                    # print("adding gaussian noise with sigma = ", gauss_sigma)
+                    noise = np.random.normal(0,gauss_sigma,size=x.shape)
+                    x = np.maximum(0,x+noise)
+
+                if any(s != 1 for s in _subsample):
+                    # print("down and upsampling by factors %s" % str(_subsample))
+                    img = _normalize_data(img)
+                    x   = _normalize_data(x)
+
+                    subsample, subsample_sizes = zip(*[
+                        adjust_subsample(d,s,crop_threshold) for s,d in zip(_subsample,x.shape[2:])
+                    ])
+                    # print(subsample, subsample_sizes)
+                    if _subsample != subsample:
+                        warnings.warn('changing subsample from %s to %s' % (str(_subsample),str(subsample)))
+
+                    img = _make_divisible_by_subsample(img,subsample_sizes)
+                    x   = _make_divisible_by_subsample(x,  subsample_sizes)
+                    x   = _scale_down_up(x,subsample)
+
+                    assert x.shape == img.shape, (x.shape, img.shape)
+
+                    img = _normalize_data(img,undo=True)
+                    x   = _normalize_data(x,  undo=True)
+
+                    # why do I need _subsample_shape if I can just call u.shape instead???
+                    # assert u.shape == _subsample_shape(x_norm.shape)
+
+                    # not clear why _resize_to_shape does the right thing, i.e. align both images as best as possible
+                    # x_norm_pad = _resize_to_shape(x_norm,u.shape)
+                    # # from skimage.feature import register_translation
+                    # # shifts = register_translation(u,x_norm_pad)[0]
+                    # # assert np.all(shifts==0), shifts
+
+                    # crop border to get rid of potential upsampling artifacts
+                    # u, x_norm_pad = _crop_xy_border(u), _crop_xy_border(x_norm_pad)
+
+                yield x, img, None
+
+
+    return Transform('Anisotropic distortions', _generator, len(subsample_list))
