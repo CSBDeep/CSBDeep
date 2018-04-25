@@ -12,8 +12,8 @@ for more information with links to our manuscript and supplementary material.
     It currently only supports CARE networks for direct image
     restoration/enhancement and isotropic reconstruction, i.e. surface
     extraction/projection is not available yet. Furthermore, the necessary
-    training data can only be generated from aligned raw images (e.g. low- and
-    high-SNR). Creating training data for isotropic reconstruction or via
+    training data can currently only be generated from aligned raw images (e.g. low- and
+    high-SNR) or for isotropic reconstruction. Creating training data via
     simulation is currently not implemented.
 
 

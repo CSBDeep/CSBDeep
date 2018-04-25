@@ -16,20 +16,24 @@ class ProbabilisticPrediction():
     """Laplace distribution (independently per pixel)."""
 
     def __init__(self, mean, scale):
-        self.mean = mean
-        self.scale = scale
+        self._mean = mean
+        self._scale = scale
 
-    def expectation(self):
-        return self.mean
+    def mean(self):
+        return self._mean
 
-    def variance():
-        raise NotImplementedError()
+    def scale(self):
+        return self._scale
 
-    def sampling_generator():
-        raise NotImplementedError()
+    def variance(self):
+        return 2.0*np.square(self._scale)
 
-    def entropy():
-        raise NotImplementedError()
+    def entropy(self):
+        return np.log(2*np.e*self._scale)
+
+    def sampling_generator(self):
+        while True:
+            yield np.random.laplace(self._mean,self._scale)
 
     def credible_intervals():
         raise NotImplementedError()
