@@ -597,18 +597,21 @@ class IsotropicCARE(CARE):
         isinstance(resizer,Resizer) or _raise(ValueError())
         isinstance(normalizer,Normalizer) or _raise(ValueError())
 
-        # try gputools for fast scaling function, fallback to scipy
-        # problem with gputools: GPU memory can be fully used by tensorflow
-        try:
-            # raise ImportError
-            from gputools import scale as _scale
-            def scale_z(arr,factor):
-                # gputools.scale can only do 3D arrays
-                return np.stack([_scale(_arr,(factor,1,1),interpolation='linear') for _arr in arr])
-        except ImportError:
-            from scipy.ndimage.interpolation import zoom
-            def scale_z(arr,factor):
-                return zoom(arr,(1,factor,1,1),order=1,prefilter=False)
+        # # try gputools for fast scaling function, fallback to scipy
+        # # problem with gputools: GPU memory can be fully used by tensorflow
+        # try:
+        #     # raise ImportError
+        #     from gputools import scale as _scale
+        #     def scale_z(arr,factor):
+        #         # gputools.scale can only do 3D arrays
+        #         return np.stack([_scale(_arr,(factor,1,1),interpolation='linear') for _arr in arr])
+        # except ImportError:
+        #     from scipy.ndimage.interpolation import zoom
+        #     def scale_z(arr,factor):
+        #         return zoom(arr,(1,factor,1,1),order=1,prefilter=False)
+        from scipy.ndimage.interpolation import zoom
+        def scale_z(arr,factor):
+            return zoom(arr,(1,factor,1,1),order=1,prefilter=False)
 
         # normalize
         x = normalizer.before(img,channel)
