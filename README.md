@@ -1,3 +1,5 @@
 # CSBDeep_code
 
-Please see the documentation at http://csbdeep.bioimagecomputing.com/doc/.
+Work in progress. 
+
+Please go to the documentation at http://csbdeep.bioimagecomputing.com/doc/.
