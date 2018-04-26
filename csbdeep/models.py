@@ -611,7 +611,7 @@ class IsotropicCARE(CARE):
         #         return zoom(arr,(1,factor,1,1),order=1,prefilter=False)
         from scipy.ndimage.interpolation import zoom
         def scale_z(arr,factor):
-            return zoom(arr,(1,factor,1,1),order=1,prefilter=False)
+            return zoom(arr,(1,factor,1,1),order=1)
 
         # normalize
         x = normalizer.before(img,channel)
