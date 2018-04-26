@@ -5,38 +5,53 @@ from six.moves import range, zip, map, reduce, filter
 from .utils import _raise, consume
 import warnings
 import numpy as np
+from scipy.stats import laplace
 
 
-# from six import add_metaclass
-# from abc import ABCMeta, abstractmethod, abstractproperty
-
-
-
-class ProbabilisticPrediction():
+class ProbabilisticPrediction(object):
     """Laplace distribution (independently per pixel)."""
 
-    def __init__(self, mean, scale):
-        self._mean = mean
-        self._scale = scale
+    def __init__(self, loc, scale):
+        loc.shape == scale.shape or _raise(ValueError())
+        #
+        self._loc     = loc
+        self._scale   = scale
+        self._shape   = loc.shape
+        # expose methods from laplace object
+        _laplace      = self[...]
+        self.rvs      = _laplace.rvs
+        self.pdf      = _laplace.pdf
+        self.logpdf   = _laplace.logpdf
+        self.cdf      = _laplace.cdf
+        self.logcdf   = _laplace.logcdf
+        self.sf       = _laplace.sf
+        self.logsf    = _laplace.logsf
+        self.ppf      = _laplace.ppf
+        self.isf      = _laplace.isf
+        self.moment   = _laplace.moment
+        self.stats    = _laplace.stats
+        self.entropy  = _laplace.entropy
+        self.expect   = _laplace.expect
+        self.median   = _laplace.median
+        self.mean     = _laplace.mean
+        self.var      = _laplace.var
+        self.std      = _laplace.std
+        self.interval = _laplace.interval
 
-    def mean(self):
-        return self._mean
+    def __getitem__(self, indices):
+        return laplace(loc=self._loc[indices],scale=self._scale[indices])
+
+    @property
+    def shape(self):
+        return self._shape
 
     def scale(self):
         return self._scale
 
-    def variance(self):
-        return 2.0*np.square(self._scale)
-
-    def entropy(self):
-        return np.log(2*np.e*self._scale)
-
-    def sampling_generator(self):
-        while True:
-            yield np.random.laplace(self._mean,self._scale)
-
-    def credible_intervals():
-        raise NotImplementedError()
-
-    def line_plot():
-        raise NotImplementedError()
+    def sampling_generator(self,n=None):
+        if n is None:
+            while True:
+                yield self.rvs()
+        else:
+            for i in range(n):
+                yield self.rvs()
