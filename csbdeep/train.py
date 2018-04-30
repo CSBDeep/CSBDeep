@@ -1,7 +1,7 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
 from six.moves import range, zip, map, reduce, filter
 
-from .utils import moveaxis_if_tf, _raise
+from .utils import _raise, move_channel_for_backend, axes_dict
 from .losses import loss_laplace, loss_mse, loss_mae, loss_thresh_weighted_decay
 
 import numpy as np
@@ -31,11 +31,17 @@ class ParameterDecayCallback(Callback):
             print("\n[ParameterDecayCallback] new %s: %s\n" % (self.name if self.name else 'parameter', new_val))
 
 
-def load_data(data,validation_split=0,n_images=None):
+def load_data(data,validation_split=0,axes=None,n_images=None):
     """ TODO """
     # print("Loading training data...")
     f = np.load(data)
     X, Y = f['X'], f['Y']
+    if axes is None:
+        axes = str(f['axes']).upper()
+
+    assert X.shape == Y.shape
+    assert len(axes) == X.ndim
+    assert 'C' in axes
     if n_images is None:
         n_images = X.shape[0]
     assert X.shape[0] == Y.shape[0]
@@ -43,6 +49,7 @@ def load_data(data,validation_split=0,n_images=None):
     assert 0 <= validation_split < 1
 
     X, Y = X[:n_images], Y[:n_images]
+    channel = axes_dict(axes)['C']
 
     if validation_split > 0:
         n_val   = int(round(n_images * validation_split))
@@ -51,8 +58,23 @@ def load_data(data,validation_split=0,n_images=None):
         X_t, Y_t = X[-n_val:],  Y[-n_val:]
         X,   Y   = X[:n_train], Y[:n_train]
         assert X.shape[0] == n_train and X_t.shape[0] == n_val
+        X_t = move_channel_for_backend(X_t,channel=channel)
+        Y_t = move_channel_for_backend(Y_t,channel=channel)
 
-    return (tuple(map(moveaxis_if_tf,(X,Y))), tuple(map(moveaxis_if_tf,(X_t,Y_t)))) if validation_split > 0 else (tuple(map(moveaxis_if_tf,(X,Y))), None)
+    X = move_channel_for_backend(X,channel=channel)
+    Y = move_channel_for_backend(Y,channel=channel)
+
+    import keras.backend as K
+    assert K.image_data_format() in ('channels_first','channels_last')
+    axes = axes.replace('C','') # remove channel
+    if K.image_data_format() == 'channels_last':
+        axes = axes+'C'
+    else:
+        axes = axes[:1]+'C'+axes[1:]
+
+    data_val = (X_t,Y_t) if validation_split > 0 else None
+
+    return (X,Y), data_val, axes
 
 
 def prepare_model(model, optimizer, loss, metrics=('mse','mae'),

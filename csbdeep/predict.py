@@ -2,7 +2,7 @@ from __future__ import print_function, unicode_literals, absolute_import, divisi
 from six.moves import range, zip, map, reduce, filter
 
 
-from .utils import _raise, consume, normalize_mi_ma, from_tensor, to_tensor, tensor_num_channels, is_tf_dim
+from .utils import _raise, consume, normalize_mi_ma, from_tensor, to_tensor, tensor_num_channels, is_tf_dim, axes_dict
 import warnings
 import numpy as np
 
@@ -18,15 +18,15 @@ class Normalizer():
     """Abstract base class for normalization methods."""
 
     @abstractmethod
-    def before(self, img, channel):
+    def before(self, img, axes):
         """Normalization of the raw input image (method stub).
 
         Parameters
         ----------
         img : :class:`numpy.ndarray`
             Raw input image.
-        channel : int or None
-            Indicates channel dimension (can be ``None``).
+        axes : str
+            Axes of img
 
         Returns
         -------
@@ -38,6 +38,8 @@ class Normalizer():
     @abstractmethod
     def after(self, mean, scale):
         """Possible adjustment of predicted restored image (method stub).
+
+        Axes remain the same wrt to `before`. TODO
 
         Parameters
         ----------
@@ -66,7 +68,7 @@ class NoNormalizer(Normalizer):
     def __init__(self, do_after=False):
         self._do_after = do_after
 
-    def before(self, img, channel):
+    def before(self, img, axes):
         return img
 
     def after(self, mean, scale):
@@ -100,13 +102,15 @@ class PercentileNormalizer(Normalizer):
         self._do_after = do_after
         self.kwargs = kwargs
 
-    def before(self, img, channel):
+    def before(self, img, axes):
         """Percentile-based normalization of raw input image.
 
         See :func:`csbdeep.predict.Normalizer.before` for parameter descriptions.
         Note that percentiles are computed individually for each channel
-        if `channel` is not ``None``.
+        if axes contains 'C' for channel.
         """
+        len(axes) == img.ndim or _raise(ValueError())
+        channel = axes_dict(axes)['C']
         axes = None if channel is None else tuple((d for d in range(img.ndim) if d != channel))
         self.mi = np.percentile(img,self.pmin,axis=axes,keepdims=True)
         self.ma = np.percentile(img,self.pmax,axis=axes,keepdims=True)
@@ -281,6 +285,10 @@ def predict_direct(keras_model,x,channel_in=None,channel_out=0,single_sample=Tru
 
 def predict_tiled(keras_model,x,n_tiles,block_size,tile_overlap,channel_in=None,channel_out=0,**kwargs):
     """TODO."""
+
+    # TODO: better check, write an axis normalization function that converts negative indices to positive ones
+    channel_in  = (channel_in  + x.ndim) % x.ndim
+    channel_out = (channel_out + x.ndim) % x.ndim
 
     def _remove_and_insert(x,a):
         # remove element at channel_in and insert a at channel_out

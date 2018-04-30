@@ -49,18 +49,29 @@ def is_tf_back():
 # def get_dir_for_file(fname=sys.argv[0]):
 #     return os.path.dirname(os.path.realpath(fname))
 
-def moveaxis_if_tf(X,reverse=False):
+def move_channel_for_backend(X,channel):
+    import keras.backend as K
+    assert K.image_data_format() in ('channels_first','channels_last')
+    if K.image_data_format() == 'channels_last':
+        return np.moveaxis(X, channel, -1)
+    else:
+        return np.moveaxis(X, channel,  1)
+
+
+def moveaxis_if_tf(X,channel=1,reverse=False):
     if X is None:
         return None
     if reverse:
-        return np.moveaxis(X, -1, 1) if not is_tf_dim() else X
+        return np.moveaxis(X, -1, channel) if not is_tf_dim() else X
     else:
-        return np.moveaxis(X, 1, -1) if     is_tf_dim() else X
+        return np.moveaxis(X, channel, -1) if     is_tf_dim() else X
 
 
 def to_tensor(x,channel=None,single_sample=True):
     if single_sample:
         x = x[np.newaxis]
+        if channel is not None and channel >= 0:
+            channel += 1
     if channel is None:
         return moveaxis_if_tf(np.expand_dims(x,1))
     else:
@@ -168,3 +179,61 @@ def download_and_extract_zip_file(url, provides=None, targetdir='.'):
                 zipfile.extractall(targetdir)
         finally:
             os.unlink(filepath)
+
+
+def axes_dict(axes):
+    """
+    from axes string to dict
+    S(ample), T(ime), C(hannel), Z, Y, X
+    """
+    allowed = 'STCZYX'
+    axes = str(axes).upper()
+    consume(a in allowed       or _raise(ValueError("invalid axis '%s'."%a))               for a in axes)
+    consume(axes.count(a) <= 1 or _raise(ValueError("axis '%s' occurs more than once."%a)) for a in allowed)
+    return { a: None if axes.find(a) == -1 else axes.find(a) for a in allowed }
+    # return collections.namedtuple('Axes',list(allowed))(*[None if axes.find(a) == -1 else axes.find(a) for a in allowed ])
+
+# def axes_dict_to_str(axes):
+#     """
+#     from dict to axes string
+#     S(ample), T(ime), C(hannel), Z, Y, X
+#     """
+#     allowed = 'STCZYX'
+#     # try:
+#     #     axes = axes._asdict()
+#     # except:
+#     #     pass
+#     consume(a in allowed or _raise(ValueError("invalid axis '%s'."%a)) for a in axes)
+#     dims = [a for a in axes.values() if a is not None]
+#     len(dims) == len(np.unique(dims)) or _raise(ValueError("dimension occurs more than once."))
+
+#     s = ['' for _ in axes]
+#     for a in axes:
+#         if axes[a] is not None:
+#             s[axes[a]] = a
+#     s = ''.join(s)
+#     return s
+
+
+def move_image_axes(x, fr, to):
+    """
+    x: ndarray
+    fr,to: axes string (see `axes_dict`)
+    """
+    isinstance(fr,str) and isinstance(to,str) or _raise(ValueError())
+    fr, to = fr.upper(), to.upper()
+    sorted(list(fr)) == sorted(list(to)) or _raise(ValueError())
+    len(fr) == x.ndim or _raise(ValueError())
+    if fr == to:
+        return x
+    ax_from, ax_to = axes_dict(fr), axes_dict(to)
+    return np.moveaxis(x, [ax_from[a] for a in fr], [ax_to[a] for a in fr])
+
+# def axes_move(axes,a,p):
+#     """move or insert 'a' in 'axes' string to position 'p'."""
+#     axes = str(axes).upper()
+#     ax
+#     ax = axes_dict(axes)
+#     if ax[a] is None:
+#         return axes
+#     else:

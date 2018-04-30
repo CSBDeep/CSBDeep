@@ -1,12 +1,12 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
 from six.moves import range, zip, map, reduce, filter
 
-# from .utils import _raise, consume, Path, load_json, save_json, from_tensor, to_tensor, is_tf_dim, rotate
 # import warnings
 import numpy as np
 from itertools import product
 import tempfile
 
+from csbdeep.utils import axes_dict
 from csbdeep.models import Config, CARE
 from csbdeep.predict import NoNormalizer, NoResizer, tile_overlap
 from csbdeep.nets import receptive_field_unet
@@ -16,16 +16,51 @@ from tqdm import tqdm
 import pytest
 
 def config_generator(**kwargs):
-    assert 'n_dim' in kwargs
+    assert 'axes' in kwargs
     keys, values = kwargs.keys(), kwargs.values()
     values = [v if isinstance(v,(list,tuple)) else [v] for v in values]
     for p in product(*values):
         yield Config(**dict(zip(keys,p)))
 
 
+def test_config():
+    assert K.image_data_format() in ('channels_first','channels_last')
+    def _with_channel(axes):
+        axes = axes.upper()
+        if 'C' in axes:
+            return axes
+        return (axes+'C') if K.image_data_format() == 'channels_last' else ('C'+axes)
+
+    axes_list = [
+        ('yx',_with_channel('YX')),
+        ('YX',_with_channel('YX')),
+        ('XYZ',_with_channel('XYZ')),
+        ('SYX',_with_channel('YX')),
+        ('SXYZ',_with_channel('XYZ')),
+        (_with_channel('YX'),_with_channel('YX')),
+        (_with_channel('XYZ'),_with_channel('XYZ')),
+        (_with_channel('SYX'),_with_channel('YX')),
+        (_with_channel('SXYZ'),_with_channel('XYZ')),
+    ]
+
+    for (axes,axes_ref) in axes_list:
+        assert Config(axes).axes == axes_ref
+
+    with pytest.raises(ValueError):
+        Config('XYC')
+        Config('CXY')
+    with pytest.raises(ValueError):
+        Config('XYZC')
+        Config('CXYZ')
+    with pytest.raises(ValueError): Config('XTY')
+    with pytest.raises(ValueError): Config('XYZT')
+    with pytest.raises(ValueError): Config('XYS')
+    with pytest.raises(ValueError): Config('XSYZ')
+
+
 def test_model_build():
     configs = config_generator(
-        n_dim                 = [2,3],
+        axes                  = ['YX','ZYX'],
         n_channel_in          = [1,2],
         n_channel_out         = [1,2],
         probabilistic         = [False,True],
@@ -60,7 +95,7 @@ def test_model_build():
 def test_model_train():
     rng = np.random.RandomState(42)
     configs = config_generator(
-        n_dim                 = [2,3],
+        axes                  = ['YX','ZYX'],
         n_channel_in          = [1,2],
         n_channel_out         = [1,2],
         probabilistic         = [False,True],
@@ -94,7 +129,7 @@ def test_model_train():
 def test_model_predict():
     rng = np.random.RandomState(42)
     configs = config_generator(
-        n_dim                 = [2,3],
+        axes                  = ['YX','ZYX'],
         n_channel_in          = [1,2],
         n_channel_out         = [1,2],
         probabilistic         = [False,True],
@@ -112,22 +147,24 @@ def test_model_predict():
         for config in filter(lambda c: c.is_valid(), configs):
             K.clear_session()
             model = CARE(config,outdir=tmpdir)
+            axes = config.axes
 
-            def _predict(imdims,channel):
+            def _predict(imdims,axes):
                 img = rng.uniform(size=imdims)
-                # print(img.shape)
-                mean, scale = model._predict_mean_and_scale(img, normalizer, resizer, channel=channel)
+                # print(img.shape, axes, config.n_channel_out)
+                mean, scale = model._predict_mean_and_scale(img, axes, normalizer, resizer)
                 if config.probabilistic:
                     assert mean.shape == scale.shape
                 else:
                     assert scale is None
 
-                if channel is None:
+                if 'C' not in axes:
                     if config.n_channel_out == 1:
                         assert mean.shape == img.shape
                     else:
-                        assert mean.shape == (config.n_channel_out,) + img.shape
+                        assert mean.shape == img.shape + (config.n_channel_out,)
                 else:
+                    channel = axes_dict(axes)['C']
                     imdims[channel] = config.n_channel_out
                     assert mean.shape == tuple(imdims)
 
@@ -137,11 +174,13 @@ def test_model_predict():
             imdims = [(d//div_n)*div_n for d in imdims]
 
             if config.n_channel_in == 1:
-                _predict(imdims,channel=None)
+                _predict(imdims,axes=axes.replace('C',''))
 
             channel = rng.randint(0,config.n_dim)
             imdims.insert(channel,config.n_channel_in)
-            _predict(imdims,channel=channel)
+            _axes = axes.replace('C','')
+            _axes = _axes[:channel]+'C'+_axes[channel:]
+            _predict(imdims,axes=_axes)
 
 
 def test_model_predict_tiled():
@@ -152,7 +191,7 @@ def test_model_predict_tiled():
     """
     rng = np.random.RandomState(42)
     configs = config_generator(
-        n_dim                 = [2,3],
+        axes                  = ['YX','ZYX'],
         n_channel_in          = [1],
         n_channel_out         = [1],
         probabilistic         = [False],
@@ -171,11 +210,11 @@ def test_model_predict_tiled():
             K.clear_session()
             model = CARE(config,outdir=tmpdir)
 
-            def _predict(imdims,channel,n_tiles):
+            def _predict(imdims,axes,n_tiles):
                 img = rng.uniform(size=imdims)
-                # print(img.shape)
-                mean,       scale       = model._predict_mean_and_scale(img, normalizer, resizer, channel=channel, n_tiles=1)
-                mean_tiled, scale_tiled = model._predict_mean_and_scale(img, normalizer, resizer, channel=channel, n_tiles=n_tiles)
+                # print(img.shape, axes)
+                mean,       scale       = model._predict_mean_and_scale(img, axes, normalizer, resizer, n_tiles=1)
+                mean_tiled, scale_tiled = model._predict_mean_and_scale(img, axes, normalizer, resizer, n_tiles=n_tiles)
                 assert mean.shape == mean_tiled.shape
                 if config.probabilistic:
                     assert scale.shape == scale_tiled.shape
@@ -191,29 +230,30 @@ def test_model_predict_tiled():
             imdims = [(d//div_n)*div_n for d in imdims]
 
             n_blocks = np.max(imdims) // div_n
-            def _predict_wrapped(imdims,channel,n_tiles):
+            def _predict_wrapped(imdims,axes,n_tiles):
                 if 0 < n_tiles <= n_blocks:
-                    _predict(imdims,channel=channel,n_tiles=n_tiles)
+                    _predict(imdims,axes,n_tiles=n_tiles)
                 else:
                     with pytest.warns(UserWarning):
-                        _predict(imdims,channel=channel,n_tiles=n_tiles)
+                        _predict(imdims,axes,n_tiles=n_tiles)
 
             imdims.insert(0,config.n_channel_in)
-            # return _predict(imdims,channel=0,n_tiles=(3,4))
+            axes = config.axes.replace('C','')
+            # return _predict(imdims,'C'+axes,n_tiles=(3,4))
 
             # tile one dimension
             for n_tiles in (0,2,3,6,n_blocks+1):
                 if config.n_channel_in == 1:
-                    _predict_wrapped(imdims[1:],None,n_tiles)
-                _predict_wrapped(imdims,0,n_tiles)
+                    _predict_wrapped(imdims[1:],axes,n_tiles)
+                _predict_wrapped(imdims,'C'+axes,n_tiles)
 
             # tile two dimensions
             for n_tiles in product((2,4),(3,5)):
-                _predict(imdims,0,n_tiles)
+                _predict(imdims,'C'+axes,n_tiles)
 
             # tile three dimensions
             if config.n_dim == 3:
-                _predict(imdims,0,(2,3,4))
+                _predict(imdims,'C'+axes,(2,3,4))
 
 
 def test_tile_overlap():
@@ -231,6 +271,12 @@ def test_tile_overlap():
             assert max(rf) == tile_overlap(n,k)
             # print("receptive field of depth %d and kernel size %d: %s"%(n,k,rf));
 
+
+def test_datagen():
+    pass
+
+def test_transforms():
+    pass
 
 def test_exceptions():
     """

@@ -16,7 +16,7 @@ from keras import backend as K
 from keras.callbacks import Callback
 from keras.layers import Lambda
 
-from .utils import _raise, is_tf_dim, is_tf_back
+from .utils import _raise, is_tf_dim, is_tf_back, save_json
 
 
 
@@ -59,7 +59,7 @@ def limit_gpu_memory(fraction, allow_growth=False):
 
 
 
-def export_SavedModel(model, outpath, format='zip'):
+def export_SavedModel(model, outpath, info={}, format='zip'):
     """Export Keras model in TensorFlow's SavedModel_ format.
 
     See `Your Model in Fiji`_ to learn how to use the exported model with our CSBDeep Fiji plugins.
@@ -73,6 +73,8 @@ def export_SavedModel(model, outpath, format='zip'):
         Keras model to be exported.
     outpath : str
         Path of the file/folder that the model will exported to.
+    info : dict, optional
+        Extra information to be saved in an additional 'info.json' file.
     format : str, optional
         Can be 'dir' to export as a directory or 'zip' (default) to export as a ZIP file.
 
@@ -96,6 +98,10 @@ def export_SavedModel(model, outpath, format='zip'):
                                              [tf.saved_model.tag_constants.SERVING],
                                              signature_def_map=signature_def_map)
         builder.save()
+        if info is not None and len(info) > 0:
+            save_json(info, os.path.join(dirname,'info.json'))
+
+
 
     ## checks
     isinstance(model,keras.Model) or _raise(ValueError("'model' must be a Keras model."))

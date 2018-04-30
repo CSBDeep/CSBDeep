@@ -4,10 +4,10 @@ from six.moves import range, zip, map, reduce, filter
 import numpy as np
 from tifffile import imread
 from collections import namedtuple
-import sys, warnings
+import sys, os, warnings
 
 from tqdm import tqdm
-from .utils import Path, normalize_mi_ma, _raise, consume, compose, shuffle_inplace
+from .utils import Path, normalize_mi_ma, _raise, consume, compose, shuffle_inplace, axes_dict, move_image_axes
 
 
 ## Transforms (to be added later)
@@ -71,7 +71,7 @@ class RawData(namedtuple('RawData',('generator','size','description'))):
         Textual description of the raw data.
     """
 
-def get_tiff_pairs_from_folders(basepath,source_dirs,target_dir='GT',pattern='*.tif*'):
+def get_tiff_pairs_from_folders(basepath,source_dirs,target_dir,axes='CZYX',pattern='*.tif*'):
     """Get pairs of corresponding TIFF images read from folders.
 
     Two images correspond to each other if they have the same file name, but are located in different folders.
@@ -84,6 +84,8 @@ def get_tiff_pairs_from_folders(basepath,source_dirs,target_dir='GT',pattern='*.
         List of folder names relative to `basepath` that contain the source images (e.g., with low SNR).
     target_dir : str
         Folder name relative to `basepath` that contains the target images (e.g., with high SNR).
+    axes : str
+        Semantics of axes of loaded images. TODO
     pattern : str
         Glob-style pattern to match the desired TIFF images.
 
@@ -129,16 +131,19 @@ def get_tiff_pairs_from_folders(basepath,source_dirs,target_dir='GT',pattern='*.
         (p/s/n).exists() or _raise(FileNotFoundError(p/s/n))
         for s in source_dirs for n in image_names
     ))
+    isinstance(axes,str) or _raise(ValueError())
+    axes = axes.upper()
     xy_name_pairs = [(p/source_dir/n, p/target_dir/n) for source_dir in source_dirs for n in image_names]
     n_images = len(xy_name_pairs)
-    description = '{p}: target=\'{o}\' sources={s}'.format(p=basepath,s=list(source_dirs),o=target_dir)
+    description = '{p}: target=\'{o}\', sources={s}, axes={a}, pattern={pt}'.format(p=basepath,s=list(source_dirs),o=target_dir,a=axes,pt=pattern)
 
     def _gen():
         for fx, fy in xy_name_pairs:
             x, y = imread(str(fx)), imread(str(fy))
             # x,y = x[:,256:-256,256:-256],y[:,256:-256,256:-256] #tmp
             x.shape == y.shape or _raise(ValueError())
-            yield x, y, None
+            len(axes) >= x.ndim or _raise(ValueError())
+            yield x, y, axes[-x.ndim:], None
 
     return RawData(_gen, n_images, description)
 
@@ -340,16 +345,15 @@ def norm_percentiles(percentiles=sample_percentiles(), relu_last=False):
     return _normalize
 
 
-
-
 def create_patches(
         raw_data,
         patch_size,
         n_patches_per_image,
+        patch_axes = None,
+        save_file = None,
         transforms = None,
         patch_filter = no_background_patches(),
         normalization = norm_percentiles(),
-        channel = None,
         shuffle = True,
         verbose = True,
     ):
@@ -364,6 +368,10 @@ def create_patches(
         Must be compatible with the number of dimensions (2D/3D) and the shape of the raw images.
     n_patches_per_image : int
         Number of patches to be sampled/extracted from each raw image pair (after transformations, see below).
+    patch_axes : str
+        Axes of patch. TODO
+    save_file : str or None
+        File name to save training data to disk in npz format. TODO
     transforms : list or tuple, optional
         List of :class:`Transform` objects that apply additional transformations to the raw images.
         This can be used to augment the set of raw images (e.g., by including rotations).
@@ -375,9 +383,6 @@ def create_patches(
         Function that takes arguments `(patches_x, patches_y, x, y, mask, channel)`, whose purpose is to
         normalize the patches (`patches_x`, `patches_y`) extracted from the associated raw images
         (`x`, `y`, with `mask`; see :class:`RawData`). Default: :func:`norm_percentiles`.
-    channel : int, optional
-        Index of channel for multi-channel images; set to ``None`` for single-channel images where
-        raw images do not explicitly contain a channel dimension.
     shuffle : bool, optional
         Randomly shuffle all extracted patches.
     verbose : bool, optional
@@ -385,7 +390,8 @@ def create_patches(
 
     Returns
     -------
-    tuple(:class:`numpy.ndarray`, :class:`numpy.ndarray`)
+    tuple(:class:`numpy.ndarray`, :class:`numpy.ndarray`, str)
+        TODO
         Returns a pair (`X`, `Y`) of arrays with the normalized extracted patches from all (transformed) raw images.
         `X` is the array of patches extracted from source images with `Y` being the array of corresponding target patches.
         The shape of `X` and `Y` is as follows: `(n_total_patches, n_channels, ...)`.
@@ -409,8 +415,15 @@ def create_patches(
 
     """
     ## images and transforms
-    if transforms is None or len(transforms)==0:
-        transforms = (Transform.identity(),)
+    if transforms is None:
+        transforms = []
+    transforms = list(transforms)
+    if patch_axes is not None:
+        transforms.append(permute_axes(patch_axes))
+    if len(transforms) == 0:
+        transforms.append(Transform.identity())
+
+
     image_pairs, n_raw_images = raw_data.generator(), raw_data.size
     tf = Transform(*zip(*transforms)) # convert list of Transforms into Transform of lists
     image_pairs = compose(*tf.generator)(image_pairs) # combine all transformations with raw images as input
@@ -418,6 +431,12 @@ def create_patches(
     n_images = n_raw_images * n_transforms
     n_patches = n_images * n_patches_per_image
     n_required_memory_bytes = 2 * n_patches*np.prod(patch_size) * 4
+
+    save_file is None or isinstance(save_file,str) or _raise(ValueError())
+    if save_file is not None:
+        # append .npz suffix
+        if os.path.splitext(save_file)[1] != '.npz':
+            save_file += '.npz'
 
     ## memory check
     _memory_check(n_required_memory_bytes)
@@ -441,8 +460,13 @@ def create_patches(
     X = np.empty((n_patches,)+tuple(patch_size),dtype=np.float32)
     Y = np.empty_like(X)
 
-    for i, (x,y,mask) in tqdm(enumerate(image_pairs),total=n_images):
+    for i, (x,y,_axes,mask) in tqdm(enumerate(image_pairs),total=n_images):
+        if i==0:
+            axes = _axes.upper()
+            channel = axes_dict(axes)['C']
         # checks
+        (isinstance(axes,str) and len(axes) >= x.ndim) or _raise(ValueError())
+        axes == _axes.upper() or _raise(ValueError('not all images have the same axes.'))
         x.shape == y.shape or _raise(ValueError())
         mask is None or mask.shape == x.shape or _raise(ValueError())
         (channel is None or (isinstance(channel,int) and 0<=channel<x.ndim)) or _raise(ValueError())
@@ -456,6 +480,7 @@ def create_patches(
     if shuffle:
         shuffle_inplace(X,Y)
 
+    axes = 'SC'+axes.replace('C','')
     if channel is None:
         X = np.expand_dims(X,1)
         Y = np.expand_dims(Y,1)
@@ -463,38 +488,41 @@ def create_patches(
         X = np.moveaxis(X, 1+channel, 1)
         Y = np.moveaxis(Y, 1+channel, 1)
 
-    return X,Y
+    if save_file is not None:
+        print('Saving data to %s.' % save_file)
+        np.savez(save_file, X=X, Y=Y, axes=axes)
+
+    return X,Y,axes
 
 
 
 def anisotropic_distortions(
         subsample,
         psf,
-        z              = 0,
-        channel        = None,
+        psf_axes       = None,
         poisson_noise  = False,
         gauss_sigma    = 0,
         crop_threshold = 0.2,
     ):
     """Simulate anisotropic distortions along z.
 
-    Modify second lateral image dimension to mimic the distortions that occur due to
+    Modify x image dimension to mimic the distortions that occur due to
     low resolution along z. Note that the modified image is finally upscaled
     to obtain the same resolution as the unmodified input image.
+
+    TODO
 
     Parameters
     ----------
     subsample : float
-        Subsampling factor to apply to the second lateral dimension to mimic axial image distortions.
+        Subsampling factor to apply to x to mimic axial image distortions.
     psf : :class:`numpy.ndarray` or None
         Point spread function (PSF) that is supposed to mimic blurring
         of the microscope due to reduced axial resolution.
         Must be compatible with the number of dimensions (2D/3D) and the shape of the raw images.
-    z : int
-        Index of z dimension.
-    channel : int, optional
-        Index of channel for multi-channel images; set to ``None`` for single-channel images where
-        raw images do not explicitly contain a channel dimension.
+    psf_axes : str or None
+        Axes string of the psf. If ``None``, psf axes are assumed to be the same as of the image
+        that it is applied to.
     poisson_noise : bool
         Flag to indicate whether Poisson noise should be added to the image.
     gauss_sigma : int
@@ -519,35 +547,40 @@ def anisotropic_distortions(
     zoom_order = 1
 
     (np.isscalar(subsample) and subsample >= 1) or _raise(ValueError('subsample must be >= 1'))
-    _subsample = (1, subsample)
+    _subsample = subsample
+
+
+    psf is None or isinstance(psf,np.ndarray) or _raise(ValueError())
+    psf_axes is None or isinstance(psf_axes,str) or _raise(ValueError())
 
     0 < crop_threshold < 1 or _raise(ValueError())
 
-    channel is None or isinstance(channel,int) or _raise(ValueError())
-    isinstance(z,int) or _raise(ValueError())
-    psf is None or isinstance(psf,np.ndarray) or _raise(ValueError())
 
+    def _make_normalize_data(axes_in,axes_out='XY'):
+        """Move X to front of image."""
+        ax = axes_dict(axes_in)
+        all((ax[a] is not None) for a in axes_out) or _raise(ValueError('X and/or Y axes missing.'))
+        # add axis in axes_in to axes_out (if it doesn't exist there)
+        for a in ax:
+            if (ax[a] is not None) and (a not in axes_out):
+                axes_out += a
 
-    def _normalize_data(data,undo=False):
-        """Move channel and z to front of image."""
-        if undo:
-            if channel is None:
-                return np.moveaxis(data[0],0,z)
+        def _normalize_data(data,undo=False):
+            if undo:
+                return move_image_axes(data, axes_out, axes_in)
             else:
-                return np.moveaxis(data,[0,1],[channel,z])
-        else:
-            if channel is None:
-                return np.moveaxis(np.expand_dims(data,-1), [-1,z],[0,1])
-            else:
-                return np.moveaxis(data,[channel,z],[0,1])
+                return move_image_axes(data, axes_in, axes_out)
+        return _normalize_data
 
 
     def _scale_down_up(data,subsample):
         from scipy.ndimage.interpolation import zoom
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
-            return zoom(zoom(data, (1,1,1./subsample[0],1./subsample[1]), order=0),
-                                   (1,1,   subsample[0],   subsample[1]), order=zoom_order)
+            factor = np.ones(data.ndim)
+            factor[0] = subsample
+            return zoom(zoom(data, 1/factor, order=0),
+                                     factor, order=zoom_order)
 
 
     def _adjust_subsample(d,s,c):
@@ -590,15 +623,16 @@ def anisotropic_distortions(
         return round(s,n_digits), int(round(crop_size(n_digits,frac)))
 
 
-    def _make_divisible_by_subsample(x,sizes):
+    def _make_divisible_by_subsample(x,size):
         def _split_slice(v):
             return slice(None) if v==0 else slice(v//2,-(v-v//2))
-        slices = (slice(None),slice(None)) + tuple(_split_slice(d-sz) for sz,d in zip(sizes,x.shape[2:]))
+        slices = [slice(None) for _ in x.shape]
+        slices[0] = _split_slice(x.shape[0]-size)
         return x[slices]
 
 
     def _generator(inputs):
-        for img,y,mask in inputs:
+        for img,y,axes,mask in inputs:
 
             if not (y is None or np.all(img==y)):
                 warnings.warn('ignoring y.')
@@ -606,16 +640,26 @@ def anisotropic_distortions(
                 warnings.warn('ignoring mask.')
             del y, mask
 
+
             # tmp
             # img = img[...,:256,:256]
+
+
+            _normalize_data = _make_normalize_data(axes)
+            # print(axes, img.shape)
 
             x = img.astype(np.float32, copy=False)
 
             if psf is not None:
-                x.ndim == psf.ndim or _raise(ValueError('image and psf must have the same number of dimensions.'))
+                np.min(psf) >= 0 or _raise(ValueError('psf has negative values.'))
+                _psf = psf / np.sum(psf)
+                x.ndim == _psf.ndim or _raise(ValueError('image and psf must have the same number of dimensions.'))
+                if psf_axes is not None:
+                    sorted(axes) == sorted(psf_axes) or _raise(ValueError('psf_axes (%s) not compatible with that of the image (%s)' % (psf_axes,axes)))
+                    _psf = move_image_axes(_psf, psf_axes, axes)
                 # print("blurring with psf")
                 from scipy.signal import fftconvolve
-                x = fftconvolve(x, psf.astype(np.float32,copy=False), mode='same')
+                x = fftconvolve(x, _psf.astype(np.float32,copy=False), mode='same')
 
             if bool(poisson_noise):
                 # print("apply poisson noise")
@@ -626,20 +670,18 @@ def anisotropic_distortions(
                 noise = np.random.normal(0,gauss_sigma,size=x.shape).astype(np.float32)
                 x = np.maximum(0,x+noise)
 
-            if any(s != 1 for s in _subsample):
-                # print("down and upsampling by factors %s" % str(_subsample))
+            if _subsample != 1:
+                # print("down and upsampling X by factor %s" % str(_subsample))
                 img = _normalize_data(img)
                 x   = _normalize_data(x)
 
-                subsample, subsample_sizes = zip(*[
-                    _adjust_subsample(d,s,crop_threshold) for s,d in zip(_subsample,x.shape[2:])
-                ])
-                # print(subsample, subsample_sizes)
+                subsample, subsample_size = _adjust_subsample(x.shape[0],_subsample,crop_threshold)
+                # print(subsample, subsample_size)
                 if _subsample != subsample:
                     warnings.warn('changing subsample from %s to %s' % (str(_subsample),str(subsample)))
 
-                img = _make_divisible_by_subsample(img,subsample_sizes)
-                x   = _make_divisible_by_subsample(x,  subsample_sizes)
+                img = _make_divisible_by_subsample(img,subsample_size)
+                x   = _make_divisible_by_subsample(x,  subsample_size)
                 x   = _scale_down_up(x,subsample)
 
                 assert x.shape == img.shape, (x.shape, img.shape)
@@ -647,7 +689,46 @@ def anisotropic_distortions(
                 img = _normalize_data(img,undo=True)
                 x   = _normalize_data(x,  undo=True)
 
-            yield x, img, None
+            yield x, img, axes, None
 
 
-    return Transform('Anisotropic distortion', _generator, 1)
+    return Transform('Anisotropic distortion (along X axis)', _generator, 1)
+
+
+
+
+
+
+def permute_axes(axes):
+    """Permute axes of images.
+
+    axes must contain all axes of images that should be transformed
+
+    TODO
+
+    Parameters
+    ----------
+    axes : str
+        Axes
+
+    Returns
+    -------
+    Transform
+        Returns a :class:`Transform` object
+
+    """
+    axes = str(axes).upper()
+    axes_dict(axes) # does some error checking
+
+    def _generator(inputs):
+        for x, y, axes_in, mask in inputs:
+            axes_in = str(axes_in).upper()
+            if axes_in != axes:
+                print('permuting axes from %s to %s' % (axes_in,axes))
+                x = move_image_axes(x, axes_in, axes)
+                y = move_image_axes(y, axes_in, axes)
+                if mask is not None:
+                    mask = move_image_axes(mask, axes_in, axes)
+            yield x, y, axes, mask
+
+    return Transform('Permute axes to %s' % axes, _generator, 1)
