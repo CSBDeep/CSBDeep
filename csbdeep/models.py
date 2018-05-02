@@ -1,5 +1,6 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
 from six.moves import range, zip, map, reduce, filter
+from six import string_types
 
 import argparse
 import datetime
@@ -174,7 +175,7 @@ class Config(argparse.Namespace):
         _v &= np.isscalar(self.train_learning_rate) and self.train_learning_rate > 0
         _v &= _is_int(self.train_batch_size,1)
         _v &= isinstance(self.train_tensorboard,bool)
-        _v &= self.train_checkpoint is None or isinstance(self.train_checkpoint,str)
+        _v &= self.train_checkpoint is None or isinstance(self.train_checkpoint,string_types)
         _v &= self.train_reduce_lr  is None or isinstance(self.train_reduce_lr,dict)
         return _v
 
@@ -225,8 +226,8 @@ class CARE(object):
         """See class docstring."""
         (config is None or (isinstance(config,Config) and config.is_valid())
             or _raise(ValueError('Invalid configuration: %s' % str(config))))
-        name is None or isinstance(name,str) or _raise(ValueError())
-        isinstance(outdir,(str,Path)) or _raise(ValueError())
+        name is None or isinstance(name,string_types) or _raise(ValueError())
+        isinstance(outdir,(string_types,Path)) or _raise(ValueError())
         self.config = config
         self.outdir = Path(outdir)
         self.name = name
@@ -245,13 +246,13 @@ class CARE(object):
             if not config_file.exists():
                 raise FileNotFoundError("config file doesn't exist: %s" % str(config_file.resolve()))
             else:
-                config_dict = load_json(config_file)
+                config_dict = load_json(str(config_file))
                 self.config = Config(**config_dict)
         else:
             if self.logdir.exists():
                 warnings.warn('output path for model already exists, files may be overwritten: %s' % str(self.logdir.resolve()))
             self.logdir.mkdir(parents=True, exist_ok=True)
-            save_json(vars(self.config), config_file)
+            save_json(vars(self.config), str(config_file))
 
 
     def _build(self):
@@ -311,7 +312,10 @@ class CARE(object):
 
         if self.config.train_reduce_lr is not None:
             from keras.callbacks import ReduceLROnPlateau
-            self.callbacks.append(ReduceLROnPlateau(**self.config.train_reduce_lr, verbose=True))
+            rlrop_params = self.config.train_reduce_lr
+            if 'verbose' not in rlrop_params:
+                rlrop_params['verbose'] = True
+            self.callbacks.append(ReduceLROnPlateau(**rlrop_params))
 
         self._model_prepared = True
 

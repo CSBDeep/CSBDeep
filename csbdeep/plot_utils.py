@@ -1,5 +1,6 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
 from six.moves import range, zip, map, reduce, filter
+from six import string_types
 
 import numpy as np
 # from .utils import normalize
@@ -32,10 +33,12 @@ from .utils import normalize
 #     plot_some(arr,**kwargs)
 
 
-def plot_history(history,*keys,logy=False,**kwargs):
+def plot_history(history,*keys,**kwargs):
     """ TODO """
 
-    if all(( isinstance(k,str) for k in keys )):
+    logy = kwargs.pop('logy',False)
+
+    if all(( isinstance(k,string_types) for k in keys )):
         w, keys = 1, [keys]
     else:
         w = len(keys)
@@ -43,7 +46,7 @@ def plot_history(history,*keys,logy=False,**kwargs):
     plt.gcf()
     for i, group in enumerate(keys):
         plt.subplot(1,w,i+1)
-        for k in ([group] if isinstance(group,str) else group):
+        for k in ([group] if isinstance(group,string_types) else group):
             plt.plot(history.epoch,history.history[k],'.-',label=k,**kwargs)
             if logy:
                 plt.gca().set_yscale('log', nonposy='clip')
@@ -53,7 +56,14 @@ def plot_history(history,*keys,logy=False,**kwargs):
     plt.show()
 
 
-def plot_some(*arr, title_list=None, pmin=0, pmax=100, **imshow_kwargs):
+def plot_some(*arr, **kwargs):
+    title_list = kwargs.pop('title_list',None)
+    pmin = kwargs.pop('pmin',0)
+    pmax = kwargs.pop('pmax',100)
+    imshow_kwargs = kwargs
+    return _plot_some(arr=arr, title_list=title_list, pmin=pmin, pmax=pmax, **imshow_kwargs)
+
+def _plot_some(arr, title_list=None, pmin=0, pmax=100, **imshow_kwargs):
     """
     plots a matrix of images
 

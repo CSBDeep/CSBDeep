@@ -1,5 +1,6 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
 from six.moves import range, zip, map, reduce, filter
+from six import string_types
 
 import os
 import numpy as np
@@ -19,6 +20,11 @@ try:
 except (ImportError,AttributeError):
     from pathlib2 import Path
 
+try:
+    import tempfile
+    tempfile.TemporaryDirectory
+except (ImportError,AttributeError):
+    from backports import tempfile
 
 
 def is_tf_dim():
@@ -220,7 +226,7 @@ def move_image_axes(x, fr, to):
     x: ndarray
     fr,to: axes string (see `axes_dict`)
     """
-    isinstance(fr,str) and isinstance(to,str) or _raise(ValueError())
+    isinstance(fr,string_types) and isinstance(to,string_types) or _raise(ValueError())
     fr, to = fr.upper(), to.upper()
     sorted(list(fr)) == sorted(list(to)) or _raise(ValueError())
     len(fr) == x.ndim or _raise(ValueError())

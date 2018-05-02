@@ -4,9 +4,8 @@ from six.moves import range, zip, map, reduce, filter
 # import warnings
 import numpy as np
 from itertools import product
-import tempfile
 
-from csbdeep.utils import axes_dict
+from csbdeep.utils import axes_dict, tempfile
 from csbdeep.models import Config, CARE
 from csbdeep.predict import NoNormalizer, NoResizer, tile_overlap
 from csbdeep.nets import receptive_field_unet

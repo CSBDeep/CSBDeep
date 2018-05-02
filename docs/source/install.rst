@@ -16,7 +16,7 @@ then installing it locally: ::
     pip install -e CSBDeep_code
 
 .. Note::
-    - The code should be compatible with Python 2 and 3, but has so far only been tested with Python 3 (which we recommend to use).
+    - The code should be compatible with Python 2 and 3, but is mainly developed and tested with Python 3 (which we recommend to use).
     - If you do not use the Anaconda_ Python distribution, you may need to use ``pip3`` instead of ``pip`` if you are using Python 3.
     - You *must not* delete the cloned ``CSBDeep_code`` folder after installation.
       In fact, you can pull from the repository (``git pull``) to update the package.

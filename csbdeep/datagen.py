@@ -1,5 +1,7 @@
+# -*- coding: utf-8 -*-
 from __future__ import print_function, unicode_literals, absolute_import, division
 from six.moves import range, zip, map, reduce, filter
+from six import string_types
 
 import numpy as np
 from tifffile import imread
@@ -29,6 +31,7 @@ class Transform(namedtuple('Transform',('name','generator','size'))):
         Number of transformations applied to every image (obtained from the input generator).
     """
 
+    @staticmethod
     def identity():
         """
         Returns
@@ -131,7 +134,7 @@ def get_tiff_pairs_from_folders(basepath,source_dirs,target_dir,axes='CZYX',patt
         (p/s/n).exists() or _raise(FileNotFoundError(p/s/n))
         for s in source_dirs for n in image_names
     ))
-    isinstance(axes,str) or _raise(ValueError())
+    isinstance(axes,string_types) or _raise(ValueError())
     axes = axes.upper()
     xy_name_pairs = [(p/source_dir/n, p/target_dir/n) for source_dir in source_dirs for n in image_names]
     n_images = len(xy_name_pairs)
@@ -265,10 +268,12 @@ def _memory_check(n_required_memory_bytes, thresh_free_frac=0.5, thresh_abs_byte
         if mem_frac > 1:
             raise MemoryError('Not enough available memory.')
         elif mem_frac > thresh_free_frac:
-            print('Warning: will use at least %.0f MB (%.1f%%) of available memory.\n' % (n_required_memory_bytes/1024**2,100*mem_frac), file=sys.stderr, flush=True)
+            print('Warning: will use at least %.0f MB (%.1f%%) of available memory.\n' % (n_required_memory_bytes/1024**2,100*mem_frac), file=sys.stderr)
+            sys.stderr.flush()
     except ImportError:
         if n_required_memory_bytes > thresh_abs_bytes:
-            print('Warning: will use at least %.0f MB of memory.\n' % (n_required_memory_bytes/1024**2), file=sys.stderr, flush=True)
+            print('Warning: will use at least %.0f MB of memory.\n' % (n_required_memory_bytes/1024**2), file=sys.stderr)
+            sys.stderr.flush()
 
 def sample_percentiles(pmin=(1,3), pmax=(99.5,99.9)):
     """Sample percentile values from a uniform distribution.
@@ -433,7 +438,7 @@ def create_patches(
     n_patches = n_images * n_patches_per_image
     n_required_memory_bytes = 2 * n_patches*np.prod(patch_size) * 4
 
-    save_file is None or isinstance(save_file,str) or _raise(ValueError())
+    save_file is None or isinstance(save_file,string_types) or _raise(ValueError())
     if save_file is not None:
         # append .npz suffix
         if os.path.splitext(save_file)[1] != '.npz':
@@ -455,7 +460,7 @@ def create_patches(
         for t in transforms:
             print('{t.size} x {t.name}'.format(t=t))
         print('='*66)
-        print(flush=True)
+        sys.stdout.flush()
 
     ## sample patches from each pair of transformed raw images
     X = np.empty((n_patches,)+tuple(patch_size),dtype=np.float32)
@@ -466,7 +471,7 @@ def create_patches(
             axes = _axes.upper()
             channel = axes_dict(axes)['C']
         # checks
-        (isinstance(axes,str) and len(axes) >= x.ndim) or _raise(ValueError())
+        (isinstance(axes,string_types) and len(axes) >= x.ndim) or _raise(ValueError())
         axes == _axes.upper() or _raise(ValueError('not all images have the same axes.'))
         x.shape == y.shape or _raise(ValueError())
         mask is None or mask.shape == x.shape or _raise(ValueError())
@@ -560,7 +565,7 @@ def anisotropic_distortions(
 
 
     psf is None or isinstance(psf,np.ndarray) or _raise(ValueError())
-    psf_axes is None or isinstance(psf_axes,str) or _raise(ValueError())
+    psf_axes is None or isinstance(psf_axes,string_types) or _raise(ValueError())
 
     0 < crop_threshold < 1 or _raise(ValueError())
 

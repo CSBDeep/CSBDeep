@@ -157,8 +157,8 @@ def common_unet_by_name(model):
 def receptive_field_unet(n_depth, kern_size, n_dim=2, img_size=1024):
     """Receptive field for U-Net model (pre/post for each dimension)."""
     x = np.zeros((1,)+(img_size,)*n_dim+(1,))
-    mid = [s//2 for s in x.shape[1:-1]]
-    x[(slice(None), *mid, slice(None))] = 1
+    mid = tuple([s//2 for s in x.shape[1:-1]])
+    x[(slice(None),) + mid + (slice(None),)] = 1
     model = common_unet(n_dim=n_dim, n_depth=n_depth, kern_size=kern_size, n_first=8)(x.shape[1:])
     y  = model.predict(x)[0,...,0]
     y0 = model.predict(0*x)[0,...,0]

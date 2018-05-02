@@ -4,7 +4,7 @@ from six.moves import range, zip, map, reduce, filter
 import numpy as np
 import os
 import warnings
-import tempfile, shutil
+import shutil
 import datetime
 
 import tensorflow as tf
@@ -16,7 +16,7 @@ from keras import backend as K
 from keras.callbacks import Callback
 from keras.layers import Lambda
 
-from .utils import _raise, is_tf_dim, is_tf_back, save_json
+from .utils import _raise, is_tf_dim, is_tf_back, save_json, tempfile
 
 
 
