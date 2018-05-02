@@ -71,6 +71,11 @@ add axis-aligned rotations and flips later.
 .. autoclass:: csbdeep.datagen.Transform
     :members:
 
+Other transforms
+^^^^^^^^^^^^^^^^
+
+.. autofunction:: csbdeep.datagen.permute_axes
+
 
 .. ------------
 

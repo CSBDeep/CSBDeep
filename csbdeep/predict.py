@@ -26,7 +26,7 @@ class Normalizer():
         img : :class:`numpy.ndarray`
             Raw input image.
         axes : str
-            Axes of img
+            Axes of ``img``.
 
         Returns
         -------
@@ -39,7 +39,7 @@ class Normalizer():
     def after(self, mean, scale):
         """Possible adjustment of predicted restored image (method stub).
 
-        Axes remain the same wrt to `before`. TODO
+        It is assumed that the image axes are the same as in the call to :func:`before`.
 
         Parameters
         ----------
@@ -63,16 +63,28 @@ class Normalizer():
 
 
 class NoNormalizer(Normalizer):
-    """Dummy normalizer that does nothing."""
+    """No normalization.
+
+    Parameters
+    ----------
+    do_after : bool
+        Flag to indicate whether to undo normalization.
+
+    Raises
+    ------
+    ValueError
+        If :func:`after` is called, but parameter `do_after` was set to ``False`` in the constructor.
+    """
 
     def __init__(self, do_after=False):
+        """foo"""
         self._do_after = do_after
 
     def before(self, img, axes):
         return img
 
     def after(self, mean, scale):
-        assert self.do_after
+        self.do_after or _raise(ValueError())
         return mean, scale
 
     @property
@@ -106,8 +118,7 @@ class PercentileNormalizer(Normalizer):
         """Percentile-based normalization of raw input image.
 
         See :func:`csbdeep.predict.Normalizer.before` for parameter descriptions.
-        Note that percentiles are computed individually for each channel
-        if axes contains 'C' for channel.
+        Note that percentiles are computed individually for each channel (if present in `axes`).
         """
         len(axes) == img.ndim or _raise(ValueError())
         channel = axes_dict(axes)['C']
@@ -120,8 +131,14 @@ class PercentileNormalizer(Normalizer):
         """Undo percentile-based normalization to map restored image to similar range as input image.
 
         See :func:`csbdeep.predict.Normalizer.before` for parameter descriptions.
+
+        Raises
+        ------
+        ValueError
+            If parameter `do_after` was set to ``False`` in the constructor.
+
         """
-        assert self.do_after
+        self.do_after or _raise(ValueError())
         alpha = self.ma - self.mi
         beta  = self.mi
         return alpha*mean+beta, alpha*scale if scale is not None else None
@@ -192,7 +209,13 @@ class Resizer():
 
 
 class NoResizer(Resizer):
-    """Dummy resizer that does not resize the image, only verifies that the size is correct."""
+    """No resizing.
+
+    Raises
+    ------
+    ValueError
+        In :func:`before`, if image resizing is necessary.
+    """
 
     def before(self, x, div_n, exclude):
         exclude = self._normalize_exclude(exclude, x.ndim)

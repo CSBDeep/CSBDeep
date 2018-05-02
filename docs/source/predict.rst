@@ -34,9 +34,10 @@ retained.
 >>> model = CARE(config=None, name='my_model')
 >>> model.load_weights()
 >>> x = imread('my_image.tif')
+>>> x_axes = 'YX'
 >>> normalizer = PercentileNormalizer(3,99.8)
 >>> resizer = PadAndCropResizer()
->>> restored = model.predict(x, normalizer, resizer)
+>>> restored = model.predict(x, x_axes, normalizer, resizer)
 
 .. .. automethod:: csbdeep.models.CARE.predict
 .. autoclass:: csbdeep.models.CARE
@@ -57,6 +58,8 @@ All normalization methods must subclass :class:`csbdeep.predict.Normalizer`.
 .. autoclass:: csbdeep.predict.Normalizer
     :members:
 
+.. autoclass:: csbdeep.predict.NoNormalizer
+
 .. autoclass:: csbdeep.predict.PercentileNormalizer
     :members:
 
@@ -68,6 +71,8 @@ All resizing methods must subclass :class:`csbdeep.predict.Resizer`.
 
 .. autoclass:: csbdeep.predict.Resizer
     :members:
+
+.. autoclass:: csbdeep.predict.NoResizer
 
 .. autoclass:: csbdeep.predict.PadAndCropResizer
     :members:

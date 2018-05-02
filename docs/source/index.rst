@@ -34,9 +34,13 @@ They can be found in the subfolder ``notebooks``:
    Loading a trained CARE network and applying it to a raw image.
    More documentation available at :doc:`predict`.
 
+See examples for probabilistic training and prediction in ``notebooks/probabilistic``
+(cf. `repository <https://github.com/mpicbg-csbd/CSBDeep_code/blob/master/notebooks/probabilistic>`_).
+
 Notebooks that demonstrate CARE networks for isotropic reconstruction
 can be found in ``notebooks/isotropic``
 (cf. `repository <https://github.com/mpicbg-csbd/CSBDeep_code/blob/master/notebooks/isotropic>`_).
+
 
 .. _`datagen.ipynb`: https://github.com/mpicbg-csbd/CSBDeep_code/blob/master/notebooks/datagen.ipynb
 .. _`training.ipynb`: https://github.com/mpicbg-csbd/CSBDeep_code/blob/master/notebooks/training.ipynb

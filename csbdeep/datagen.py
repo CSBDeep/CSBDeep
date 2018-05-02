@@ -85,7 +85,7 @@ def get_tiff_pairs_from_folders(basepath,source_dirs,target_dir,axes='CZYX',patt
     target_dir : str
         Folder name relative to `basepath` that contains the target images (e.g., with high SNR).
     axes : str
-        Semantics of axes of loaded images. TODO
+        Semantics of axes of loaded images (must be same for all images).
     pattern : str
         Glob-style pattern to match the desired TIFF images.
 
@@ -93,9 +93,9 @@ def get_tiff_pairs_from_folders(basepath,source_dirs,target_dir,axes='CZYX',patt
     -------
     RawData
         :obj:`RawData` object, whose `generator` is used to yield all matching TIFF pairs.
-        The generator will return a tuple `(x,y,mask)`, where `x` is from
-        `source_dirs` and `y` is the corresponding image from the `target_dir`; `mask` is
-        set to `None`.
+        The generator will return a tuple `(x,y,axes,mask)`, where `x` is from
+        `source_dirs` and `y` is the corresponding image from the `target_dir`;
+        `mask` is set to `None`.
 
     Raises
     ------
@@ -118,9 +118,9 @@ def get_tiff_pairs_from_folders(basepath,source_dirs,target_dir,axes='CZYX',patt
         ├── imageA.tif
         └── imageB.tif
 
-    >>> data = get_tiff_pairs_from_folders(basepath='data', source_dirs=['source1','source2'], target_dir='GT')
+    >>> data = get_tiff_pairs_from_folders(basepath='data', source_dirs=['source1','source2'], target_dir='GT', axes='YX')
     >>> n_images = data.size
-    >>> for source_x, target_y, mask in data.generator():
+    >>> for source_x, target_y, axes, mask in data.generator():
     ...     pass
     """
 
@@ -263,7 +263,7 @@ def _memory_check(n_required_memory_bytes, thresh_free_frac=0.5, thresh_abs_byte
         mem = psutil.virtual_memory()
         mem_frac = n_required_memory_bytes / mem.available
         if mem_frac > 1:
-            raise(MemoryError('Not enough available memory.'))
+            raise MemoryError('Not enough available memory.')
         elif mem_frac > thresh_free_frac:
             print('Warning: will use at least %.0f MB (%.1f%%) of available memory.\n' % (n_required_memory_bytes/1024**2,100*mem_frac), file=sys.stderr, flush=True)
     except ImportError:
@@ -349,13 +349,13 @@ def create_patches(
         raw_data,
         patch_size,
         n_patches_per_image,
-        patch_axes = None,
-        save_file = None,
-        transforms = None,
-        patch_filter = no_background_patches(),
+        patch_axes    = None,
+        save_file     = None,
+        transforms    = None,
+        patch_filter  = no_background_patches(),
         normalization = norm_percentiles(),
-        shuffle = True,
-        verbose = True,
+        shuffle       = True,
+        verbose       = True,
     ):
     """Create normalized training data to be used for neural network training.
 
@@ -365,13 +365,14 @@ def create_patches(
         Object that yields matching pairs of raw images.
     patch_size : tuple
         Shape of the patches to be extraced from raw images.
-        Must be compatible with the number of dimensions (2D/3D) and the shape of the raw images.
+        Must be compatible with the number of dimensions and axes of the raw images.
     n_patches_per_image : int
         Number of patches to be sampled/extracted from each raw image pair (after transformations, see below).
-    patch_axes : str
-        Axes of patch. TODO
+    patch_axes : str or None
+        Axes of the extracted patches. If ``None``, will assume to be equal to that of transformed raw data.
     save_file : str or None
-        File name to save training data to disk in npz format. TODO
+        File name to save training data to disk in ``.npz`` format (see :func:`numpy.savez`).
+        If ``None``, data will not be saved.
     transforms : list or tuple, optional
         List of :class:`Transform` objects that apply additional transformations to the raw images.
         This can be used to augment the set of raw images (e.g., by including rotations).
@@ -391,8 +392,8 @@ def create_patches(
     Returns
     -------
     tuple(:class:`numpy.ndarray`, :class:`numpy.ndarray`, str)
-        TODO
-        Returns a pair (`X`, `Y`) of arrays with the normalized extracted patches from all (transformed) raw images.
+        Returns a tuple (`X`, `Y`, `axes`) with the normalized extracted patches from all (transformed) raw images
+        and their axes.
         `X` is the array of patches extracted from source images with `Y` being the array of corresponding target patches.
         The shape of `X` and `Y` is as follows: `(n_total_patches, n_channels, ...)`.
         For single-channel images (`channel` = ``None``), `n_channels` = 1.
@@ -404,8 +405,8 @@ def create_patches(
 
     Example
     -------
-    >>> raw_data = get_tiff_pairs_from_folders(basepath='data', source_dirs=['source1','source2'], target_dir='GT')
-    >>> X, Y = create_patches(raw_data, patch_size=(32,128,128), n_patches_per_image=16)
+    >>> raw_data = get_tiff_pairs_from_folders(basepath='data', source_dirs=['source1','source2'], target_dir='GT', axes='ZYX')
+    >>> X, Y, XY_axes = create_patches(raw_data, patch_size=(32,128,128), n_patches_per_image=16)
 
     Todo
     ----
@@ -504,33 +505,41 @@ def anisotropic_distortions(
         gauss_sigma    = 0,
         crop_threshold = 0.2,
     ):
-    """Simulate anisotropic distortions along z.
+    """Simulate anisotropic distortions.
 
-    Modify x image dimension to mimic the distortions that occur due to
-    low resolution along z. Note that the modified image is finally upscaled
+    Modify image along X axis to mimic the distortions that occur due to
+    low resolution along Z axis. Note that the modified image is finally upscaled
     to obtain the same resolution as the unmodified input image.
 
-    TODO
+    The following operations are applied to the image (in order):
+
+    1. Convolution with PSF
+    2. Poisson noise
+    3. Gaussian noise
+    4. Subsampling along X axis
+    5. Upsampling along X axis (to former size).
+
 
     Parameters
     ----------
     subsample : float
-        Subsampling factor to apply to x to mimic axial image distortions.
+        Subsampling factor to apply to X axis to mimic distortions along Z.
     psf : :class:`numpy.ndarray` or None
         Point spread function (PSF) that is supposed to mimic blurring
         of the microscope due to reduced axial resolution.
         Must be compatible with the number of dimensions (2D/3D) and the shape of the raw images.
+        Set to ``None`` to disable.
     psf_axes : str or None
-        Axes string of the psf. If ``None``, psf axes are assumed to be the same as of the image
+        Axes of the psf. If ``None``, psf axes are assumed to be the same as of the image
         that it is applied to.
     poisson_noise : bool
         Flag to indicate whether Poisson noise should be added to the image.
-    gauss_sigma : int
-        Standard deviation of white Gaussian noise to be added to the image (after Poisson).
+    gauss_sigma : float
+        Standard deviation of white Gaussian noise to be added to the image.
     crop_threshold : float
-        The subsample factors must evenly divide the raw image dimensions to prevent
-        potential image misalignement. If this is not the case the subsample factors are
-        modified and the raw image will be cropped up to a fraction indiced by `crop_threshold`.
+        The subsample factor must evenly divide the image size along the X axis to prevent
+        potential image misalignment. If this is not the case the subsample factors are
+        modified and the raw image will be cropped along X up to a fraction indicated by `crop_threshold`.
 
     Returns
     -------
@@ -700,21 +709,21 @@ def anisotropic_distortions(
 
 
 def permute_axes(axes):
-    """Permute axes of images.
+    """Transformation to permute images axes.
 
-    axes must contain all axes of images that should be transformed
-
-    TODO
+    Note that input images must have compatible axes, i.e.
+    they must be a permutation of the target axis.
 
     Parameters
     ----------
     axes : str
-        Axes
+        Target axis, to which the input images will be permuted.
 
     Returns
     -------
     Transform
-        Returns a :class:`Transform` object
+        Returns a :class:`Transform` object whose `generator` will
+        perform the axes permutation of `x`, `y`, and `mask`.
 
     """
     axes = str(axes).upper()
@@ -724,7 +733,7 @@ def permute_axes(axes):
         for x, y, axes_in, mask in inputs:
             axes_in = str(axes_in).upper()
             if axes_in != axes:
-                print('permuting axes from %s to %s' % (axes_in,axes))
+                # print('permuting axes from %s to %s' % (axes_in,axes))
                 x = move_image_axes(x, axes_in, axes)
                 y = move_image_axes(y, axes_in, axes)
                 if mask is not None:

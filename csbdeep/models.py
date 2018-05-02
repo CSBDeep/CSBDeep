@@ -19,12 +19,13 @@ from .probability import ProbabilisticPrediction
 class Config(argparse.Namespace):
     """Default configuration for a (standard) CARE network.
 
-    This configuration is meant to be used with :class:`csbdeep.models.CARE`.
+    This configuration is meant to be used with :class:`CARE`
+    and related models (e.g., :class:`IsotropicCARE`).
 
     Parameters
     ----------
     axes : str
-        Axes of the neural network
+        Axes of the neural network (channel axis optional).
     n_channel_in : int
         Number of channels of given input image.
     n_channel_out : int
@@ -37,7 +38,7 @@ class Config(argparse.Namespace):
 
     Example
     -------
-    >>> config = Config(2, probabilistic=True, unet_n_depth=3)
+    >>> config = Config('YX', probabilistic=True, unet_n_depth=3)
 
     Attributes
     ----------
@@ -380,7 +381,7 @@ class CARE(object):
             Raw input image, with image dimensions expected in the same order as in data for training.
             If applicable, only the channel dimension can be anywhere.
         axes : str
-            TODO
+            Axes of ``img``.
         normalizer : :class:`csbdeep.predict.Normalizer`
             Normalization of input image before prediction and (potentially) transformation back after prediction.
         resizer : :class:`csbdeep.predict.Resizer`
@@ -398,8 +399,8 @@ class CARE(object):
         :class:`numpy.ndarray`
             Returns the restored image. If the model is probabilistic, this denotes the `mean` parameter of
             the predicted per-pixel Laplace distributions (i.e., the expected restored image).
-            Axes ordering is unchanged wrt input image. only if there is multi-channel output and
-            the input image didn't have a channel axis, then channels are appended at the end. TODO
+            Axes ordering is unchanged wrt input image. Only if there the output is multi-channel and
+            the input image didn't have a channel axis, then channels are appended at the end.
 
         """
         return self._predict_mean_and_scale(img, axes, normalizer, resizer, n_tiles)[0]
@@ -524,7 +525,6 @@ class CARE(object):
 
 
 
-
 class IsotropicCARE(CARE):
     """CARE network for isotropic image reconstruction.
 
@@ -541,7 +541,7 @@ class IsotropicCARE(CARE):
             Raw input image, with image dimensions expected in the same order as in data for training.
             If applicable, only the z and channel dimensions can be anywhere.
         axes : str
-            TODO
+            Axes of ``img``.
         factor : int
             Upsampling factor for z dimension. It is important that this is chosen in correspondence
             to the subsampling factor used during training data generation.
@@ -559,10 +559,8 @@ class IsotropicCARE(CARE):
         :class:`numpy.ndarray`
             Returns the restored image. If the model is probabilistic, this denotes the `mean` parameter of
             the predicted per-pixel Laplace distributions (i.e., the expected restored image).
-
-        Todo
-        ----
-        - :func:`scipy.ndimage.interpolation.zoom` differs from :func:`gputools.scale`. Important?
+            Axes ordering is unchanged wrt input image. Only if there the output is multi-channel and
+            the input image didn't have a channel axis, then channels are appended at the end.
 
         """
         return self._predict_mean_and_scale(img, axes, factor, normalizer, resizer, batch_size)[0]
@@ -592,24 +590,7 @@ class IsotropicCARE(CARE):
     def _predict_mean_and_scale(self, img, axes, factor, normalizer, resizer, batch_size=8):
         """Apply neural network to raw image to restore isotropic resolution.
 
-        Parameters
-        ----------
-        img : :class:`numpy.ndarray`
-            Raw input image, with image dimensions expected in the same order as in data for training.
-            If applicable, only the z and channel dimensions can be anywhere.
-        axes : str
-            TODO
-        factor : int
-            Upsampling factor for z dimension. It is important that this is chosen in correspondence
-            to the subsampling factor used during training data generation.
-        normalizer : :class:`csbdeep.predict.Normalizer`
-            Normalization of input image before prediction and (potentially) transformation back after prediction.
-        resizer : :class:`csbdeep.predict.Resizer`
-            If necessary, input image is resized to enable neural network prediction and result is (possibly)
-            resized to yield original image size.
-        batch_size : int
-            Number of image slices that are processed together by the neural network.
-            Reduce this value if out of memory errors occur.
+        See :func:`predict` for parameter explanations.
 
         Returns
         -------

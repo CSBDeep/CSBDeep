@@ -74,7 +74,7 @@ def export_SavedModel(model, outpath, info={}, format='zip'):
     outpath : str
         Path of the file/folder that the model will exported to.
     info : dict, optional
-        Extra information to be saved in an additional 'info.json' file.
+        Extra information to be saved in an additional ``info.json`` file.
     format : str, optional
         Can be 'dir' to export as a directory or 'zip' (default) to export as a ZIP file.
 

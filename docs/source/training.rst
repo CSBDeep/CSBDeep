@@ -23,10 +23,10 @@ After training, the learned model can be exported via
 >>> from csbdeep.train import load_data
 >>> from csbdeep.models import Config, CARE
 >>> limit_gpu_memory(fraction=0.75)
->>> (X,Y), data_val = load_data('my_data.npz', validation_split=0.1)
->>> config = Config(3, probabilistic=True, unet_n_depth=3)
+>>> (X,Y), (X_val,Y_val), axes = load_data('my_data.npz', validation_split=0.1)
+>>> config = Config(axes, probabilistic=True, unet_n_depth=3)
 >>> model = CARE(config, 'my_model')
->>> model.train(X,Y, validation_data=data_val)
+>>> model.train(X,Y, validation_data=(X_val,Y_val))
 >>> model.export_TF()
 
 .. autoclass:: csbdeep.models.Config
@@ -73,6 +73,7 @@ Isotropic reconstruction
 Training a CARE network for isotropic reconstruction
 (:class:`csbdeep.models.IsotropicCARE`) does not differ from that of a
 standard CARE model. What changes is the way in which the training data is
-generated (not available yet.)
+generated (see :doc:`datagen`).
 
 .. autoclass:: csbdeep.models.IsotropicCARE
+    :members:
