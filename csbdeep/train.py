@@ -37,7 +37,8 @@ def load_data(data,validation_split=0,axes=None,n_images=None):
     f = np.load(data)
     X, Y = f['X'], f['Y']
     if axes is None:
-        axes = str(f['axes']).upper()
+        axes = f['axes']
+    axes = str(axes).upper()
 
     assert X.shape == Y.shape
     assert len(axes) == X.ndim
