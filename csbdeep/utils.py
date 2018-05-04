@@ -11,6 +11,7 @@ import json
 # import keras.models
 # from tqdm import tqdm_notebook, tqdm as tqdm_terminal
 
+import warnings
 import collections
 
 # https://www.scivision.co/python-idiomatic-pathlib-use/
@@ -221,18 +222,36 @@ def axes_dict(axes):
 #     return s
 
 
-def move_image_axes(x, fr, to):
+def move_image_axes(x, fr, to, adjust_singletons=False):
     """
     x: ndarray
     fr,to: axes string (see `axes_dict`)
     """
     isinstance(fr,string_types) and isinstance(to,string_types) or _raise(ValueError())
-    fr, to = fr.upper(), to.upper()
-    sorted(list(fr)) == sorted(list(to)) or _raise(ValueError())
     len(fr) == x.ndim or _raise(ValueError())
+    fr, to = fr.upper(), to.upper()
+    axes_dict(fr), axes_dict(to) # performs checks
+
+    if bool(adjust_singletons):
+        # remove axes not present in 'to'
+        slices = [slice(None) for _ in x.shape]
+        for i,a in enumerate(fr):
+            if (a not in to) and (x.shape[i]==1):
+                # remove singleton axis
+                slices[i] = 0
+                fr = fr.replace(a,'')
+        x = x[slices]
+        # add dummy axes present in 'to'
+        for i,a in enumerate(to):
+            if (a not in fr):
+                # add singleton axis
+                x = np.expand_dims(x,-1)
+                fr += a
+
+    sorted(list(fr)) == sorted(list(to)) or _raise(ValueError())
+    ax_from, ax_to = axes_dict(fr), axes_dict(to)
     if fr == to:
         return x
-    ax_from, ax_to = axes_dict(fr), axes_dict(to)
     return np.moveaxis(x, [ax_from[a] for a in fr], [ax_to[a] for a in fr])
 
 # def axes_move(axes,a,p):
@@ -243,3 +262,26 @@ def move_image_axes(x, fr, to):
 #     if ax[a] is None:
 #         return axes
 #     else:
+
+def save_tiff_imagej_compatible(file, img, axes, **imsave_kwargs):
+    """Save tiff in ImageJ-compatible format."""
+    from tifffile import imsave
+    axes = str(axes).upper()
+    axes_dict(axes) # perform checks
+    'S' not in axes or _raise(ValueError())
+
+    # convert to imagej-compatible data type
+    t = img.dtype
+    if   'float' in t.name: t_new = np.float32
+    elif 'uint'  in t.name: t_new = np.uint16 if t.itemsize >= 2 else np.uint8
+    elif 'int'   in t.name: t_new = np.int16
+    else:                   t_new = t
+    img = img.astype(t_new, copy=False)
+    if t != t_new:
+        warnings.warn("Converting data type from '%s' to ImageJ-compatible '%s'." % (t, t_new))
+
+    # move axes to correct positions for imagej
+    img = move_image_axes(img, axes, 'TZCYX', True)
+
+    imsave_kwargs['imagej'] = True
+    imsave(file, img, **imsave_kwargs)
