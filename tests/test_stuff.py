@@ -83,7 +83,7 @@ def test_model_build():
         for config in configs:
             K.clear_session()
             def _build():
-                CARE(config,outdir=tmpdir)
+                CARE(config,basedir=tmpdir)
             if config.is_valid():
                 _build()
             else:
@@ -121,7 +121,7 @@ def test_model_train():
             if config.is_valid():
                 X = rng.uniform(size=(4,)+(32,)*config.n_dim+(config.n_channel_in,))
                 Y = rng.uniform(size=(4,)+(32,)*config.n_dim+(config.n_channel_out,))
-                model = CARE(config,outdir=tmpdir)
+                model = CARE(config,basedir=tmpdir)
                 model.train(X,Y,(X,Y))
 
 
@@ -145,7 +145,7 @@ def test_model_predict():
 
         for config in filter(lambda c: c.is_valid(), configs):
             K.clear_session()
-            model = CARE(config,outdir=tmpdir)
+            model = CARE(config,basedir=tmpdir)
             axes = config.axes
 
             def _predict(imdims,axes):
@@ -207,7 +207,7 @@ def test_model_predict_tiled():
 
         for config in filter(lambda c: c.is_valid(), configs):
             K.clear_session()
-            model = CARE(config,outdir=tmpdir)
+            model = CARE(config,basedir=tmpdir)
 
             def _predict(imdims,axes,n_tiles):
                 img = rng.uniform(size=imdims)
