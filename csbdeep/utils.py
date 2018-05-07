@@ -278,7 +278,7 @@ def save_tiff_imagej_compatible(file, img, axes, **imsave_kwargs):
     else:                   t_new = t
     img = img.astype(t_new, copy=False)
     if t != t_new:
-        warnings.warn("Converting data type from '%s' to ImageJ-compatible '%s'." % (t, t_new))
+        warnings.warn("Converting data type from '%s' to ImageJ-compatible '%s'." % (t, np.dtype(t_new)))
 
     # move axes to correct positions for imagej
     img = move_image_axes(img, axes, 'TZCYX', True)

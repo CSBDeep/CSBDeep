@@ -21,5 +21,9 @@ setup(name='csbdeep',
                         # "tensorflow-gpu>=1.2.0",
                         # "pandas>=0.20.1",
                         ],
-      entry_points={}
+      entry_points={
+          'console_scripts': [
+              'care_predict = csbdeep.scripts.care_predict:main'
+          ]
+      }
       )

@@ -196,8 +196,8 @@ class CARE(object):
         If set to ``None``, will be loaded from disk (must exist).
     name : str or None
         Model name. Uses a timestamp if set to ``None`` (default).
-    outdir : str
-        Output directory that contains (or will contain) a folder with the given model name.
+    basedir : str
+        Directory that contains (or will contain) a folder with the given model name.
 
     Raises
     ------
@@ -222,14 +222,14 @@ class CARE(object):
         Path to model's folder (which stores configuration, weights, etc.)
     """
 
-    def __init__(self, config, name=None, outdir='.'):
+    def __init__(self, config, name=None, basedir='.'):
         """See class docstring."""
         (config is None or (isinstance(config,Config) and config.is_valid())
             or _raise(ValueError('Invalid configuration: %s' % str(config))))
         name is None or isinstance(name,string_types) or _raise(ValueError())
-        isinstance(outdir,(string_types,Path)) or _raise(ValueError())
+        isinstance(basedir,(string_types,Path)) or _raise(ValueError())
         self.config = config
-        self.outdir = Path(outdir)
+        self.basedir = Path(basedir)
         self.name = name
         self._set_logdir()
         self._model_prepared = False
@@ -239,7 +239,7 @@ class CARE(object):
     def _set_logdir(self):
         if self.name is None:
             self.name = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S.%f")
-        self.logdir = self.outdir / self.name
+        self.logdir = self.basedir / self.name
 
         config_file =  self.logdir / 'config.json'
         if self.config is None:
