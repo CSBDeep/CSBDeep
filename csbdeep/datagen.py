@@ -9,7 +9,7 @@ from collections import namedtuple
 import sys, os, warnings
 
 from tqdm import tqdm
-from .utils import Path, normalize_mi_ma, _raise, consume, compose, shuffle_inplace, axes_dict, move_image_axes
+from .utils import Path, normalize_mi_ma, _raise, consume, compose, shuffle_inplace, axes_dict, move_image_axes, axes_check_and_normalize
 
 
 ## Transforms (to be added later)
@@ -135,8 +135,7 @@ def get_tiff_pairs_from_folders(basepath,source_dirs,target_dir,axes='CZYX',patt
         (p/s/n).exists() or _raise(FileNotFoundError(p/s/n))
         for s in source_dirs for n in image_names
     ))
-    isinstance(axes,string_types) or _raise(ValueError())
-    axes = axes.upper()
+    axes = axes_check_and_normalize(axes)
     xy_name_pairs = [(p/source_dir/n, p/target_dir/n) for source_dir in source_dirs for n in image_names]
     n_images = len(xy_name_pairs)
     description = '{p}: target=\'{o}\', sources={s}, axes={a}, pattern={pt}'.format(p=basepath,s=list(source_dirs),o=target_dir,a=axes,pt=pattern)
@@ -469,11 +468,11 @@ def create_patches(
 
     for i, (x,y,_axes,mask) in tqdm(enumerate(image_pairs),total=n_images):
         if i==0:
-            axes = _axes.upper()
+            axes = axes_check_and_normalize(_axes,len(patch_size))
             channel = axes_dict(axes)['C']
         # checks
-        (isinstance(axes,string_types) and len(axes) >= x.ndim) or _raise(ValueError())
-        axes == _axes.upper() or _raise(ValueError('not all images have the same axes.'))
+        # len(axes) >= x.ndim or _raise(ValueError())
+        axes == axes_check_and_normalize(_axes) or _raise(ValueError('not all images have the same axes.'))
         x.shape == y.shape or _raise(ValueError())
         mask is None or mask.shape == x.shape or _raise(ValueError())
         (channel is None or (isinstance(channel,int) and 0<=channel<x.ndim)) or _raise(ValueError())
@@ -566,19 +565,19 @@ def anisotropic_distortions(
 
 
     psf is None or isinstance(psf,np.ndarray) or _raise(ValueError())
-    psf_axes is None or isinstance(psf_axes,string_types) or _raise(ValueError())
+    if psf_axes is not None:
+        psf_axes = axes_check_and_normalize(psf_axes)
 
     0 < crop_threshold < 1 or _raise(ValueError())
 
 
     def _make_normalize_data(axes_in,axes_out='XY'):
         """Move X to front of image."""
-        ax = axes_dict(axes_in)
-        all((ax[a] is not None) for a in axes_out) or _raise(ValueError('X and/or Y axes missing.'))
+        axes_in  = axes_check_and_normalize(axes_in)
+        axes_out = axes_check_and_normalize(axes_out)
+        (a in axes_in for a in 'XY') or _raise(ValueError('X and/or Y axis missing.'))
         # add axis in axes_in to axes_out (if it doesn't exist there)
-        for a in ax:
-            if (ax[a] is not None) and (a not in axes_out):
-                axes_out += a
+        axes_out += ''.join(a for a in axes_in if a not in axes_out)
 
         def _normalize_data(data,undo=False):
             if undo:
@@ -670,8 +669,8 @@ def anisotropic_distortions(
                 _psf = psf / np.sum(psf)
                 x.ndim == _psf.ndim or _raise(ValueError('image and psf must have the same number of dimensions.'))
                 if psf_axes is not None:
-                    sorted(axes) == sorted(psf_axes) or _raise(ValueError('psf_axes (%s) not compatible with that of the image (%s)' % (psf_axes,axes)))
-                    _psf = move_image_axes(_psf, psf_axes, axes)
+                    # sorted(axes) == sorted(psf_axes) or _raise(ValueError('psf_axes (%s) not compatible with that of the image (%s)' % (psf_axes,axes)))
+                    _psf = move_image_axes(_psf, psf_axes, axes, True)
                 # print("blurring with psf")
                 from scipy.signal import fftconvolve
                 x = fftconvolve(x, _psf.astype(np.float32,copy=False), mode='same')
@@ -732,16 +731,14 @@ def permute_axes(axes):
         perform the axes permutation of `x`, `y`, and `mask`.
 
     """
-    axes = str(axes).upper()
-    axes_dict(axes) # does some error checking
-
+    axes = axes_check_and_normalize(axes)
     def _generator(inputs):
         for x, y, axes_in, mask in inputs:
-            axes_in = str(axes_in).upper()
+            axes_in = axes_check_and_normalize(axes_in)
             if axes_in != axes:
                 # print('permuting axes from %s to %s' % (axes_in,axes))
-                x = move_image_axes(x, axes_in, axes)
-                y = move_image_axes(y, axes_in, axes)
+                x = move_image_axes(x, axes_in, axes, True)
+                y = move_image_axes(y, axes_in, axes, True)
                 if mask is not None:
                     mask = move_image_axes(mask, axes_in, axes)
             yield x, y, axes, mask

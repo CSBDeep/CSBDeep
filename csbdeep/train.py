@@ -1,7 +1,7 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
 from six.moves import range, zip, map, reduce, filter
 
-from .utils import _raise, move_channel_for_backend, axes_dict
+from .utils import _raise, move_channel_for_backend, axes_dict, axes_check_and_normalize
 from .losses import loss_laplace, loss_mse, loss_mae, loss_thresh_weighted_decay
 
 import numpy as np
@@ -38,7 +38,7 @@ def load_data(data,validation_split=0,axes=None,n_images=None):
     X, Y = f['X'], f['Y']
     if axes is None:
         axes = f['axes']
-    axes = str(axes).upper()
+    axes = axes_check_and_normalize(axes)
 
     assert X.shape == Y.shape
     assert len(axes) == X.ndim

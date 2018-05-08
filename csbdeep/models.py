@@ -5,7 +5,7 @@ from six import string_types
 import argparse
 import datetime
 
-from .utils import _raise, consume, Path, load_json, save_json, is_tf_dim, rotate, axes_dict, move_image_axes
+from .utils import _raise, consume, Path, load_json, save_json, is_tf_dim, rotate, axes_check_and_normalize, axes_dict, move_image_axes
 import warnings
 import numpy as np
 # from collections import namedtuple
@@ -79,7 +79,7 @@ class Config(argparse.Namespace):
         """See class docstring."""
 
         # parse and check axes
-        axes = str(axes).upper()
+        axes = axes_check_and_normalize(axes)
         ax = axes_dict(axes)
         ax = {a: (ax[a] is not None) for a in ax}
 
@@ -151,8 +151,7 @@ class Config(argparse.Namespace):
         _v  = True
         _v &= self.n_dim in (2,3)
         try:
-            axes_dict(self.axes) # check
-            _v &= len(self.axes) == self.n_dim+1
+            axes_check_and_normalize(self.axes,self.n_dim+1,disallowed='ST')
         except:
             _v = False
         _v &= _is_int(self.n_channel_in,1)
@@ -243,11 +242,11 @@ class CARE(object):
 
         config_file =  self.logdir / 'config.json'
         if self.config is None:
-            if not config_file.exists():
-                raise FileNotFoundError("config file doesn't exist: %s" % str(config_file.resolve()))
-            else:
+            if config_file.exists():
                 config_dict = load_json(str(config_file))
                 self.config = Config(**config_dict)
+            else:
+                raise FileNotFoundError("config file doesn't exist: %s" % str(config_file.resolve()))
         else:
             if self.logdir.exists():
                 warnings.warn('output path for model already exists, files may be overwritten: %s' % str(self.logdir.resolve()))
@@ -367,12 +366,12 @@ class CARE(object):
         """Export neural network via :func:`csbdeep.tf.export_SavedModel`."""
         from csbdeep.tf import export_SavedModel
         fout = self.logdir / 'TF_SavedModel.zip'
-        info = {
+        meta = {
             'axes':         self.config.axes,
             'div_by':       2**self.config.unet_n_depth,
             'tile_overlap': tile_overlap(self.config.unet_n_depth, self.config.unet_kern_size),
         }
-        export_SavedModel(self.keras_model, str(fout), info=info)
+        export_SavedModel(self.keras_model, str(fout), meta=meta)
         print("\nModel exported in TensorFlow's SavedModel format:\n%s" % str(fout.resolve()))
 
 
@@ -443,6 +442,7 @@ class CARE(object):
             of per-pixel Laplace distributions. Otherwise, returns the restored image via a tuple `(restored,None)`
 
         """
+        axes = axes_check_and_normalize(axes,img.ndim)
         _permute_axes = self._make_permute_axes(axes, self.config.axes)
 
         x = _permute_axes(img)
@@ -493,6 +493,7 @@ class CARE(object):
         # separate mean and scale
         if self.config.probabilistic:
             _n = self.config.n_channel_out
+            assert x.shape[axis] == 2*_n
             slices = [slice(None) for _ in x.shape]
             slices[axis] = slice(None,_n)
             mean = x[slices]
@@ -505,26 +506,25 @@ class CARE(object):
     def _make_permute_axes(self,axes_in,axes_out=None):
         if axes_out is None:
             axes_out = self.config.axes
-
-        channel_in  = axes_dict(axes_in )['C']
+        channel_in  = axes_dict(axes_in) ['C']
         channel_out = axes_dict(axes_out)['C']
         assert channel_out is not None
-        if channel_in is None:
-            axes_in += 'C'
-        assert sorted(axes_in) == sorted(axes_out)
 
         def _permute_axes(data,undo=False):
             if data is None:
                 return None
             if undo:
-                data = move_image_axes(data, axes_out, axes_in)
-                if channel_in is None and data.shape[-1]==1:
-                    data = data[...,0]
-                return data
+                if channel_in is not None:
+                    return move_image_axes(data, axes_out, axes_in, True)
+                else:
+                    # input is single-channel and has no channel axis
+                    data = move_image_axes(data, axes_out, axes_in+'C', True)
+                    # output is single-channel -> remove channel axis
+                    if data.shape[-1] == 1:
+                        data = data[...,0]
+                    return data
             else:
-                if channel_in is None:
-                    data = np.expand_dims(data,-1)
-                return move_image_axes(data, axes_in, axes_out)
+                return move_image_axes(data, axes_in, axes_out, True)
         return _permute_axes
 
 
@@ -607,7 +607,7 @@ class IsotropicCARE(CARE):
         - :func:`scipy.ndimage.interpolation.zoom` differs from :func:`gputools.scale`. Important?
 
         """
-        axes = axes.upper()
+        axes = axes_check_and_normalize(axes,img.ndim)
         'Z' in axes or _raise(ValueError())
         axes_tmp = 'CZ' + axes.replace('Z','').replace('C','')
         _permute_axes = self._make_permute_axes(axes, axes_tmp)

@@ -188,38 +188,26 @@ def download_and_extract_zip_file(url, provides=None, targetdir='.'):
             os.unlink(filepath)
 
 
-def axes_dict(axes):
+def axes_check_and_normalize(axes,length=None,disallowed=None,return_allowed=False):
     """
-    from axes string to dict
     S(ample), T(ime), C(hannel), Z, Y, X
     """
     allowed = 'STCZYX'
     axes = str(axes).upper()
-    consume(a in allowed       or _raise(ValueError("invalid axis '%s'."%a))               for a in axes)
-    consume(axes.count(a) <= 1 or _raise(ValueError("axis '%s' occurs more than once."%a)) for a in allowed)
+    consume(a in allowed or _raise(ValueError("invalid axis '%s', must be one of %s."%(a,list(allowed)))) for a in axes)
+    disallowed is None or consume(a not in disallowed or _raise(ValueError("disallowed axis '%s'."%a)) for a in axes)
+    consume(axes.count(a)==1 or _raise(ValueError("axis '%s' occurs more than once."%a)) for a in axes)
+    length is None or len(axes)==length or _raise(ValueError('axes (%s) must be of length %d.' % (axes,length)))
+    return (axes,allowed) if return_allowed else axes
+
+
+def axes_dict(axes):
+    """
+    from axes string to dict
+    """
+    axes, allowed = axes_check_and_normalize(axes,return_allowed=True)
     return { a: None if axes.find(a) == -1 else axes.find(a) for a in allowed }
     # return collections.namedtuple('Axes',list(allowed))(*[None if axes.find(a) == -1 else axes.find(a) for a in allowed ])
-
-# def axes_dict_to_str(axes):
-#     """
-#     from dict to axes string
-#     S(ample), T(ime), C(hannel), Z, Y, X
-#     """
-#     allowed = 'STCZYX'
-#     # try:
-#     #     axes = axes._asdict()
-#     # except:
-#     #     pass
-#     consume(a in allowed or _raise(ValueError("invalid axis '%s'."%a)) for a in axes)
-#     dims = [a for a in axes.values() if a is not None]
-#     len(dims) == len(np.unique(dims)) or _raise(ValueError("dimension occurs more than once."))
-
-#     s = ['' for _ in axes]
-#     for a in axes:
-#         if axes[a] is not None:
-#             s[axes[a]] = a
-#     s = ''.join(s)
-#     return s
 
 
 def move_image_axes(x, fr, to, adjust_singletons=False):
@@ -227,12 +215,13 @@ def move_image_axes(x, fr, to, adjust_singletons=False):
     x: ndarray
     fr,to: axes string (see `axes_dict`)
     """
-    isinstance(fr,string_types) and isinstance(to,string_types) or _raise(ValueError())
-    len(fr) == x.ndim or _raise(ValueError())
-    fr, to = fr.upper(), to.upper()
-    axes_dict(fr), axes_dict(to) # performs checks
+    fr = axes_check_and_normalize(fr, length=x.ndim)
+    to = axes_check_and_normalize(to)
 
-    if bool(adjust_singletons):
+    fr_initial = fr
+    x_shape_initial = x.shape
+    adjust_singletons = bool(adjust_singletons)
+    if adjust_singletons:
         # remove axes not present in 'to'
         slices = [slice(None) for _ in x.shape]
         for i,a in enumerate(fr):
@@ -248,7 +237,13 @@ def move_image_axes(x, fr, to, adjust_singletons=False):
                 x = np.expand_dims(x,-1)
                 fr += a
 
-    sorted(list(fr)) == sorted(list(to)) or _raise(ValueError())
+    if set(fr) != set(to):
+        _adjusted = '(adjusted to %s and %s) ' % (x.shape, fr) if adjust_singletons else ''
+        raise ValueError(
+            'image with shape %s and axes %s %snot compatible with target axes %s.'
+            % (x_shape_initial, fr_initial, _adjusted, to)
+        )
+
     ax_from, ax_to = axes_dict(fr), axes_dict(to)
     if fr == to:
         return x
@@ -266,9 +261,7 @@ def move_image_axes(x, fr, to, adjust_singletons=False):
 def save_tiff_imagej_compatible(file, img, axes, **imsave_kwargs):
     """Save tiff in ImageJ-compatible format."""
     from tifffile import imsave
-    axes = str(axes).upper()
-    axes_dict(axes) # perform checks
-    'S' not in axes or _raise(ValueError())
+    axes = axes_check_and_normalize(axes,img.ndim,disallowed='S')
 
     # convert to imagej-compatible data type
     t = img.dtype
