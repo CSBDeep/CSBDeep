@@ -531,9 +531,9 @@ def anisotropic_distortions(
         Subsampling factor to apply to X axis to mimic distortions along Z.
     psf : :class:`numpy.ndarray` or None
         Point spread function (PSF) that is supposed to mimic blurring
-        of the microscope due to reduced axial resolution.
-        Must be compatible with the number of dimensions (2D/3D) and the shape of the raw images.
-        Set to ``None`` to disable.
+        of the microscope due to reduced axial resolution. Set to ``None`` to disable.
+        Note that convolution with the PSF is applied separately for each channel, i.e.
+        the PSF must have the same number of channels as the image it is applied to.
     psf_axes : str or None
         Axes of the psf. If ``None``, psf axes are assumed to be the same as of the image
         that it is applied to.
@@ -659,21 +659,41 @@ def anisotropic_distortions(
             # img = img[...,:256,:256]
 
 
+            axes = axes_check_and_normalize(axes)
             _normalize_data = _make_normalize_data(axes)
             # print(axes, img.shape)
 
             x = img.astype(np.float32, copy=False)
 
             if psf is not None:
-                np.min(psf) >= 0 or _raise(ValueError('psf has negative values.'))
-                _psf = psf / np.sum(psf)
-                x.ndim == _psf.ndim or _raise(ValueError('image and psf must have the same number of dimensions.'))
-                if psf_axes is not None:
-                    # sorted(axes) == sorted(psf_axes) or _raise(ValueError('psf_axes (%s) not compatible with that of the image (%s)' % (psf_axes,axes)))
-                    _psf = move_image_axes(_psf, psf_axes, axes, True)
-                # print("blurring with psf")
                 from scipy.signal import fftconvolve
-                x = fftconvolve(x, _psf.astype(np.float32,copy=False), mode='same')
+                # print("blurring with psf")
+                _psf = psf.astype(np.float32,copy=False)
+                np.min(_psf) >= 0 or _raise(ValueError('psf has negative values.'))
+                _psf /= np.sum(_psf)
+                if psf_axes is not None:
+                    _psf = move_image_axes(_psf, psf_axes, axes, True)
+                x.ndim == _psf.ndim or _raise(ValueError('image and psf must have the same number of dimensions.'))
+
+                if 'C' in axes:
+                    ch = axes_dict(axes)['C']
+                    n_channels = x.shape[ch]
+                    # convolve with psf separately for every channel
+                    if _psf.shape[ch] == 1:
+                        warnings.warn('applying same psf to every channel of the image.')
+                    if _psf.shape[ch] in (1,n_channels):
+                        x = np.stack([
+                            fftconvolve(
+                                np.take(x,   i,axis=ch),
+                                np.take(_psf,i,axis=ch,mode='clip'),
+                                mode='same'
+                            )
+                            for i in range(n_channels)
+                        ],axis=ch)
+                    else:
+                        raise ValueError('number of psf channels (%d) incompatible with number of image channels (%d).' % (_psf.shape[ch],n_channels))
+                else:
+                    x = fftconvolve(x, _psf, mode='same')
 
             if bool(poisson_noise):
                 # print("apply poisson noise")
