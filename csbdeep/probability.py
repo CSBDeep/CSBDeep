@@ -16,9 +16,8 @@ class ProbabilisticPrediction(object):
         #
         self._loc     = loc
         self._scale   = scale
-        self._shape   = loc.shape
         # expose methods from laplace object
-        _laplace      = self[...]
+        _laplace      = laplace(loc=self._loc,scale=self._scale)
         self.rvs      = _laplace.rvs
         self.pdf      = _laplace.pdf
         self.logpdf   = _laplace.logpdf
@@ -39,11 +38,22 @@ class ProbabilisticPrediction(object):
         self.interval = _laplace.interval
 
     def __getitem__(self, indices):
-        return laplace(loc=self._loc[indices],scale=self._scale[indices])
+        return ProbabilisticPrediction(loc=self._loc[indices],scale=self._scale[indices])
+
+    def __len__(self):
+        return len(self._loc)
 
     @property
     def shape(self):
-        return self._shape
+        return self._loc.shape
+
+    @property
+    def ndim(self):
+        return self._loc.ndim
+
+    @property
+    def size(self):
+        return self._loc.size
 
     def scale(self):
         return self._scale
