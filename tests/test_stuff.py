@@ -32,13 +32,19 @@ def test_config():
 
     axes_list = [
         ('yx',_with_channel('YX')),
+        ('ytx',_with_channel('YTX')),
+        ('zyx',_with_channel('ZYX')),
         ('YX',_with_channel('YX')),
         ('XYZ',_with_channel('XYZ')),
+        ('XYT',_with_channel('XYT')),
         ('SYX',_with_channel('YX')),
         ('SXYZ',_with_channel('XYZ')),
+        ('SXTY',_with_channel('XTY')),
         (_with_channel('YX'),_with_channel('YX')),
         (_with_channel('XYZ'),_with_channel('XYZ')),
+        (_with_channel('XTY'),_with_channel('XTY')),
         (_with_channel('SYX'),_with_channel('YX')),
+        (_with_channel('STYX'),_with_channel('TYX')),
         (_with_channel('SXYZ'),_with_channel('XYZ')),
     ]
 
@@ -51,8 +57,11 @@ def test_config():
     with pytest.raises(ValueError):
         Config('XYZC')
         Config('CXYZ')
-    with pytest.raises(ValueError): Config('XTY')
+    with pytest.raises(ValueError):
+        Config('XTYC')
+        Config('CXTY')
     with pytest.raises(ValueError): Config('XYZT')
+    with pytest.raises(ValueError): Config('tXYZ')
     with pytest.raises(ValueError): Config('XYS')
     with pytest.raises(ValueError): Config('XSYZ')
 

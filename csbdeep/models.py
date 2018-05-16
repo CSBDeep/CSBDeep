@@ -83,12 +83,13 @@ class Config(argparse.Namespace):
         ax = axes_dict(axes)
         ax = {a: (ax[a] is not None) for a in ax}
 
-        not ax['T'] or _raise(ValueError('time axis T currently not supported.'))
+        (ax['X'] and ax['Y']) or _raise(ValueError('lateral axes X and Y must be present.'))
+        not (ax['Z'] and ax['T']) or _raise(ValueError('using Z and T axes together not supported.'))
+
         axes.startswith('S') or (not ax['S']) or _raise(ValueError('sample axis S must be first.'))
         axes = axes.replace('S','') # remove sample axis if it exists
 
-        (ax['X'] and ax['Y']) or _raise(ValueError('lateral axes X and Y must be present.'))
-        n_dim = 3 if ax['Z'] else 2
+        n_dim = 3 if (ax['Z'] or ax['T']) else 2
 
         # TODO: Config not independent of backend. Problem?
         # could move things around during train/predict as an alternative... good idea?
@@ -129,11 +130,18 @@ class Config(argparse.Namespace):
         self.train_checkpoint      = 'weights_best.h5'
         self.train_reduce_lr       = {'factor': 0.5, 'patience': 10}
 
+        # disallow setting 'n_dim' manually
+        try:
+            del kwargs['n_dim']
+            # warnings.warn("ignoring parameter 'n_dim'")
+        except:
+            pass
+
         for k in kwargs:
             setattr(self, k, kwargs[k])
 
 
-    def is_valid(self):
+    def is_valid(self, return_invalid=False):
         """Check if configuration is valid.
 
         Returns
@@ -147,36 +155,48 @@ class Config(argparse.Namespace):
                 (True if low is None else low <= v) and
                 (True if high is None else v <= high)
             )
-        # TODO: make nicer and terminate early on False
-        _v  = True
-        _v &= self.n_dim in (2,3)
+
+        ok = {}
+        ok['n_dim'] = self.n_dim in (2,3)
         try:
-            axes_check_and_normalize(self.axes,self.n_dim+1,disallowed='ST')
+            axes_check_and_normalize(self.axes,self.n_dim+1,disallowed='S')
+            ok['axes'] = True
         except:
-            _v = False
-        _v &= _is_int(self.n_channel_in,1)
-        _v &= _is_int(self.n_channel_out,1)
-        _v &= isinstance(self.probabilistic,bool)
-        _v &= (isinstance(self.unet_residual,bool) and
-               (not self.unet_residual or (self.n_channel_in==self.n_channel_out)))
-        _v &= _is_int(self.unet_n_depth,1)
-        _v &= _is_int(self.unet_kern_size,1)
-        _v &= _is_int(self.unet_n_first,1)
-        _v &= self.unet_last_activation in ('linear','relu')
-        _v &= (isinstance(self.unet_input_shape,tuple) and
-               (len(self.unet_input_shape)==self.n_dim+1) and
-               (self.unet_input_shape[-1]==self.n_channel_in) and
-               all((d is None or (_is_int(d) and d%(2**self.unet_n_depth)==0) for d in self.unet_input_shape[:-1])))
-        _v &= ((    self.probabilistic and self.train_loss == 'laplace'   ) or
-               (not self.probabilistic and self.train_loss in ('mse','mae')))
-        _v &= _is_int(self.train_epochs,1)
-        _v &= _is_int(self.train_steps_per_epoch,1)
-        _v &= np.isscalar(self.train_learning_rate) and self.train_learning_rate > 0
-        _v &= _is_int(self.train_batch_size,1)
-        _v &= isinstance(self.train_tensorboard,bool)
-        _v &= self.train_checkpoint is None or isinstance(self.train_checkpoint,string_types)
-        _v &= self.train_reduce_lr  is None or isinstance(self.train_reduce_lr,dict)
-        return _v
+            ok['axes'] = False
+        ok['n_channel_in']  = _is_int(self.n_channel_in,1)
+        ok['n_channel_out'] = _is_int(self.n_channel_out,1)
+        ok['probabilistic'] = isinstance(self.probabilistic,bool)
+
+        ok['unet_residual'] = (
+            isinstance(self.unet_residual,bool) and
+            (not self.unet_residual or (self.n_channel_in==self.n_channel_out))
+        )
+        ok['unet_n_depth']         = _is_int(self.unet_n_depth,1)
+        ok['unet_kern_size']       = _is_int(self.unet_kern_size,1)
+        ok['unet_n_first']         = _is_int(self.unet_n_first,1)
+        ok['unet_last_activation'] = self.unet_last_activation in ('linear','relu')
+        ok['unet_input_shape'] = (
+            isinstance(self.unet_input_shape,(list,tuple)) and
+            len(self.unet_input_shape) == self.n_dim+1 and
+            self.unet_input_shape[-1] == self.n_channel_in and
+            all((d is None or (_is_int(d) and d%(2**self.unet_n_depth)==0) for d in self.unet_input_shape[:-1]))
+        )
+        ok['train_loss'] = (
+            (    self.probabilistic and self.train_loss == 'laplace'   ) or
+            (not self.probabilistic and self.train_loss in ('mse','mae'))
+        )
+        ok['train_epochs']          = _is_int(self.train_epochs,1)
+        ok['train_steps_per_epoch'] = _is_int(self.train_steps_per_epoch,1)
+        ok['train_learning_rate']   = np.isscalar(self.train_learning_rate) and self.train_learning_rate > 0
+        ok['train_batch_size']      = _is_int(self.train_batch_size,1)
+        ok['train_tensorboard']     = isinstance(self.train_tensorboard,bool)
+        ok['train_checkpoint']      = self.train_checkpoint is None or isinstance(self.train_checkpoint,string_types)
+        ok['train_reduce_lr']       = self.train_reduce_lr  is None or isinstance(self.train_reduce_lr,dict)
+
+        if return_invalid:
+            return all(ok.values()), tuple(k for (k,v) in ok.items() if not v)
+        else:
+            return all(ok.values())
 
 
 
@@ -223,8 +243,12 @@ class CARE(object):
 
     def __init__(self, config, name=None, basedir='.'):
         """See class docstring."""
-        (config is None or (isinstance(config,Config) and config.is_valid())
-            or _raise(ValueError('Invalid configuration: %s' % str(config))))
+
+        config is None or isinstance(config,Config) or _raise(ValueError('Invalid configuration: %s' % str(config)))
+        if config is not None and not config.is_valid():
+            invalid_attr = config.is_valid(True)[1]
+            raise ValueError('Invalid configuration attributes: ' + ', '.join(invalid_attr))
+
         name is None or isinstance(name,string_types) or _raise(ValueError())
         isinstance(basedir,(string_types,Path)) or _raise(ValueError())
         self.config = config
@@ -245,6 +269,9 @@ class CARE(object):
             if config_file.exists():
                 config_dict = load_json(str(config_file))
                 self.config = Config(**config_dict)
+                if not self.config.is_valid():
+                    invalid_attr = self.config.is_valid(True)[1]
+                    raise ValueError('Invalid attributes in loaded config: ' + ', '.join(invalid_attr))
             else:
                 raise FileNotFoundError("config file doesn't exist: %s" % str(config_file.resolve()))
         else:
