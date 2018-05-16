@@ -508,13 +508,17 @@ def anisotropic_distortions(
         psf_axes       = None,
         poisson_noise  = False,
         gauss_sigma    = 0,
+        subsample_axis = 'X',
+        yield_target   = 'source',
         crop_threshold = 0.2,
     ):
     """Simulate anisotropic distortions.
 
-    Modify image along X axis to mimic the distortions that occur due to
-    low resolution along Z axis. Note that the modified image is finally upscaled
-    to obtain the same resolution as the unmodified input image.
+    Modify the first image (obtained from input generator) along the one axis to mimic the
+    distortions that typically occur due to low resolution along Z axis.
+    Note that the modified image is finally upscaled to obtain the same resolution
+    as the unmodified input image and is yielded as the 'source' image (see :class:`RawData').
+    The mask from the input generator is simply passed through.
 
     The following operations are applied to the image (in order):
 
@@ -528,7 +532,7 @@ def anisotropic_distortions(
     Parameters
     ----------
     subsample : float
-        Subsampling factor to apply to X axis to mimic distortions along Z.
+        Subsampling factor to mimic distortions along Z.
     psf : :class:`numpy.ndarray` or None
         Point spread function (PSF) that is supposed to mimic blurring
         of the microscope due to reduced axial resolution. Set to ``None`` to disable.
@@ -541,10 +545,18 @@ def anisotropic_distortions(
         Flag to indicate whether Poisson noise should be added to the image.
     gauss_sigma : float
         Standard deviation of white Gaussian noise to be added to the image.
+    subsample_axis : str
+        Subsampling image axis (default 'X').
+    yield_target : str
+        Which image from the input generator should be yielded by the generator ('source' or 'target').
+        If 'source', the unmodified input/source image (from which the distorted image is computed)
+        is yielded as the target image. If 'target', the target image from the input generator is simply
+        passed through.
     crop_threshold : float
-        The subsample factor must evenly divide the image size along the X axis to prevent
+        The subsample factor must evenly divide the image size along the subsampling axis to prevent
         potential image misalignment. If this is not the case the subsample factors are
-        modified and the raw image will be cropped along X up to a fraction indicated by `crop_threshold`.
+        modified and the raw image will be cropped along the subsampling axis
+        up to a fraction indicated by `crop_threshold`.
 
     Returns
     -------
@@ -563,6 +575,8 @@ def anisotropic_distortions(
     (np.isscalar(subsample) and subsample >= 1) or _raise(ValueError('subsample must be >= 1'))
     _subsample = subsample
 
+    subsample_axis = axes_check_and_normalize(subsample_axis)
+    len(subsample_axis)==1 or _raise(ValueError())
 
     psf is None or isinstance(psf,np.ndarray) or _raise(ValueError())
     if psf_axes is not None:
@@ -570,12 +584,14 @@ def anisotropic_distortions(
 
     0 < crop_threshold < 1 or _raise(ValueError())
 
+    yield_target in ('source','target') or _raise(ValueError())
 
-    def _make_normalize_data(axes_in,axes_out='XY'):
+
+    def _make_normalize_data(axes_in):
         """Move X to front of image."""
         axes_in  = axes_check_and_normalize(axes_in)
-        axes_out = axes_check_and_normalize(axes_out)
-        (a in axes_in for a in 'XY') or _raise(ValueError('X and/or Y axis missing.'))
+        axes_out = subsample_axis
+        # (a in axes_in for a in 'XY') or _raise(ValueError('X and/or Y axis missing.'))
         # add axis in axes_in to axes_out (if it doesn't exist there)
         axes_out += ''.join(a for a in axes_in if a not in axes_out)
 
@@ -648,16 +664,11 @@ def anisotropic_distortions(
     def _generator(inputs):
         for img,y,axes,mask in inputs:
 
-            if not (y is None or np.all(img==y)):
-                warnings.warn('ignoring y.')
-            if mask is not None:
-                warnings.warn('ignoring mask.')
-            del y, mask
-
-
-            # tmp
-            # img = img[...,:256,:256]
-
+            if yield_target == 'source':
+                y is None or np.allclose(img,y) or warnings.warn("ignoring 'target' image from input generator")
+                target = img
+            else:
+                target = y
 
             axes = axes_check_and_normalize(axes)
             _normalize_data = _make_normalize_data(axes)
@@ -706,27 +717,27 @@ def anisotropic_distortions(
 
             if _subsample != 1:
                 # print("down and upsampling X by factor %s" % str(_subsample))
-                img = _normalize_data(img)
-                x   = _normalize_data(x)
+                target = _normalize_data(target)
+                x      = _normalize_data(x)
 
                 subsample, subsample_size = _adjust_subsample(x.shape[0],_subsample,crop_threshold)
                 # print(subsample, subsample_size)
                 if _subsample != subsample:
                     warnings.warn('changing subsample from %s to %s' % (str(_subsample),str(subsample)))
 
-                img = _make_divisible_by_subsample(img,subsample_size)
-                x   = _make_divisible_by_subsample(x,  subsample_size)
-                x   = _scale_down_up(x,subsample)
+                target = _make_divisible_by_subsample(target,subsample_size)
+                x      = _make_divisible_by_subsample(x,     subsample_size)
+                x      = _scale_down_up(x,subsample)
 
-                assert x.shape == img.shape, (x.shape, img.shape)
+                assert x.shape == target.shape, (x.shape, target.shape)
 
-                img = _normalize_data(img,undo=True)
-                x   = _normalize_data(x,  undo=True)
+                target = _normalize_data(target,undo=True)
+                x      = _normalize_data(x,     undo=True)
 
-            yield x, img, axes, None
+            yield x, target, axes, mask
 
 
-    return Transform('Anisotropic distortion (along X axis)', _generator, 1)
+    return Transform('Anisotropic distortion (along %s axis)' % subsample_axis, _generator, 1)
 
 
 
@@ -764,3 +775,35 @@ def permute_axes(axes):
             yield x, y, axes, mask
 
     return Transform('Permute axes to %s' % axes, _generator, 1)
+
+
+
+
+
+
+
+def crop_images(slices):
+    """Transformation to crop all images (and mask).
+
+    Note that slices must be compatible with the image size.
+
+    Parameters
+    ----------
+    slices : list or tuple of slice
+        List of slices to apply to each dimension of the image.
+
+    Returns
+    -------
+    Transform
+        Returns a :class:`Transform` object whose `generator` will
+        perform image cropping of `x`, `y`, and `mask`.
+
+    """
+    slices = tuple(slices)
+    def _generator(inputs):
+        for x, y, axes, mask in inputs:
+            axes = axes_check_and_normalize(axes)
+            len(axes) == len(slices) or _raise(ValueError())
+            yield x[slices], y[slices], axes, (mask[slices] if mask is not None else None)
+
+    return Transform('Crop images (%s)' % str(slices), _generator, 1)
