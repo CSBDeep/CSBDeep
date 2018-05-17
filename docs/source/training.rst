@@ -77,3 +77,6 @@ generated (see :doc:`datagen`).
 
 .. autoclass:: csbdeep.models.IsotropicCARE
     :members:
+
+.. autoclass:: csbdeep.models.UndersampledCARE
+    :members:

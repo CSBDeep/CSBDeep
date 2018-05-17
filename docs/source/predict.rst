@@ -50,6 +50,10 @@ retained.
     :members: predict, predict_probabilistic
 
 
+.. autoclass:: csbdeep.models.UndersampledCARE
+    :members: predict, predict_probabilistic
+
+
 Normalization
 -------------
 
