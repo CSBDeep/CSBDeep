@@ -1,6 +1,8 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
 from six.moves import range, zip, map, reduce, filter
 
+from .utils import _raise, backend_channels_last
+
 from keras.layers import Dropout, Activation, BatchNormalization
 from keras.layers import Conv2D, MaxPooling2D, UpSampling2D, Conv3D, MaxPooling3D, UpSampling3D
 from keras.layers.merge import Concatenate
@@ -74,10 +76,7 @@ def unet_block(n_depth=2, n_filter_base=16, kernel_size=(3,3), n_conv_per_depth=
     if last_activation is None:
         last_activation = activation
 
-    if K.image_data_format() == "channels_last":
-        channel_axis = -1
-    else:
-        channel_axis = 1
+    channel_axis = -1 if backend_channels_last() else 1
 
     def _name(s):
         return prefix+s

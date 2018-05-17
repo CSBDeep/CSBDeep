@@ -16,7 +16,7 @@ from keras import backend as K
 from keras.callbacks import Callback
 from keras.layers import Lambda
 
-from .utils import _raise, is_tf_dim, is_tf_back, save_json, tempfile
+from .utils import _raise, is_tf_backend, save_json, tempfile
 
 
 
@@ -43,7 +43,7 @@ def limit_gpu_memory(fraction, allow_growth=False):
 
     fraction is None or (np.isscalar(fraction) and 0<=fraction<=1) or _raise(ValueError('fraction must be between 0 and 1.'))
 
-    if is_tf_back():
+    if is_tf_backend():
         if K.tensorflow_backend._SESSION is None:
             config = tf.ConfigProto()
             if fraction is not None:

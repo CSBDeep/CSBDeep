@@ -5,7 +5,7 @@ from six import string_types
 import argparse
 import datetime
 
-from .utils import _raise, consume, Path, load_json, save_json, is_tf_dim, rotate, axes_check_and_normalize, axes_dict, move_image_axes
+from .utils import _raise, consume, Path, load_json, save_json, axes_check_and_normalize, axes_dict, move_image_axes, backend_channels_last
 import warnings
 import numpy as np
 # from collections import namedtuple
@@ -95,8 +95,7 @@ class Config(argparse.Namespace):
         # TODO: Config not independent of backend. Problem?
         # could move things around during train/predict as an alternative... good idea?
         # otherwise, users can choose axes of input image anyhow, so doesn't matter if model is fixed to something else
-        assert K.image_data_format() in ('channels_first','channels_last')
-        if K.image_data_format() == 'channels_last':
+        if backend_channels_last():
             if ax['C']:
                 axes[-1] == 'C' or _raise(ValueError('channel axis must be last for backend (%s).' % K.backend()))
             else:
@@ -668,16 +667,16 @@ class IsotropicCARE(CARE):
         channel = -1
 
         # u1: first rotation and prediction
-        x_rot1   = rotate(x_scaled, axis=1, copy=False)
+        x_rot1   = self._rotate(x_scaled, axis=1, copy=False)
         u_rot1   = predict_direct(self.keras_model, x_rot1, channel_in=channel, channel_out=channel, single_sample=False,
                                   batch_size=batch_size, verbose=0)
-        u1       = rotate(u_rot1, -1, axis=1, copy=False)
+        u1       = self._rotate(u_rot1, -1, axis=1, copy=False)
 
         # u2: second rotation and prediction
-        x_rot2   = rotate(rotate(x_scaled, axis=2, copy=False), axis=0, copy=False)
+        x_rot2   = self._rotate(self._rotate(x_scaled, axis=2, copy=False), axis=0, copy=False)
         u_rot2   = predict_direct(self.keras_model, x_rot2, channel_in=channel, channel_out=channel, single_sample=False,
                                   batch_size=batch_size, verbose=0)
-        u2       = rotate(rotate(u_rot2, -1, axis=0, copy=False), -1, axis=2, copy=False)
+        u2       = self._rotate(self._rotate(u_rot2, -1, axis=0, copy=False), -1, axis=2, copy=False)
 
         n_channel_predicted = self.config.n_channel_out * (2 if self.config.probabilistic else 1)
         u_rot1.shape[channel] == n_channel_predicted or _raise(ValueError())
@@ -708,6 +707,29 @@ class IsotropicCARE(CARE):
         mean, scale = _permute_axes(mean,undo=True), _permute_axes(scale,undo=True)
 
         return mean, scale
+
+
+    @staticmethod
+    def _rotate(arr, k=1, axis=1, copy=True):
+        """Rotate by 90 degrees around the first 2 axis."""
+        if copy:
+            arr = arr.copy()
+
+        k = k % 4
+
+        arr = np.rollaxis(arr, axis, arr.ndim)
+
+        if k == 0:
+            res = arr
+        elif k == 1:
+            res = arr[::-1].swapaxes(0, 1)
+        elif k == 2:
+            res = arr[::-1, ::-1]
+        else:
+            res = arr.swapaxes(0, 1)[::-1]
+
+        res = np.rollaxis(res, -1, axis)
+        return res
 
 
 
@@ -781,7 +803,8 @@ class UndersampledCARE(CARE):
         return ProbabilisticPrediction(mean, scale)
 
 
-    def _upsample(self, img, axes, factor, axis='Z'):
+    @staticmethod
+    def _upsample(img, axes, factor, axis='Z'):
         factors = np.ones(img.ndim)
-        factors[axes_dict(axes)['Z']] = factor
+        factors[axes_dict(axes)[axis]] = factor
         return zoom(img,factors,order=1)

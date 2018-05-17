@@ -9,7 +9,7 @@ from collections import namedtuple
 import sys, os, warnings
 
 from tqdm import tqdm
-from .utils import Path, normalize_mi_ma, _raise, consume, compose, shuffle_inplace, axes_dict, move_image_axes, axes_check_and_normalize
+from .utils import Path, normalize_mi_ma, _raise, consume, compose, axes_dict, move_image_axes, axes_check_and_normalize
 
 
 ## Transforms (to be added later)
@@ -517,7 +517,7 @@ def anisotropic_distortions(
     Modify the first image (obtained from input generator) along the one axis to mimic the
     distortions that typically occur due to low resolution along Z axis.
     Note that the modified image is finally upscaled to obtain the same resolution
-    as the unmodified input image and is yielded as the 'source' image (see :class:`RawData').
+    as the unmodified input image and is yielded as the 'source' image (see :class:`RawData`).
     The mask from the input generator is simply passed through.
 
     The following operations are applied to the image (in order):
@@ -807,3 +807,14 @@ def crop_images(slices):
             yield x[slices], y[slices], axes, (mask[slices] if mask is not None else None)
 
     return Transform('Crop images (%s)' % str(slices), _generator, 1)
+
+
+
+# Misc
+
+def shuffle_inplace(*arrs):
+    rng = np.random.RandomState()
+    state = rng.get_state()
+    for a in arrs:
+        rng.set_state(state)
+        rng.shuffle(a)

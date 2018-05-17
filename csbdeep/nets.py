@@ -8,7 +8,7 @@ import keras.backend as K
 from .blocks import unet_block
 import re
 
-from .utils import _raise
+from .utils import _raise, backend_channels_last
 import warnings
 import numpy as np
 
@@ -34,10 +34,7 @@ def custom_unet(input_shape,
 
     all((s % 2 == 1 for s in kernel_size)) or _raise(ValueError('kernel size should be odd in all dimensions.'))
 
-    if K.image_data_format() == "channels_last":
-        channel_axis = -1
-    else:
-        channel_axis = 1
+    channel_axis = -1 if backend_channels_last() else 1
 
     n_dim = len(kernel_size)
     conv = Conv2D if n_dim==2 else Conv3D
@@ -49,7 +46,7 @@ def custom_unet(input_shape,
 
     final = conv(n_channel_out, (1,)*n_dim, activation='linear')(unet)
     if residual:
-        if not (n_channel_out == input_shape[-1] if K.image_data_format() == "channels_last" else n_channel_out == input_shape[0]):
+        if not (n_channel_out == input_shape[-1] if backend_channels_last() else n_channel_out == input_shape[0]):
             raise ValueError("number of input and output channels must be the same for a residual net.")
         final = Add()([final, input])
     final = Activation(activation=last_activation)(final)

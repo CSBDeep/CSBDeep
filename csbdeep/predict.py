@@ -2,7 +2,7 @@ from __future__ import print_function, unicode_literals, absolute_import, divisi
 from six.moves import range, zip, map, reduce, filter
 
 
-from .utils import _raise, consume, normalize_mi_ma, from_tensor, to_tensor, tensor_num_channels, is_tf_dim, axes_dict
+from .utils import _raise, consume, normalize_mi_ma, axes_dict, move_channel_for_backend, backend_channels_last
 import warnings
 import numpy as np
 
@@ -304,6 +304,26 @@ class PadAndCropResizer(Resizer):
 #         return x
 
 
+def to_tensor(x,channel=None,single_sample=True):
+    if single_sample:
+        x = x[np.newaxis]
+        if channel is not None and channel >= 0:
+            channel += 1
+    if channel is None:
+        x, channel = np.expand_dims(x,-1), -1
+    return move_channel_for_backend(x,channel)
+
+
+
+def from_tensor(x,channel=0,single_sample=True):
+    return np.moveaxis((x[0] if single_sample else x), (-1 if backend_channels_last() else 1), channel)
+
+
+
+def tensor_num_channels(x):
+    return x.shape[-1 if backend_channels_last() else 1]
+
+
 
 def predict_direct(keras_model,x,channel_in=None,channel_out=0,single_sample=True,**kwargs):
     """TODO."""
@@ -448,3 +468,4 @@ def tile_overlap(n_depth, kern_size):
         return rf[n_depth, kern_size]
     except KeyError:
         raise ValueError('tile_overlap value for n_depth=%d and kern_size=%d not available.' % (n_depth, kern_size))
+

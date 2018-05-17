@@ -1,7 +1,7 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
 from six.moves import range, zip, map, reduce, filter
 
-from .utils import _raise, move_channel_for_backend, axes_dict, axes_check_and_normalize
+from .utils import _raise, move_channel_for_backend, axes_dict, axes_check_and_normalize, backend_channels_last
 from .losses import loss_laplace, loss_mse, loss_mae, loss_thresh_weighted_decay
 
 import numpy as np
@@ -65,10 +65,8 @@ def load_data(data,validation_split=0,axes=None,n_images=None):
     X = move_channel_for_backend(X,channel=channel)
     Y = move_channel_for_backend(Y,channel=channel)
 
-    import keras.backend as K
-    assert K.image_data_format() in ('channels_first','channels_last')
     axes = axes.replace('C','') # remove channel
-    if K.image_data_format() == 'channels_last':
+    if backend_channels_last():
         axes = axes+'C'
     else:
         axes = axes[:1]+'C'+axes[1:]
