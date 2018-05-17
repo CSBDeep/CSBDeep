@@ -60,10 +60,11 @@ def plot_some(*arr, **kwargs):
     title_list = kwargs.pop('title_list',None)
     pmin = kwargs.pop('pmin',0)
     pmax = kwargs.pop('pmax',100)
+    cmap = kwargs.pop('cmap','magma')
     imshow_kwargs = kwargs
-    return _plot_some(arr=arr, title_list=title_list, pmin=pmin, pmax=pmax, **imshow_kwargs)
+    return _plot_some(arr=arr, title_list=title_list, pmin=pmin, pmax=pmax, cmap=cmap, **imshow_kwargs)
 
-def _plot_some(arr, title_list=None, pmin=0, pmax=100, **imshow_kwargs):
+def _plot_some(arr, title_list=None, pmin=0, pmax=100, cmap='magma', **imshow_kwargs):
     """
     plots a matrix of images
 
@@ -79,7 +80,7 @@ def _plot_some(arr, title_list=None, pmin=0, pmax=100, **imshow_kwargs):
     :return:
     """
 
-
+    imshow_kwargs['cmap'] = cmap
 
     def color_image(a):
         return np.stack(map(to_color,a)) if 1<a.shape[-1]<=3 else np.squeeze(a)

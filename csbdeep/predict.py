@@ -102,16 +102,19 @@ class PercentileNormalizer(Normalizer):
     pmax : float
         High percentile.
     do_after : bool
-        Flag to indicate whether to undo normalization.
+        Flag to indicate whether to undo normalization (original data type will not be restored).
+    dtype : type
+        Data type after normalization.
     kwargs : dict
         Keyword arguments for :func:`csbdeep.utils.normalize_mi_ma`.
     """
 
-    def __init__(self, pmin, pmax, do_after=True, **kwargs):
+    def __init__(self, pmin, pmax, do_after=True, dtype=np.float32, **kwargs):
         """TODO."""
         self.pmin = pmin
         self.pmax = pmax
         self._do_after = do_after
+        self.dtype = dtype
         self.kwargs = kwargs
 
     def before(self, img, axes):
@@ -123,9 +126,9 @@ class PercentileNormalizer(Normalizer):
         len(axes) == img.ndim or _raise(ValueError())
         channel = axes_dict(axes)['C']
         axes = None if channel is None else tuple((d for d in range(img.ndim) if d != channel))
-        self.mi = np.percentile(img,self.pmin,axis=axes,keepdims=True)
-        self.ma = np.percentile(img,self.pmax,axis=axes,keepdims=True)
-        return normalize_mi_ma(img, self.mi, self.ma, **self.kwargs)
+        self.mi = np.percentile(img,self.pmin,axis=axes,keepdims=True).astype(self.dtype,copy=False)
+        self.ma = np.percentile(img,self.pmax,axis=axes,keepdims=True).astype(self.dtype,copy=False)
+        return normalize_mi_ma(img, self.mi, self.ma, dtype=self.dtype, **self.kwargs)
 
     def after(self, mean, scale):
         """Undo percentile-based normalization to map restored image to similar range as input image.
@@ -141,7 +144,10 @@ class PercentileNormalizer(Normalizer):
         self.do_after or _raise(ValueError())
         alpha = self.ma - self.mi
         beta  = self.mi
-        return alpha*mean+beta, alpha*scale if scale is not None else None
+        return (
+            ( alpha*mean+beta ).astype(self.dtype,copy=False),
+            ( alpha*scale     ).astype(self.dtype,copy=False) if scale is not None else None
+        )
 
     @property
     def do_after(self):
