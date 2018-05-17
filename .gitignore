@@ -12,6 +12,7 @@ config.json
 _tensorboard/
 logs
 data
+!csbdeep/data
 
 dist/
 build/

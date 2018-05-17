@@ -281,7 +281,7 @@ def test_tile_overlap():
 
 
 def test_create_patches():
-    from csbdeep.datagen import RawData, create_patches
+    from csbdeep.data import RawData, create_patches
     rng = np.random.RandomState(42)
     def get_data(n_images, axes, shape):
         def _gen():

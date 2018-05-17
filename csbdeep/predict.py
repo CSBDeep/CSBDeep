@@ -12,6 +12,7 @@ from itertools import product
 from six import add_metaclass
 from abc import ABCMeta, abstractmethod, abstractproperty
 
+# TODO: move Normalizer and Resizer to .data sub-module?
 
 @add_metaclass(ABCMeta)
 class Normalizer():

@@ -5,7 +5,8 @@ from pprint import pprint
 import numpy as np
 from tqdm import tqdm
 
-from csbdeep.utils import Path, _raise, consume, save_tiff_imagej_compatible
+from csbdeep.utils import Path, _raise, consume
+from csbdeep.data.io import save_tiff_imagej_compatible
 
 
 def str2bool(v):
