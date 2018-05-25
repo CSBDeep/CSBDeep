@@ -5,7 +5,7 @@ from pprint import pprint
 import numpy as np
 from tqdm import tqdm
 
-from csbdeep.utils import Path, _raise, consume
+from csbdeep.utils import Path, _raise, consume, axes_check_and_normalize
 from csbdeep.data.io import save_tiff_imagej_compatible
 
 
@@ -127,7 +127,7 @@ def main():
         restored = model.predict(img, axes=args.input_axes, normalizer=normalizer, n_tiles=args.n_tiles)
 
         # restored image could be multi-channel even if input image is not
-        axes_out = args.input_axes.upper()
+        axes_out = axes_check_and_normalize(args.input_axes)
         if restored.ndim > img.ndim:
             assert restored.ndim == img.ndim + 1
             assert 'C' not in axes_out

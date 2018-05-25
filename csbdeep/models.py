@@ -393,12 +393,15 @@ class CARE(object):
 
     def export_TF(self):
         """Export neural network via :func:`csbdeep.tf.export_SavedModel`."""
-        from csbdeep.tf import export_SavedModel
+        from .tf import export_SavedModel
+        from .version import __version__
         fout = self.logdir / 'TF_SavedModel.zip'
         meta = {
-            'axes':         self.config.axes,
-            'div_by':       2**self.config.unet_n_depth,
-            'tile_overlap': tile_overlap(self.config.unet_n_depth, self.config.unet_kern_size),
+            'version':       __version__,
+            'probabilistic': self.config.probabilistic,
+            'axes':          self.config.axes,
+            'axes_div_by':   [(2**self.config.unet_n_depth if a in 'XYZT' else 1) for a in self.config.axes],
+            'tile_overlap':  tile_overlap(self.config.unet_n_depth, self.config.unet_kern_size),
         }
         export_SavedModel(self.keras_model, str(fout), meta=meta)
         print("\nModel exported in TensorFlow's SavedModel format:\n%s" % str(fout.resolve()))
