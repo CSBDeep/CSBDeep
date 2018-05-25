@@ -110,7 +110,7 @@ class PercentileNormalizer(Normalizer):
         Keyword arguments for :func:`csbdeep.utils.normalize_mi_ma`.
     """
 
-    def __init__(self, pmin, pmax, do_after=True, dtype=np.float32, **kwargs):
+    def __init__(self, pmin=2, pmax=99.8, do_after=True, dtype=np.float32, **kwargs):
         """TODO."""
         self.pmin = pmin
         self.pmax = pmax

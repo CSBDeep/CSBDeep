@@ -14,7 +14,9 @@ import tensorflow as tf
 from scipy.ndimage.interpolation import zoom
 
 from . import nets, train
-from .predict import predict_direct, predict_tiled, tile_overlap, Normalizer, Resizer, PadAndCropResizer
+from .predict import predict_direct, predict_tiled, tile_overlap
+from .predict import Normalizer, NoNormalizer, PercentileNormalizer
+from .predict import Resizer, NoResizer, PadAndCropResizer
 from .probability import ProbabilisticPrediction
 
 
@@ -402,7 +404,7 @@ class CARE(object):
         print("\nModel exported in TensorFlow's SavedModel format:\n%s" % str(fout.resolve()))
 
 
-    def predict(self, img, axes, normalizer, resizer=PadAndCropResizer(), n_tiles=1):
+    def predict(self, img, axes, normalizer=PercentileNormalizer(), resizer=PadAndCropResizer(), n_tiles=1):
         """Apply neural network to raw image to predict restored image.
 
         Parameters
@@ -437,7 +439,7 @@ class CARE(object):
         return self._predict_mean_and_scale(img, axes, normalizer, resizer, n_tiles)[0]
 
 
-    def predict_probabilistic(self, img, axes, normalizer, resizer=PadAndCropResizer(), n_tiles=1):
+    def predict_probabilistic(self, img, axes, normalizer=PercentileNormalizer(), resizer=PadAndCropResizer(), n_tiles=1):
         """Apply neural network to raw image to predict probability distribution for restored image.
 
         See :func:`predict` for parameter explanations.
@@ -478,6 +480,11 @@ class CARE(object):
 
         # print(x.shape, channel)
         self.config.n_channel_in == x.shape[channel] or _raise(ValueError())
+
+        if normalizer is None:
+            normalizer = NoNormalizer()
+        if resizer is None:
+            resizer = NoResizer()
         isinstance(resizer,Resizer) or _raise(ValueError())
         isinstance(normalizer,Normalizer) or _raise(ValueError())
 
@@ -510,8 +517,11 @@ class CARE(object):
 
 
         if normalizer.do_after:
-            self.config.n_channel_in == self.config.n_channel_out or _raise(ValueError())
-            mean, scale = normalizer.after(mean, scale)
+            if self.config.n_channel_in != self.config.n_channel_out:
+                warnings.warn('skipping normalization step after prediction because ' +
+                              'number of input and output channels differ.')
+            else:
+                mean, scale = normalizer.after(mean, scale)
 
         mean, scale = _permute_axes(mean,undo=True), _permute_axes(scale,undo=True)
 
@@ -565,7 +575,7 @@ class IsotropicCARE(CARE):
     (:func:`predict`, :func:`predict_probabilistic`) to do isotropic reconstruction.
     """
 
-    def predict(self, img, axes, factor, normalizer, resizer=PadAndCropResizer(), batch_size=8):
+    def predict(self, img, axes, factor, normalizer=PercentileNormalizer(), resizer=PadAndCropResizer(), batch_size=8):
         """Apply neural network to raw image to restore isotropic resolution.
 
         Parameters
@@ -599,7 +609,7 @@ class IsotropicCARE(CARE):
         return self._predict_mean_and_scale(img, axes, factor, normalizer, resizer, batch_size)[0]
 
 
-    def predict_probabilistic(self, img, axes, factor, normalizer, resizer=PadAndCropResizer(), batch_size=8):
+    def predict_probabilistic(self, img, axes, factor, normalizer=PercentileNormalizer(), resizer=PadAndCropResizer(), batch_size=8):
         """Apply neural network to raw image to predict probability distribution for isotropic restored image.
 
         See :func:`predict` for parameter explanations.
@@ -620,7 +630,7 @@ class IsotropicCARE(CARE):
         return ProbabilisticPrediction(mean, scale)
 
 
-    def _predict_mean_and_scale(self, img, axes, factor, normalizer, resizer, batch_size=8):
+    def _predict_mean_and_scale(self, img, axes, factor, normalizer, resizer, batch_size):
         """Apply neural network to raw image to restore isotropic resolution.
 
         See :func:`predict` for parameter explanations.
@@ -647,6 +657,11 @@ class IsotropicCARE(CARE):
         # print(x.shape, channel)
         self.config.n_channel_in == x.shape[channel] or _raise(ValueError())
         np.isscalar(factor) and factor > 0 or _raise(ValueError())
+
+        if normalizer is None:
+            normalizer = NoNormalizer()
+        if resizer is None:
+            resizer = NoResizer()
         isinstance(resizer,Resizer) or _raise(ValueError())
         isinstance(normalizer,Normalizer) or _raise(ValueError())
 
@@ -743,7 +758,7 @@ class UndersampledCARE(CARE):
     (:func:`predict`, :func:`predict_probabilistic`) to first upscale Z before image restoration.
     """
 
-    def predict(self, img, axes, factor, normalizer, resizer=PadAndCropResizer(), n_tiles=1):
+    def predict(self, img, axes, factor, normalizer=PercentileNormalizer(), resizer=PadAndCropResizer(), n_tiles=1):
         """Apply neural network to raw image with undersampled Z resolution.
 
         Parameters
@@ -783,7 +798,7 @@ class UndersampledCARE(CARE):
         return self._predict_mean_and_scale(img, axes, normalizer, resizer, n_tiles)[0]
 
 
-    def predict_probabilistic(self, img, axes, factor, normalizer, resizer=PadAndCropResizer(), n_tiles=1):
+    def predict_probabilistic(self, img, axes, factor, normalizer=PercentileNormalizer(), resizer=PadAndCropResizer(), n_tiles=1):
         """Apply neural network to raw image to predict probability distribution for image with undersampled Z resolution.
 
         See :func:`predict` for parameter explanations.
