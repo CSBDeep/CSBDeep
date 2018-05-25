@@ -290,9 +290,7 @@ class PadAndCropResizer(Resizer):
 
 #     def before(self, x, div_n, exclude):
 #         """TODO."""
-#         if np.isscalar(div_n):
-#             div_n = x.ndim * [div_n]
-#         len(div_n) == x.ndim or _raise(ValueError())
+#         div_n = x.ndim * [div_n]
 #         for i in self._normalize_exclude(exclude, x.ndim):
 #             div_n[i] = 1
 #         all((s>=i>=1 for s,i in zip(x.shape,div_n))) or _raise(ValueError())

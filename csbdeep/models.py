@@ -376,6 +376,18 @@ class CARE(object):
         # if self.logdir.exists():
         #     warnings.warn('output path for model already exists, files may be overwritten during training: %s' % str(self.logdir.resolve()))
 
+        axes = axes_check_and_normalize('S'+self.config.axes,X.ndim)
+        ax = axes_dict(axes)
+        div_by = 2**self.config.unet_n_depth
+        axes_relevant = ''.join(a for a in 'XYZT' if a in axes)
+        for a in axes_relevant:
+            n = X.shape[ax[a]]
+            if n % div_by != 0:
+                raise ValueError(
+                    "training images must be evenly divisible by %d along axes %s"
+                    " (axis %s has incompatible size %d)" % (div_by,axes_relevant,a,n)
+                )
+
         if epochs is None:
             epochs = self.config.train_epochs
         if steps_per_epoch is None:
@@ -475,21 +487,14 @@ class CARE(object):
             of per-pixel Laplace distributions. Otherwise, returns the restored image via a tuple `(restored,None)`
 
         """
+        normalizer, resizer = self._check_normalizer_resizer(normalizer, resizer)
         axes = axes_check_and_normalize(axes,img.ndim)
         _permute_axes = self._make_permute_axes(axes, self.config.axes)
 
         x = _permute_axes(img)
         channel = axes_dict(self.config.axes)['C']
 
-        # print(x.shape, channel)
         self.config.n_channel_in == x.shape[channel] or _raise(ValueError())
-
-        if normalizer is None:
-            normalizer = NoNormalizer()
-        if resizer is None:
-            resizer = NoResizer()
-        isinstance(resizer,Resizer) or _raise(ValueError())
-        isinstance(normalizer,Normalizer) or _raise(ValueError())
 
         # normalize
         x = normalizer.before(x,self.config.axes)
@@ -518,13 +523,8 @@ class CARE(object):
 
         mean, scale = self._mean_and_scale_from_prediction(x,axis=channel)
 
-
-        if normalizer.do_after:
-            if self.config.n_channel_in != self.config.n_channel_out:
-                warnings.warn('skipping normalization step after prediction because ' +
-                              'number of input and output channels differ.')
-            else:
-                mean, scale = normalizer.after(mean, scale)
+        if normalizer.do_after and self.config.n_channel_in==self.config.n_channel_out:
+            mean, scale = normalizer.after(mean, scale)
 
         mean, scale = _permute_axes(mean,undo=True), _permute_axes(scale,undo=True)
 
@@ -568,6 +568,21 @@ class CARE(object):
             else:
                 return move_image_axes(data, axes_in, axes_out, True)
         return _permute_axes
+
+    def _check_normalizer_resizer(self, normalizer, resizer):
+        if normalizer is None:
+            normalizer = NoNormalizer()
+        if resizer is None:
+            resizer = NoResizer()
+        isinstance(resizer,Resizer) or _raise(ValueError())
+        isinstance(normalizer,Normalizer) or _raise(ValueError())
+        if normalizer.do_after:
+            if self.config.n_channel_in != self.config.n_channel_out:
+                warnings.warn('skipping normalization step after prediction because ' +
+                              'number of input and output channels differ.')
+
+        return normalizer, resizer
+
 
 
 
@@ -649,6 +664,7 @@ class IsotropicCARE(CARE):
         - :func:`scipy.ndimage.interpolation.zoom` differs from :func:`gputools.scale`. Important?
 
         """
+        normalizer, resizer = self._check_normalizer_resizer(normalizer, resizer)
         axes = axes_check_and_normalize(axes,img.ndim)
         'Z' in axes or _raise(ValueError())
         axes_tmp = 'CZ' + axes.replace('Z','').replace('C','')
@@ -657,23 +673,15 @@ class IsotropicCARE(CARE):
 
         x = _permute_axes(img)
 
-        # print(x.shape, channel)
         self.config.n_channel_in == x.shape[channel] or _raise(ValueError())
         np.isscalar(factor) and factor > 0 or _raise(ValueError())
-
-        if normalizer is None:
-            normalizer = NoNormalizer()
-        if resizer is None:
-            resizer = NoResizer()
-        isinstance(resizer,Resizer) or _raise(ValueError())
-        isinstance(normalizer,Normalizer) or _raise(ValueError())
 
         def scale_z(arr,factor):
             return zoom(arr,(1,factor,1,1),order=1)
 
         # normalize
         x = normalizer.before(x,axes_tmp)
-        
+
         # scale z up (second axis)
         x_scaled = scale_z(x,factor)
 
@@ -687,7 +695,6 @@ class IsotropicCARE(CARE):
 
         # u1: first rotation and prediction
         x_rot1   = self._rotate(x_scaled, axis=1, copy=False)
-
         u_rot1   = predict_direct(self.keras_model, x_rot1, channel_in=channel, channel_out=channel, single_sample=False,
                                   batch_size=batch_size, verbose=0)
         u1       = self._rotate(u_rot1, -1, axis=1, copy=False)
@@ -720,8 +727,7 @@ class IsotropicCARE(CARE):
         if self.config.probabilistic:
             scale = np.maximum(scale1,scale2)
 
-        if normalizer.do_after:
-            self.config.n_channel_in == self.config.n_channel_out or _raise(ValueError())
+        if normalizer.do_after and self.config.n_channel_in==self.config.n_channel_out:
             mean, scale = normalizer.after(mean, scale)
 
         mean, scale = _permute_axes(mean,undo=True), _permute_axes(scale,undo=True)
