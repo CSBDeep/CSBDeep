@@ -653,11 +653,12 @@ class IsotropicCARE(CARE):
         def scale_z(arr,factor):
             return zoom(arr,(1,factor,1,1),order=1)
 
+        # normalize
+        x = normalizer.before(x,axes_tmp)
+        
         # scale z up (second axis)
         x_scaled = scale_z(x,factor)
 
-        # normalize
-        x = normalizer.before(x,axes_tmp)
         # resize: make (x,y,z) image dimensions divisible by power of 2 to allow downsampling steps in unet
         div_n = 2 ** self.config.unet_n_depth
         x_scaled = resizer.before(x_scaled,div_n,exclude=channel)
@@ -668,6 +669,7 @@ class IsotropicCARE(CARE):
 
         # u1: first rotation and prediction
         x_rot1   = self._rotate(x_scaled, axis=1, copy=False)
+
         u_rot1   = predict_direct(self.keras_model, x_rot1, channel_in=channel, channel_out=channel, single_sample=False,
                                   batch_size=batch_size, verbose=0)
         u1       = self._rotate(u_rot1, -1, axis=1, copy=False)
