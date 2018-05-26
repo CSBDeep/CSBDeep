@@ -320,7 +320,11 @@ def create_patches(
         for t in transforms:
             print('{t.size} x {t.name}'.format(t=t))
         print('='*66)
-        sys.stdout.flush()
+        print('Patch size:')
+        print(" x ".join(str(p) for p in patch_size))
+        print('=' * 66)
+
+    sys.stdout.flush()
 
     ## sample patches from each pair of transformed raw images
     X = np.empty((n_patches,)+tuple(patch_size),dtype=np.float32)

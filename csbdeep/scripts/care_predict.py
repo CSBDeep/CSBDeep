@@ -1,12 +1,14 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
 
-import os, sys, argparse
+import argparse
+import sys
 from pprint import pprint
+
 import numpy as np
 from tqdm import tqdm
 
-from csbdeep.utils import Path, _raise, consume, axes_check_and_normalize
 from csbdeep.data.io import save_tiff_imagej_compatible
+from csbdeep.utils import Path, _raise, axes_check_and_normalize
 
 
 def str2bool(v):
@@ -92,13 +94,13 @@ def main():
     from tifffile import imread, imsave
     import keras.backend as K
     from csbdeep.models import CARE
-    from csbdeep.predict import PercentileNormalizer
+    from csbdeep.internals.predict import PercentileNormalizer
     sys.stdout.flush()
     sys.stderr.flush()
 
     # limit gpu memory
     if args.gpu_memory_limit is not None:
-        from csbdeep.tf import limit_gpu_memory
+        from csbdeep.utils.tf import limit_gpu_memory
         limit_gpu_memory(args.gpu_memory_limit)
 
     # create CARE model and load weights, create normalizer

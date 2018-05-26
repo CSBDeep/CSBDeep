@@ -8,7 +8,7 @@ import warnings
 
 import keras.backend as K
 
-from ..utils import _raise, axes_check_and_normalize, axes_dict, backend_channels_last
+from ..utils.utils import _raise, axes_check_and_normalize, axes_dict, backend_channels_last
 
 
 class Config(argparse.Namespace):

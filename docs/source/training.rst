@@ -19,7 +19,47 @@ After training, the learned model can be exported via
 
 **Example**
 
->>> from csbdeep.tf import limit_gpu_memory
+>>> from csbdeep.utils.tf import limit_gpu_memory
+>>> from csbdeep.internals.train import load_data
+>>> from csbdeep.models import Config, CARE
+>>> limit_gpu_memory(fraction=0.75)
+>>> (X,Y), (X_val,Y_val), axes = load_data('my_data.npz', validation_split=0.1)
+>>> config = Config(axes, probabilistic=True, unet_n_depth=3)
+>>> model = CARE(config, 'my_model')
+>>> model.train(X,Y, validation_data=(X_val,Y_val))
+>>> model.export_TF()
+
+
+>>> from csbdeep.train import load_data
+>>> from csbdeep.models import Config, CARE
+>>> limit_gpu_memory(fraction=0.75)
+>>> (X,Y), (X_val,Y_val), axes = load_data('my_data.npz', validation_split=0.1)
+>>> config = Config(axes, probabilistic=True, unet_n_depth=3)
+>>> model = CARE(config, 'my_model')
+>>> model.train(X,Y, validation_data=(X_val,Y_val))
+>>> model.export_TF()
+
+
+>>> from csbdeep.internals.train import load_data
+>>> from csbdeep.models import Config, CARE
+>>> limit_gpu_memory(fraction=0.75)
+>>> (X,Y), (X_val,Y_val), axes = load_data('my_data.npz', validation_split=0.1)
+>>> config = Config(axes, probabilistic=True, unet_n_depth=3)
+>>> model = CARE(config, 'my_model')
+>>> model.train(X,Y, validation_data=(X_val,Y_val))
+>>> model.export_TF()
+
+
+>>> from csbdeep.internals.train import load_data
+>>> from csbdeep.models import Config, CARE
+>>> limit_gpu_memory(fraction=0.75)
+>>> (X,Y), (X_val,Y_val), axes = load_data('my_data.npz', validation_split=0.1)
+>>> config = Config(axes, probabilistic=True, unet_n_depth=3)
+>>> model = CARE(config, 'my_model')
+>>> model.train(X,Y, validation_data=(X_val,Y_val))
+>>> model.export_TF()
+
+
 >>> from csbdeep.train import load_data
 >>> from csbdeep.models import Config, CARE
 >>> limit_gpu_memory(fraction=0.75)

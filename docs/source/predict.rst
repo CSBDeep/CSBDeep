@@ -30,6 +30,17 @@ retained.
 
 >>> from tifffile import imread
 >>> from csbdeep.models import CARE
+>>> from csbdeep.internals.predict import PercentileNormalizer, PadAndCropResizer
+>>> model = CARE(config=None, name='my_model')
+>>> model.load_weights()
+>>> x = imread('my_image.tif')
+>>> x_axes = 'YX'
+>>> normalizer = PercentileNormalizer(3,99.8)
+>>> resizer = PadAndCropResizer()
+>>> restored = model.predict(x, x_axes, normalizer, resizer)
+
+
+>>> from csbdeep.models import CARE
 >>> from csbdeep.predict import PercentileNormalizer, PadAndCropResizer
 >>> model = CARE(config=None, name='my_model')
 >>> model.load_weights()

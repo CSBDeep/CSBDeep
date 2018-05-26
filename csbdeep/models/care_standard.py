@@ -1,21 +1,19 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
-from six.moves import range, zip, map, reduce, filter
-from six import string_types
 
-import numpy as np
 import datetime
 import warnings
 
 import tensorflow as tf
+from six import string_types
 
-from .. import nets, train
-from ..utils import _raise, consume, Path, load_json, save_json, axes_check_and_normalize, axes_dict, move_image_axes
-from ..predict import predict_direct, predict_tiled, tile_overlap
-from ..predict import Normalizer, NoNormalizer, PercentileNormalizer
-from ..predict import Resizer, NoResizer, PadAndCropResizer
-from ..probability import ProbabilisticPrediction
-
+from csbdeep.internals.probability import ProbabilisticPrediction
 from .config import Config
+
+from ..utils.utils import _raise, Path, load_json, save_json, axes_check_and_normalize, axes_dict, move_image_axes
+from ..internals.predict import Normalizer, NoNormalizer, PercentileNormalizer
+from ..internals.predict import Resizer, NoResizer, PadAndCropResizer
+from ..internals.predict import predict_direct, predict_tiled, tile_overlap
+from ..internals import nets, train
 
 
 class CARE(object):
@@ -151,7 +149,7 @@ class CARE(object):
             self.callbacks.append(ModelCheckpoint(str(self.logdir / self.config.train_checkpoint), save_best_only=True, save_weights_only=True))
 
         if self.config.train_tensorboard:
-            from csbdeep.tf import CARETensorBoard
+            from csbdeep.utils.tf import CARETensorBoard
             self.callbacks.append(CARETensorBoard(log_dir=str(self.logdir), prefix_with_timestamp=False, n_images=3, write_images=True, prob_out=self.config.probabilistic))
 
         if self.config.train_reduce_lr is not None:

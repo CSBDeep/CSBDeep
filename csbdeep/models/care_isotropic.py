@@ -1,16 +1,12 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
-from six.moves import range, zip, map, reduce, filter
-from six import string_types
 
 import numpy as np
-import warnings
 from scipy.ndimage.interpolation import zoom
 
-from ..utils import _raise, consume, axes_check_and_normalize
-from ..predict import predict_direct, PercentileNormalizer, PadAndCropResizer
-from ..probability import ProbabilisticPrediction
-
+from csbdeep.internals.probability import ProbabilisticPrediction
 from .care_standard import CARE
+from ..internals.predict import predict_direct, PercentileNormalizer, PadAndCropResizer
+from ..utils import _raise, axes_check_and_normalize
 
 
 class IsotropicCARE(CARE):

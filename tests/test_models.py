@@ -1,18 +1,18 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
-from six.moves import range, zip, map, reduce, filter
+
+from itertools import product
 
 # import warnings
 import numpy as np
-from itertools import product
-
-from csbdeep.utils import axes_dict, tempfile
-from csbdeep.models import Config, CARE
-from csbdeep.predict import NoNormalizer, NoResizer, tile_overlap
-from csbdeep.nets import receptive_field_unet
-
-from keras import backend as K
-from tqdm import tqdm
 import pytest
+from csbdeep.predict import NoNormalizer, NoResizer, tile_overlap
+from keras import backend as K
+from six.moves import zip, filter
+
+from csbdeep.internals.nets import receptive_field_unet
+from csbdeep.models import Config, CARE
+from csbdeep.utils import axes_dict, tempfile
+
 
 def config_generator(**kwargs):
     assert 'axes' in kwargs
