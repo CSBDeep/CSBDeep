@@ -9,7 +9,9 @@ from six import string_types
 from csbdeep.internals.probability import ProbabilisticPrediction
 from .config import Config
 
-from ..utils.utils import _raise, Path, load_json, save_json, axes_check_and_normalize, axes_dict, move_image_axes
+from ..utils import _raise, Path, load_json, save_json, axes_check_and_normalize, axes_dict, move_image_axes
+from ..utils.tf import export_SavedModel
+from ..version import __version__ as package_version
 from ..internals.predict import Normalizer, NoNormalizer, PercentileNormalizer
 from ..internals.predict import Resizer, NoResizer, PadAndCropResizer
 from ..internals.predict import predict_direct, predict_tiled, tile_overlap
@@ -149,7 +151,7 @@ class CARE(object):
             self.callbacks.append(ModelCheckpoint(str(self.logdir / self.config.train_checkpoint), save_best_only=True, save_weights_only=True))
 
         if self.config.train_tensorboard:
-            from csbdeep.utils.tf import CARETensorBoard
+            from ..utils.tf import CARETensorBoard
             self.callbacks.append(CARETensorBoard(log_dir=str(self.logdir), prefix_with_timestamp=False, n_images=3, write_images=True, prob_out=self.config.probabilistic))
 
         if self.config.train_reduce_lr is not None:
@@ -219,11 +221,9 @@ class CARE(object):
 
     def export_TF(self):
         """Export neural network via :func:`csbdeep.tf.export_SavedModel`."""
-        from .tf import export_SavedModel
-        from .version import __version__
         fout = self.logdir / 'TF_SavedModel.zip'
         meta = {
-            'version':       __version__,
+            'version':       package_version,
             'probabilistic': self.config.probabilistic,
             'axes':          self.config.axes,
             'axes_div_by':   [(2**self.config.unet_n_depth if a in 'XYZT' else 1) for a in self.config.axes],

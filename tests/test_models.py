@@ -1,13 +1,13 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
+from six.moves import range, zip, map, reduce, filter
 
 from itertools import product
 
 # import warnings
 import numpy as np
 import pytest
-from csbdeep.predict import NoNormalizer, NoResizer, tile_overlap
+from csbdeep.internals.predict import NoNormalizer, NoResizer, tile_overlap
 from keras import backend as K
-from six.moves import zip, filter
 
 from csbdeep.internals.nets import receptive_field_unet
 from csbdeep.models import Config, CARE
