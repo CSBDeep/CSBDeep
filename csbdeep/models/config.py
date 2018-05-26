@@ -6,6 +6,8 @@ import numpy as np
 import argparse
 import warnings
 
+import keras.backend as K
+
 from ..utils import _raise, axes_check_and_normalize, axes_dict, backend_channels_last
 
 
