@@ -5,7 +5,7 @@ from scipy.ndimage.interpolation import zoom
 
 from csbdeep.internals.probability import ProbabilisticPrediction
 from .care_standard import CARE
-from ..internals.predict import PercentileNormalizer, PadAndCropResizer
+from ..data import PercentileNormalizer, PadAndCropResizer
 from ..utils import _raise, axes_dict
 
 

@@ -6,7 +6,8 @@ from itertools import product
 # import warnings
 import numpy as np
 import pytest
-from csbdeep.internals.predict import NoNormalizer, NoResizer, tile_overlap
+from csbdeep.data import NoNormalizer, NoResizer
+from csbdeep.internals.predict import tile_overlap
 from keras import backend as K
 
 from csbdeep.internals.nets import receptive_field_unet

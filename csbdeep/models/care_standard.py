@@ -12,8 +12,8 @@ from .config import Config
 from ..utils import _raise, Path, load_json, save_json, axes_check_and_normalize, axes_dict, move_image_axes
 from ..utils.tf import export_SavedModel
 from ..version import __version__ as package_version
-from ..internals.predict import Normalizer, NoNormalizer, PercentileNormalizer
-from ..internals.predict import Resizer, NoResizer, PadAndCropResizer
+from ..data import Normalizer, NoNormalizer, PercentileNormalizer
+from ..data import Resizer, NoResizer, PadAndCropResizer
 from ..internals.predict import predict_direct, predict_tiled, tile_overlap
 from ..internals import nets, train
 
