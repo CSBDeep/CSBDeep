@@ -8,6 +8,7 @@ import sys, os, warnings
 
 from tqdm import tqdm
 from ..utils import _raise, consume, compose, normalize_mi_ma, axes_dict, axes_check_and_normalize
+from ..io import save_training_data
 
 from .transform import Transform, permute_axes
 
@@ -360,7 +361,7 @@ def create_patches(
 
     if save_file is not None:
         print('Saving data to %s.' % save_file)
-        np.savez(save_file, X=X, Y=Y, axes=axes)
+        save_training_data(save_file, X, Y, axes)
 
     return X,Y,axes
 
