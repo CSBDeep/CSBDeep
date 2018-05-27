@@ -102,7 +102,6 @@ class CARE(object):
 
 
     def _find_and_load_weights(self,prefer='best'):
-        import sys
         from itertools import chain
         # get all weight files and sort by modification time descending (newest first)
         weights_ext   = ('*.h5','*.hdf5')
@@ -110,7 +109,7 @@ class CARE(object):
         weights_files = reversed(sorted(weights_files, key=lambda f: f.lstat().st_mtime))
         weights_files = list(weights_files)
         if len(weights_files) == 0:
-            print("Couldn't find any network weights (%s) to load." % ', '.join(weights_ext), file=sys.stderr)
+            warnings.warn("Couldn't find any network weights (%s) to load." % ', '.join(weights_ext))
             return
         weights_preferred = list(filter(lambda f: prefer in f.name, weights_files))
         weights_chosen = weights_preferred[0] if len(weights_preferred)>0 else weights_files[0]
@@ -205,12 +204,14 @@ class CARE(object):
             See `Keras training history <https://keras.io/models/model/#fit>`_.
 
         """
-        if not self._model_prepared:
-            self.prepare_for_training()
 
-        # if self.logdir.exists():
-        #     warnings.warn('output path for model already exists, files may be overwritten during training: %s' % str(self.logdir.resolve()))
+        (isinstance(validation_data,(list,tuple)) and len(validation_data)==2) or _raise(ValueError())
 
+        n_train, n_val = len(X), len(validation_data[0])
+        frac_val = (1.0 * n_val) / (n_train + n_val)
+        frac_warn = 0.05
+        if frac_val < frac_warn:
+            warnings.warn("small number of validation images (only %.1f%% of all images)" % (100*frac_val))
         axes = axes_check_and_normalize('S'+self.config.axes,X.ndim)
         ax = axes_dict(axes)
         div_by = 2**self.config.unet_n_depth
@@ -228,13 +229,20 @@ class CARE(object):
         if steps_per_epoch is None:
             steps_per_epoch = self.config.train_steps_per_epoch
 
+        if not self._model_prepared:
+            self.prepare_for_training()
+
         training_data = train.DataWrapper(X, Y, self.config.train_batch_size)
 
         history = self.keras_model.fit_generator(generator=training_data, validation_data=validation_data,
                                                  epochs=epochs, steps_per_epoch=steps_per_epoch,
                                                  callbacks=self.callbacks, verbose=1)
 
-        self.keras_model.save_weights(str(self.logdir/'weights_final.h5'))
+        self.keras_model.save_weights(str(self.logdir / 'weights_last.h5'))
+
+        if self.config.train_checkpoint is not None:
+            self.load_weights(self.config.train_checkpoint)
+
         return history
 
 
