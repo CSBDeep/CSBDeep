@@ -136,6 +136,15 @@ def anisotropic_distortions(
 
     yield_target in ('source','target') or _raise(ValueError())
 
+    if psf is None and yield_target == 'source':
+        warnings.warn(
+            "It is strongly recommended to use an appropriate PSF to "
+            "mimic the optical effects of the microscope. "
+            "We found that training with synthesized anisotropic images "
+            "that were created without a PSF "
+            "can sometimes lead to unwanted artifacts in the reconstructed images."
+        )
+
 
     def _make_normalize_data(axes_in):
         """Move X to front of image."""
