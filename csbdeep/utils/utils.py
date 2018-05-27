@@ -57,7 +57,7 @@ def save_json(data,fpath,**kwargs):
 
 
 def normalize(x, pmin=3, pmax=99.8, axis=None, clip=False, eps=1e-20, dtype=np.float32):
-    """ TODO 
+    """ TODO
     """
     mi = np.percentile(x,pmin,axis=axis,keepdims=True)
     ma = np.percentile(x,pmax,axis=axis,keepdims=True)
@@ -102,16 +102,66 @@ def compose(*funcs):
 ###
 
 
-def download_and_extract_zip_file(url, provides=None, targetdir='.'):
-    if provides is None or not all(map(os.path.exists,provides)):
-        import zipfile
-        from six.moves.urllib.request import urlretrieve
+def download_and_extract_zip_file(url, targetdir='.', verbose=True):
+    import csv
+    from six.moves.urllib.request import urlretrieve
+    from zipfile import ZipFile
+
+    log = (print) if verbose else (lambda *a,**k: None)
+
+    targetdir = Path(targetdir)
+    if not targetdir.is_dir():
+        targetdir.mkdir(parents=True,exist_ok=True)
+
+    provided = []
+
+    def content_is_missing():
         try:
-            filepath, http_msg = urlretrieve(url)
-            with zipfile.ZipFile(filepath,'r') as zipfile:
-                zipfile.extractall(targetdir)
+            filepath, http_msg = urlretrieve(url+'.contents')
+            with open(filepath,'r') as contents_file:
+                contents = list(csv.reader(contents_file,delimiter='\t'))
+        except:
+            return True
         finally:
-            os.unlink(filepath)
+            try: os.unlink(filepath)
+            except: pass
+
+        for size, relpath in contents:
+            size, relpath = int(size.strip()), relpath.strip()
+            entry = targetdir / relpath
+            if not entry.exists():
+                return True
+            if entry.is_dir():
+                if not relpath.endswith('/'): return True
+            elif entry.is_file():
+                if relpath.endswith('/') or entry.stat().st_size != size: return True
+            else:
+                return True
+            provided.append(relpath)
+
+        return False
+
+
+    if content_is_missing():
+        try:
+            log('Files missing, downloading...',end='')
+            filepath, http_msg = urlretrieve(url)
+            with ZipFile(filepath,'r') as zip_file:
+                log(' extracting...',end='')
+                zip_file.extractall(str(targetdir))
+                provided = zip_file.namelist()
+            log(' done.\n')
+        finally:
+            try: os.unlink(filepath)
+            except: pass
+    else:
+        log('Files found, nothing to download.\n')
+
+    if verbose:
+        log(str(targetdir)+':')
+        consume(map(lambda x: log('-',x), provided))
+
+
 
 
 ###

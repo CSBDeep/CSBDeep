@@ -106,7 +106,7 @@ class CARE(object):
         # get all weight files and sort by modification time descending (newest first)
         weights_ext   = ('*.h5','*.hdf5')
         weights_files = chain(*(self.logdir.glob(ext) for ext in weights_ext))
-        weights_files = reversed(sorted(weights_files, key=lambda f: f.lstat().st_mtime))
+        weights_files = reversed(sorted(weights_files, key=lambda f: f.stat().st_mtime))
         weights_files = list(weights_files)
         if len(weights_files) == 0:
             warnings.warn("Couldn't find any network weights (%s) to load." % ', '.join(weights_ext))
