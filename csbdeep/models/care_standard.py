@@ -75,6 +75,8 @@ class CARE(object):
         self._set_logdir()
         self._model_prepared = False
         self.keras_model = self._build()
+        if config is None:
+            self._find_and_load_weights()
 
 
     def _set_logdir(self):
@@ -97,6 +99,23 @@ class CARE(object):
                 warnings.warn('output path for model already exists, files may be overwritten: %s' % str(self.logdir.resolve()))
             self.logdir.mkdir(parents=True, exist_ok=True)
             save_json(vars(self.config), str(config_file))
+
+
+    def _find_and_load_weights(self,prefer='best'):
+        import sys
+        from itertools import chain
+        # get all weight files and sort by modification time descending (newest first)
+        weights_ext   = ('*.h5','*.hdf5')
+        weights_files = chain(*(self.logdir.glob(ext) for ext in weights_ext))
+        weights_files = reversed(sorted(weights_files, key=lambda f: f.lstat().st_mtime))
+        weights_files = list(weights_files)
+        if len(weights_files) == 0:
+            print("Couldn't find any network weights (%s) to load." % ', '.join(weights_ext), file=sys.stderr)
+            return
+        weights_preferred = list(filter(lambda f: prefer in f.name, weights_files))
+        weights_chosen = weights_preferred[0] if len(weights_preferred)>0 else weights_files[0]
+        print("Loading network weights from '%s'." % weights_chosen.name)
+        self.load_weights(weights_chosen.name)
 
 
     def _build(self):
