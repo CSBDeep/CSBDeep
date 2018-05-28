@@ -27,7 +27,7 @@ class RawData(namedtuple('RawData' ,('generator' ,'size' ,'description'))):
     """
 
     @staticmethod
-    def from_folder(basepath ,source_dirs ,target_dir ,axes='CZYX' ,pattern='*.tif*'):
+    def from_folder(basepath, source_dirs, target_dir, axes='CZYX', pattern='*.tif*'):
         """Get pairs of corresponding TIFF images read from folders.
 
         Two images correspond to each other if they have the same file name, but are located in different folders.
@@ -79,7 +79,7 @@ class RawData(namedtuple('RawData' ,('generator' ,'size' ,'description'))):
         >>> for source_x, target_y, axes, mask in data.generator():
         ...     pass
         """
-        return get_tiff_pairs_from_folders(basepath ,source_dirs ,target_dir ,axes='CZYX' ,pattern='*.tif*')
+        return get_tiff_pairs_from_folders(basepath, source_dirs, target_dir, axes=axes, pattern=pattern)
 
     @staticmethod
     def from_arrays(X ,Y, axes = "CZYX"):
@@ -98,7 +98,7 @@ class RawData(namedtuple('RawData' ,('generator' ,'size' ,'description'))):
 
 
 
-def get_tiff_pairs_from_folders(basepath ,source_dirs ,target_dir ,axes='CZYX' ,pattern='*.tif*'):
+def get_tiff_pairs_from_folders(basepath, source_dirs, target_dir, axes='CZYX', pattern='*.tif*'):
     """Get pairs of corresponding TIFF images read from folders.
 
     Two images correspond to each other if they have the same file name, but are located in different folders.
@@ -161,7 +161,7 @@ def get_tiff_pairs_from_folders(basepath ,source_dirs ,target_dir ,axes='CZYX' ,
     axes = axes_check_and_normalize(axes)
     xy_name_pairs = [( p / source_dir /n, p/ target_dir / n) for source_dir in source_dirs for n in image_names]
     n_images = len(xy_name_pairs)
-    description = '{p}: target=\'{o}\', sources={s}, axes={a}, pattern={pt}'.format(p=basepath, s=list(source_dirs),
+    description = "{p}: target='{o}', sources={s}, axes='{a}', pattern='{pt}'".format(p=basepath, s=list(source_dirs),
                                                                                     o=target_dir, a=axes, pt=pattern)
 
     def _gen():

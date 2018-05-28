@@ -159,7 +159,7 @@ def download_and_extract_zip_file(url, targetdir='.', verbose=True):
 
     if verbose:
         log(str(targetdir)+':')
-        consume(map(lambda x: log('-',x), provided))
+        consume(map(lambda x: log('-',Path(x)), provided))
 
 
 ###
