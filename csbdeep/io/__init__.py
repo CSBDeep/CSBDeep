@@ -32,7 +32,7 @@ def save_tiff_imagej_compatible(file, img, axes, **imsave_kwargs):
 
 
 
-def load_training_data(file, validation_split=0, axes=None, n_images=None):
+def load_training_data(file, validation_split=0, axes=None, n_images=None, verbose=False):
     """ TODO """
     # print("Loading training data...")
     f = np.load(file)
@@ -73,6 +73,19 @@ def load_training_data(file, validation_split=0, axes=None, n_images=None):
         axes = axes[:1]+'C'+axes[1:]
 
     data_val = (X_t,Y_t) if validation_split > 0 else None
+
+    if verbose:
+        ax = axes_dict(axes)
+        n_train, n_val = len(X), len(X_t) if validation_split>0 else 0
+        image_size = tuple( X.shape[ax[a]] for a in 'TZYX' if a in axes )
+        n_dim = len(image_size)
+        n_channel_in, n_channel_out = X.shape[ax['C']], Y.shape[ax['C']]
+
+        print('number of training images:\t', n_train)
+        print('number of validation images:\t', n_val)
+        print('image size (%dD):\t\t'%n_dim, image_size)
+        print('axes:\t\t\t\t', axes)
+        print('channels in / out:\t\t', n_channel_in, '/', n_channel_out)
 
     return (X,Y), data_val, axes
 
