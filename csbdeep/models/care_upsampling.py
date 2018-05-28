@@ -3,7 +3,6 @@ from __future__ import print_function, unicode_literals, absolute_import, divisi
 import numpy as np
 from scipy.ndimage.interpolation import zoom
 
-from csbdeep.internals.probability import ProbabilisticPrediction
 from .care_standard import CARE
 from ..data import PercentileNormalizer, PadAndCropResizer
 from ..utils import _raise, axes_dict
@@ -54,7 +53,7 @@ class UpsamplingCARE(CARE):
 
         """
         img = self._upsample(img, axes, factor)
-        return self._predict_mean_and_scale(img, axes, normalizer, resizer, n_tiles)[0]
+        return super(UpsamplingCARE, self).predict(img, axes, normalizer, resizer, n_tiles)
 
 
     def predict_probabilistic(self, img, axes, factor, normalizer=PercentileNormalizer(), resizer=PadAndCropResizer(), n_tiles=1):
@@ -73,10 +72,8 @@ class UpsamplingCARE(CARE):
             If this is not a probabilistic model.
 
         """
-        self.config.probabilistic or _raise(ValueError('This is not a probabilistic model.'))
         img = self._upsample(img, axes, factor)
-        mean, scale = self._predict_mean_and_scale(img, axes, factor, normalizer, resizer, n_tiles)
-        return ProbabilisticPrediction(mean, scale)
+        return super(UpsamplingCARE, self).predict_probabilistic(img, axes, normalizer, resizer, n_tiles)
 
 
     @staticmethod

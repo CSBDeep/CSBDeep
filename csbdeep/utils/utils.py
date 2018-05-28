@@ -162,8 +162,6 @@ def download_and_extract_zip_file(url, targetdir='.', verbose=True):
         consume(map(lambda x: log('-',x), provided))
 
 
-
-
 ###
 
 

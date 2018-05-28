@@ -13,7 +13,7 @@ from keras import backend as K
 from keras.callbacks import Callback
 from keras.layers import Lambda
 
-from .utils import _raise, is_tf_backend, save_json, tempfile
+from .utils import _raise, is_tf_backend, save_json, tempfile, backend_channels_last
 
 
 
@@ -132,9 +132,7 @@ class CARETensorBoard(Callback):
                  prefix_with_timestamp=True,
                  write_images=False):
         super(CARETensorBoard, self).__init__()
-        if K.backend() != 'tensorflow':
-            raise RuntimeError('TensorBoard callback only works '
-                               'with the TensorFlow backend.')
+        is_tf_backend() or _raise(RuntimeError('TensorBoard callback only works with the TensorFlow backend.'))
 
         self.freq = freq
         self.image_freq = freq
@@ -165,65 +163,58 @@ class CARETensorBoard(Callback):
                                                         layer.output))
 
         # outputs
-        if K.image_dim_ordering() == "tf":
-            n_channels_in = self.model.input_shape[-1]
-            n_dim_in = len(self.model.input_shape)
+        backend_channels_last() or _raise(NotImplementedError())
 
-            # FIXME: not fully baked, eg. n_dim==5 multichannel doesnt work
+        n_channels_in = self.model.input_shape[-1]
+        n_dim_in = len(self.model.input_shape)
 
-            if n_dim_in > 4:
-                # print("tensorboard shape: %s"%str(self.model.input_shape))
-                input_layer = Lambda(lambda x: K.max(K.max(x, axis=1), axis=-1, keepdims=True))(self.model.input)
+        # FIXME: not fully baked, eg. n_dim==5 multichannel doesnt work
+
+        if n_dim_in > 4:
+            # print("tensorboard shape: %s"%str(self.model.input_shape))
+            input_layer = Lambda(lambda x: K.max(K.max(x, axis=1), axis=-1, keepdims=True))(self.model.input)
+        else:
+            if n_channels_in > 3:
+                input_layer = Lambda(lambda x: K.max(x, axis=-1, keepdims=True))(self.model.input)
+            elif n_channels_in == 2:
+                input_layer = Lambda(lambda x: K.concatenate([x,x[...,:1]], axis=-1))(self.model.input)
             else:
-                if n_channels_in > 3:
-                    input_layer = Lambda(lambda x: K.max(x, axis=-1, keepdims=True))(self.model.input)
-                elif n_channels_in == 2:
-                    input_layer = Lambda(lambda x: K.concatenate([x,x[...,:1]], axis=-1))(self.model.input)
-                else:
-                    input_layer = self.model.input
+                input_layer = self.model.input
 
-            n_channels_out = self.model.output_shape[-1]
-            n_dim_out = len(self.model.output_shape)
+        n_channels_out = self.model.output_shape[-1]
+        n_dim_out = len(self.model.output_shape)
 
-            if self.prob_out:
-                # first half of output channels is mean, second half scale
-                # assert n_channels_in*2 == n_channels_out
-                # if n_channels_in*2 != n_channels_out:
-                #     raise ValueError('prob_out: must be two output channels for every input channel')
-                if n_channels_out % 2 != 0:
-                    raise ValueError()
+        sep = n_channels_out
+        if self.prob_out:
+            # first half of output channels is mean, second half scale
+            # assert n_channels_in*2 == n_channels_out
+            # if n_channels_in*2 != n_channels_out:
+            #     raise ValueError('prob_out: must be two output channels for every input channel')
+            n_channels_out % 2 == 0 or _raise(ValueError())
+            sep = sep // 2
 
-                sep = n_channels_out // 2
+        if n_dim_out > 4:
+            output_layer = Lambda(lambda x: K.max(K.max(x[...,:sep], axis=1), axis=-1, keepdims=True))(self.model.output)
+        else:
+            if sep > 3:
+                output_layer = Lambda(lambda x: K.max(x[...,:sep], axis=-1, keepdims=True))(self.model.output)
+            elif sep == 2:
+                output_layer = Lambda(lambda x: K.concatenate([x[...,:sep],x[...,:1]], axis=-1))(self.model.output)
             else:
-                sep = n_channels_out
+                output_layer = Lambda(lambda x: x[...,:sep])(self.model.output)
 
+        if self.prob_out:
+            # scale images
             if n_dim_out > 4:
-                output_layer = Lambda(lambda x: K.max(K.max(x[...,:sep], axis=1), axis=-1, keepdims=True))(self.model.output)
+                scale_layer = Lambda(lambda x: K.max(K.max(x[...,sep:], axis=1), axis=-1, keepdims=True))(self.model.output)
             else:
                 if sep > 3:
-                    output_layer = Lambda(lambda x: K.max(x[...,:sep], axis=-1, keepdims=True))(self.model.output)
+                    scale_layer = Lambda(lambda x: K.max(x[...,sep:], axis=-1, keepdims=True))(self.model.output)
                 elif sep == 2:
-                    output_layer = Lambda(lambda x: K.concatenate([x[...,:sep],x[...,:1]], axis=-1))(self.model.output)
+                    scale_layer = Lambda(lambda x: K.concatenate([x[...,sep:],x[...,-1:]], axis=-1))(self.model.output)
                 else:
-                    output_layer = Lambda(lambda x: x[...,:sep])(self.model.output)
+                    scale_layer = Lambda(lambda x: x[...,sep:])(self.model.output)
 
-            if self.prob_out:
-                # scale images
-                if n_dim_out > 4:
-                    scale_layer = Lambda(lambda x: K.max(K.max(x[...,sep:], axis=1), axis=-1, keepdims=True))(self.model.output)
-                else:
-                    if sep > 3:
-                        scale_layer = Lambda(lambda x: K.max(x[...,sep:], axis=-1, keepdims=True))(self.model.output)
-                    elif sep == 2:
-                        scale_layer = Lambda(lambda x: K.concatenate([x[...,sep:],x[...,-1:]], axis=-1))(self.model.output)
-                    else:
-                        scale_layer = Lambda(lambda x: x[...,sep:])(self.model.output)
-
-
-
-
-        else:
-            raise NotImplementedError()
         #
         #     n_channels = self.model.input_shape[0]
         #     if n_channels > 1:
