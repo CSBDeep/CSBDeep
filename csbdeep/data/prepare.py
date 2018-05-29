@@ -110,6 +110,7 @@ class PercentileNormalizer(Normalizer):
 
     def __init__(self, pmin=2, pmax=99.8, do_after=True, dtype=np.float32, **kwargs):
         """TODO."""
+        (np.isscalar(pmin) and np.isscalar(pmax) and 0 <= pmin < pmax <= 100) or _raise(ValueError())
         self.pmin = pmin
         self.pmax = pmax
         self._do_after = do_after

@@ -7,7 +7,7 @@ from pprint import pprint
 import numpy as np
 from tqdm import tqdm
 
-from csbdeep.data.io import save_tiff_imagej_compatible
+from csbdeep.io import save_tiff_imagej_compatible
 from csbdeep.utils import Path, _raise, axes_check_and_normalize
 
 
@@ -30,15 +30,15 @@ def parse_args():
     data.add_argument('--input-dir',          metavar='', type=str,      required=False,                         default=None,                                             help="path to folder with input images")
     data.add_argument('--input-pattern',      metavar='', type=str,      required=False,                         default='*.tif*',                                         help="glob-style file name pattern of input images")
     data.add_argument('--input-axes',         metavar='', type=str,      required=False,                         default=None,                                             help="axes string of input images")
-    data.add_argument('--norm-pmin',          metavar='', type=float,    required=False,                         default=None,                                             help="'pmin' for PercentileNormalizer")
-    data.add_argument('--norm-pmax',          metavar='', type=float,    required=False,                         default=None,                                             help="'pmax' for PercentileNormalizer")
+    data.add_argument('--norm-pmin',          metavar='', type=float,    required=False,                         default=2,                                                help="'pmin' for PercentileNormalizer")
+    data.add_argument('--norm-pmax',          metavar='', type=float,    required=False,                         default=99.8,                                             help="'pmax' for PercentileNormalizer")
     data.add_argument('--norm-undo',          metavar='', type=str2bool, required=False,  const=True, nargs='?', default=True,                                             help="'do_after' for PercentileNormalizer")
     data.add_argument('--n-tiles',            metavar='', type=int,      required=False,                         default=1,                                                help="number of tiles for prediction")
 
     model = parser.add_argument_group("model")
     model.add_argument('--model-basedir',     metavar='', type=str,      required=False,                         default=None,                                             help="path to folder that contains CARE model")
     model.add_argument('--model-name',        metavar='', type=str,      required=False,                         default=None,                                             help="name of CARE model")
-    model.add_argument('--model-weights',     metavar='', type=str,      required=False,                         default='weights_best.h5',                                help="name of weights file to load (located in model folder)")
+    model.add_argument('--model-weights',     metavar='', type=str,      required=False,                         default=None,                                             help="specific name of weights file to load (located in model folder)")
 
     output = parser.add_argument_group("output")
     output.add_argument('--output-dir',       metavar='', type=str,      required=False,                         default=None,                                             help="path to folder where restored images will be saved")
@@ -94,7 +94,7 @@ def main():
     from tifffile import imread, imsave
     import keras.backend as K
     from csbdeep.models import CARE
-    from csbdeep.internals.predict import PercentileNormalizer
+    from csbdeep.data import PercentileNormalizer
     sys.stdout.flush()
     sys.stderr.flush()
 
@@ -106,7 +106,9 @@ def main():
     # create CARE model and load weights, create normalizer
     K.clear_session()
     model = CARE(config=None, name=args.model_name, basedir=args.model_basedir)
-    model.load_weights(args.model_weights)
+    if args.model_weights is not None:
+        print("Loading network weights from '%s'." % args.model_weights)
+        model.load_weights(args.model_weights)
     normalizer = PercentileNormalizer(pmin=args.norm_pmin, pmax=args.norm_pmax, do_after=args.norm_undo)
 
     processed = []
@@ -117,7 +119,7 @@ def main():
         file_out = Path(args.output_dir) / args.output_name.format (
             file_path = str(file_in.relative_to(args.input_dir).parent),
             file_name = file_in.stem, file_ext = file_in.suffix,
-            model_name = args.model_name, model_weights = Path(args.model_weights).stem
+            model_name = args.model_name, model_weights = Path(args.model_weights).stem if args.model_weights is not None else None
         )
 
         # checks
