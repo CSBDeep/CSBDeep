@@ -250,6 +250,7 @@ class CARE(object):
         """Export neural network via :func:`csbdeep.tf.export_SavedModel`."""
         fout = self.logdir / 'TF_SavedModel.zip'
         meta = {
+            'type':          self.__class__.__name__,
             'version':       package_version,
             'probabilistic': self.config.probabilistic,
             'axes':          self.config.axes,
