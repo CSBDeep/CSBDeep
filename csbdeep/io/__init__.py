@@ -6,12 +6,25 @@ import numpy as np
 from tifffile import imsave
 import warnings
 
-from ..utils import axes_check_and_normalize, axes_dict, move_image_axes, move_channel_for_backend, backend_channels_last
+from ..utils import _raise, axes_check_and_normalize, axes_dict, move_image_axes, move_channel_for_backend, backend_channels_last
 
 
 
 def save_tiff_imagej_compatible(file, img, axes, **imsave_kwargs):
-    """Save tiff in ImageJ-compatible format."""
+    """Save image in ImageJ-compatible TIFF format.
+
+    Parameters
+    ----------
+    file : str
+        File name
+    img : numpy.ndarray
+        Image
+    axes: str
+        Axes of ``img``
+    imsave_kwargs : dict, optional
+        Keyword arguments for :func:`tifffile.imsave`
+
+    """
     axes = axes_check_and_normalize(axes,img.ndim,disallowed='S')
 
     # convert to imagej-compatible data type
@@ -33,8 +46,35 @@ def save_tiff_imagej_compatible(file, img, axes, **imsave_kwargs):
 
 
 def load_training_data(file, validation_split=0, axes=None, n_images=None, verbose=False):
-    """ TODO """
-    # print("Loading training data...")
+    """Load training data from file in ``.npz`` format.
+
+    The data file is expected to have the keys:
+    - ``X``    : Array of training input images.
+    - ``Y``    : Array of corresponding target images.
+    - ``axes`` : Axes of the training images.
+
+    Parameters
+    ----------
+    file : str
+        File name
+    validation_split : float
+        Fraction of images to use as validation set during training.
+    axes: str, optional
+        Must be provided in case the loaded data does not contain ``axes`` information.
+    n_images : int, optional
+        Can be used to limit the number of images loaded from data.
+    verbose : bool, optional
+        Can be used to display information about the loaded images.
+
+    Returns
+    -------
+    tuple( tuple(:class:`numpy.ndarray`, :class:`numpy.ndarray`), tuple(:class:`numpy.ndarray`, :class:`numpy.ndarray`), str )
+        Returns two tuples (`X_train`, `Y_train`), (`X_val`, `Y_val`) of training and validation sets
+        and the axes of the input images.
+        The tuple of validation data will be ``None`` if ``validation_split = 0``.
+
+    """
+
     f = np.load(file)
     X, Y = f['X'], f['Y']
     if axes is None:
@@ -92,4 +132,20 @@ def load_training_data(file, validation_split=0, axes=None, n_images=None, verbo
 
 
 def save_training_data(file, X, Y, axes):
+    """Save training data in ``.npz`` format.
+
+    Parameters
+    ----------
+    file : str
+        File name
+    X : :class:`numpy.ndarray`
+        Array of patches extracted from source images.
+    Y : :class:`numpy.ndarray`
+        Array of corresponding target patches.
+    axes : str
+        Axes of the extracted patches.
+
+    """
+    axes = axes_check_and_normalize(axes)
+    len(axes) == X.ndim or _raise(ValueError())
     np.savez(file, X=X, Y=Y, axes=axes)

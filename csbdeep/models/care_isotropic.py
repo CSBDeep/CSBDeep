@@ -18,34 +18,18 @@ class IsotropicCARE(CARE):
     """
 
     def predict(self, img, axes, factor, normalizer=PercentileNormalizer(), resizer=PadAndCropResizer(), batch_size=8):
-        """Apply neural network to raw image to restore isotropic resolution.
+        """Apply neural network to raw image for isotropic reconstruction.
+
+        See :func:`CARE.predict` for documentation.
 
         Parameters
         ----------
-        img : :class:`numpy.ndarray`
-            Raw input image, with image dimensions expected in the same order as in data for training.
-            If applicable, only the z and channel dimensions can be anywhere.
-        axes : str
-            Axes of ``img``.
         factor : float
-            Upsampling factor for z dimension. It is important that this is chosen in correspondence
+            Upsampling factor for Z axis. It is important that this is chosen in correspondence
             to the subsampling factor used during training data generation.
-        normalizer : :class:`csbdeep.predict.Normalizer`
-            Normalization of input image before prediction and (potentially) transformation back after prediction.
-        resizer : :class:`csbdeep.predict.Resizer`
-            If necessary, input image is resized to enable neural network prediction and result is (possibly)
-            resized to yield original image size.
         batch_size : int
             Number of image slices that are processed together by the neural network.
             Reduce this value if out of memory errors occur.
-
-        Returns
-        -------
-        :class:`numpy.ndarray`
-            Returns the restored image. If the model is probabilistic, this denotes the `mean` parameter of
-            the predicted per-pixel Laplace distributions (i.e., the expected restored image).
-            Axes ordering is unchanged wrt input image. Only if there the output is multi-channel and
-            the input image didn't have a channel axis, then channels are appended at the end.
 
         """
         return self._predict_mean_and_scale(img, axes, factor, normalizer, resizer, batch_size)[0]
@@ -54,17 +38,16 @@ class IsotropicCARE(CARE):
     def predict_probabilistic(self, img, axes, factor, normalizer=PercentileNormalizer(), resizer=PadAndCropResizer(), batch_size=8):
         """Apply neural network to raw image to predict probability distribution for isotropic restored image.
 
-        See :func:`predict` for parameter explanations.
+        See :func:`CARE.predict_probabilistic` for documentation.
 
-        Returns
-        -------
-        :class:`csbdeep.probability.ProbabilisticPrediction`
-            Returns the probability distribution of the restored image.
-
-        Raises
-        ------
-        ValueError
-            If this is not a probabilistic model.
+        Parameters
+        ----------
+        factor : float
+            Upsampling factor for Z axis. It is important that this is chosen in correspondence
+            to the subsampling factor used during training data generation.
+        batch_size : int
+            Number of image slices that are processed together by the neural network.
+            Reduce this value if out of memory errors occur.
 
         """
         self.config.probabilistic or _raise(ValueError('This is not a probabilistic model.'))
@@ -82,10 +65,6 @@ class IsotropicCARE(CARE):
         tuple(:class:`numpy.ndarray`, :class:`numpy.ndarray` or None)
             If model is probabilistic, returns a tuple `(mean, scale)` that defines the parameters
             of per-pixel Laplace distributions. Otherwise, returns the restored image via a tuple `(restored,None)`
-
-        Todo
-        ----
-        - :func:`scipy.ndimage.interpolation.zoom` differs from :func:`gputools.scale`. Important?
 
         """
         normalizer, resizer = self._check_normalizer_resizer(normalizer, resizer)
@@ -161,7 +140,7 @@ class IsotropicCARE(CARE):
 
     @staticmethod
     def _rotate(arr, k=1, axis=1, copy=True):
-        """Rotate by 90 degrees around the first 2 axis."""
+        """Rotate by 90 degrees around the first 2 axes."""
         if copy:
             arr = arr.copy()
 

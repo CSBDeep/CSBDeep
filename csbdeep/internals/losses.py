@@ -14,9 +14,9 @@ def _mean_or_not(mean):
     return (lambda x: K.mean(x,axis=-1)) if mean else (lambda x: x)
 
 
-def loss_laplace(mean=True): # FIXME: added 1e-3 in model itself instead of here -> need to change in Fiji/KNIME code
+def loss_laplace(mean=True):
     R = _mean_or_not(mean)
-    C = np.log(2.0) # FIXME: in the supplement, we have dropped C, ie. C = 0
+    C = np.log(2.0)
     if backend_channels_last():
         def nll(y_true, y_pred):
             n     = K.shape(y_true)[-1]

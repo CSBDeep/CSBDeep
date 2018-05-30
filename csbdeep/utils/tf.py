@@ -38,21 +38,20 @@ def limit_gpu_memory(fraction, allow_growth=False):
         If TensorFlow is not used as the backend.
     """
 
+    is_tf_backend() or _raise(NotImplementedError('Not using tensorflow backend.'))
     fraction is None or (np.isscalar(fraction) and 0<=fraction<=1) or _raise(ValueError('fraction must be between 0 and 1.'))
 
-    if is_tf_backend():
-        if K.tensorflow_backend._SESSION is None:
-            config = tf.ConfigProto()
-            if fraction is not None:
-                config.gpu_options.per_process_gpu_memory_fraction = fraction
-            config.gpu_options.allow_growth = bool(allow_growth)
-            session = tf.Session(config=config)
-            K.tensorflow_backend.set_session(session)
-            # print("[tf_limit]\t setting config.gpu_options.per_process_gpu_memory_fraction to ",config.gpu_options.per_process_gpu_memory_fraction)
-        else:
-            warnings.warn('Too late too limit GPU memory, must be done before any computation.')
+    if K.tensorflow_backend._SESSION is None:
+        config = tf.ConfigProto()
+        if fraction is not None:
+            config.gpu_options.per_process_gpu_memory_fraction = fraction
+        config.gpu_options.allow_growth = bool(allow_growth)
+        session = tf.Session(config=config)
+        K.tensorflow_backend.set_session(session)
+        # print("[tf_limit]\t setting config.gpu_options.per_process_gpu_memory_fraction to ",config.gpu_options.per_process_gpu_memory_fraction)
     else:
-        raise NotImplementedError('Not using tensorflow backend.')
+        warnings.warn('Too late too limit GPU memory, can only be done once and before any computation.')
+
 
 
 

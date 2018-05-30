@@ -57,8 +57,8 @@ def save_json(data,fpath,**kwargs):
 
 
 def normalize(x, pmin=3, pmax=99.8, axis=None, clip=False, eps=1e-20, dtype=np.float32):
-    """ TODO
-    """
+    """Percentile-based image normalization."""
+
     mi = np.percentile(x,pmin,axis=axis,keepdims=True)
     ma = np.percentile(x,pmax,axis=axis,keepdims=True)
     return normalize_mi_ma(x, mi, ma, clip=clip, eps=eps, dtype=dtype)

@@ -17,9 +17,10 @@ from .transform import Transform, permute_axes
 ## Patch filter
 
 def no_background_patches(threshold=0.4, percentile=99.9):
+
     """Returns a patch filter to be used by :func:`create_patches` to determine for each image pair which patches
     are eligible for sampling. The purpose is to only sample patches from "interesting" regions of the raw image that
-    actually contain some non-background signal. To that end, a maximum filter is applied to the target image
+    actually contain a substantial amount of non-background signal. To that end, a maximum filter is applied to the target image
     to find the largest values in a region.
 
     Parameters
@@ -81,7 +82,7 @@ def sample_patches_from_multiple_stacks(datas, patch_size, n_samples, datas_mask
         patch_mask = patch_filter(datas, patch_size)
 
     if datas_mask is not None:
-        # FIXME: Test this
+        # TODO: Test this
         warnings.warn('Using pixel masks for raw/transformed images not tested.')
         datas_mask.shape == datas[0].shape or _raise(ValueError())
         datas_mask.dtype == np.bool or _raise(ValueError())
@@ -108,7 +109,6 @@ def sample_patches_from_multiple_stacks(datas, patch_size, n_samples, datas_mask
     #                  r[2] - patch_size[2] // 2:r[2] + patch_size[2] - patch_size[2] // 2,
     #                  ] for r in zip(*rand_inds)]) for data in datas]
 
-    # FIXME: Test this
     res = [np.stack([data[tuple(slice(_r-(_p//2),_r+_p-(_p//2)) for _r,_p in zip(r,patch_size))] for r in zip(*rand_inds)]) for data in datas]
 
     return res
@@ -232,12 +232,13 @@ def create_patches(
     patch_size : tuple
         Shape of the patches to be extraced from raw images.
         Must be compatible with the number of dimensions and axes of the raw images.
+        As a general rule, use a power of two along all XYZT axes, or at least divisible by 8.
     n_patches_per_image : int
         Number of patches to be sampled/extracted from each raw image pair (after transformations, see below).
     patch_axes : str or None
         Axes of the extracted patches. If ``None``, will assume to be equal to that of transformed raw data.
     save_file : str or None
-        File name to save training data to disk in ``.npz`` format (see :func:`numpy.savez`).
+        File name to save training data to disk in ``.npz`` format (see :func:`csbdeep.io.save_training_data`).
         If ``None``, data will not be saved.
     transforms : list or tuple, optional
         List of :class:`Transform` objects that apply additional transformations to the raw images.
@@ -262,7 +263,7 @@ def create_patches(
         and their axes.
         `X` is the array of patches extracted from source images with `Y` being the array of corresponding target patches.
         The shape of `X` and `Y` is as follows: `(n_total_patches, n_channels, ...)`.
-        For single-channel images (`channel` = ``None``), `n_channels` = 1.
+        For single-channel images, `n_channels` will be 1.
 
     Raises
     ------
@@ -271,12 +272,11 @@ def create_patches(
 
     Example
     -------
-    >>> raw_data = get_tiff_pairs_from_folders(basepath='data', source_dirs=['source1','source2'], target_dir='GT', axes='ZYX')
+    >>> raw_data = RawData.from_folder(basepath='data', source_dirs=['source1','source2'], target_dir='GT', axes='ZYX')
     >>> X, Y, XY_axes = create_patches(raw_data, patch_size=(32,128,128), n_patches_per_image=16)
 
     Todo
     ----
-    - Is :func:`create_patches` a good name?
     - Save created patches directly to disk using :class:`numpy.memmap` or similar?
       Would allow to work with large data that doesn't fit in memory.
 

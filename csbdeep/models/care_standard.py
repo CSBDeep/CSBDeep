@@ -21,9 +21,9 @@ from ..internals import nets, train
 class CARE(object):
     """Standard CARE network for image restoration and enhancement.
 
-    Uses a convolutional neural network created by :func:`csbdeep.nets.common_unet`.
+    Uses a convolutional neural network created by :func:`csbdeep.internals.nets.common_unet`.
     Note that isotropic reconstruction and manifold extraction/projection are not supported here
-    (see :class:`csbdeep.models.IsotropicCARE`).
+    (see :class:`csbdeep.models.IsotropicCARE` ).
 
     Parameters
     ----------
@@ -54,9 +54,9 @@ class CARE(object):
     keras_model : `Keras model <https://keras.io/getting-started/functional-api-guide/>`_
         Keras neural network model.
     name : str
-        Model's name.
+        Model name.
     logdir : :class:`pathlib.Path`
-        Path to model's folder (which stores configuration, weights, etc.)
+        Path to model folder (which stores configuration, weights, etc.)
     """
 
     def __init__(self, config, name=None, basedir='.'):
@@ -144,7 +144,7 @@ class CARE(object):
     def prepare_for_training(self, optimizer=None, **kwargs):
         """Prepare for neural network training.
 
-        Calls :func:`csbdeep.train.prepare_model` and creates
+        Calls :func:`csbdeep.internals.train.prepare_model` and creates
         `Keras Callbacks <https://keras.io/callbacks/>`_ to be used for training.
 
         Note that this method will be implicitly called once by :func:`train`
@@ -156,7 +156,7 @@ class CARE(object):
             Instance of a `Keras Optimizer <https://keras.io/optimizers/>`_ to be used for training.
             If ``None`` (default), uses ``Adam`` with the learning rate specified in ``config``.
         kwargs : dict
-            Additional arguments for :func:`csbdeep.train.prepare_model`.
+            Additional arguments for :func:`csbdeep.internals.train.prepare_model`.
 
         """
         if optimizer is None:
@@ -188,11 +188,11 @@ class CARE(object):
         Parameters
         ----------
         X : :class:`numpy.ndarray`
-            Array of source images
+            Array of source images.
         Y : :class:`numpy.ndarray`
-            Array of target images
+            Array of target images.
         validation_data : tuple(:class:`numpy.ndarray`, :class:`numpy.ndarray`)
-            Tuple of arrays for source and target validation images
+            Tuple of arrays for source and target validation images.
         epochs : int
             Optional argument to use instead of the value from ``config``.
         steps_per_epoch : int
@@ -205,7 +205,8 @@ class CARE(object):
 
         """
 
-        (isinstance(validation_data,(list,tuple)) and len(validation_data)==2) or _raise(ValueError())
+        ((isinstance(validation_data,(list,tuple)) and len(validation_data)==2)
+            or _raise(ValueError('validation_data must be a pair of numpy arrays')))
 
         n_train, n_val = len(X), len(validation_data[0])
         frac_val = (1.0 * n_val) / (n_train + n_val)
@@ -247,7 +248,7 @@ class CARE(object):
 
 
     def export_TF(self):
-        """Export neural network via :func:`csbdeep.tf.export_SavedModel`."""
+        """Export neural network via :func:`csbdeep.utils.tf.export_SavedModel`."""
         fout = self.logdir / 'TF_SavedModel.zip'
         meta = {
             'type':          self.__class__.__name__,
@@ -267,14 +268,12 @@ class CARE(object):
         Parameters
         ----------
         img : :class:`numpy.ndarray`
-            Raw input image, with image dimensions expected in the same order as in data for training.
-            If applicable, only the channel dimension can be anywhere.
-            TODO: docstrings need update now that "axes" is used.
+            Raw input image
         axes : str
-            Axes of ``img``.
-        normalizer : :class:`csbdeep.predict.Normalizer`
+            Axes of the input ``img``.
+        normalizer : :class:`csbdeep.predict.Normalizer` or None
             Normalization of input image before prediction and (potentially) transformation back after prediction.
-        resizer : :class:`csbdeep.predict.Resizer`
+        resizer : :class:`csbdeep.predict.Resizer` or None
             If necessary, input image is resized to enable neural network prediction and result is (possibly)
             resized to yield original image size.
         n_tiles : int
@@ -289,8 +288,8 @@ class CARE(object):
         :class:`numpy.ndarray`
             Returns the restored image. If the model is probabilistic, this denotes the `mean` parameter of
             the predicted per-pixel Laplace distributions (i.e., the expected restored image).
-            Axes ordering is unchanged wrt input image. Only if there the output is multi-channel and
-            the input image didn't have a channel axis, then channels are appended at the end.
+            Axes semantics are the same as in the input image. Only if the output is multi-channel and
+            the input image didn't have a channel axis, then output channels are appended at the end.
 
         """
         return self._predict_mean_and_scale(img, axes, normalizer, resizer, n_tiles)[0]

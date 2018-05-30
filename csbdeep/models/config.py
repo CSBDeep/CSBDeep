@@ -12,7 +12,7 @@ from ..utils import _raise, axes_check_and_normalize, axes_dict, backend_channel
 
 
 class Config(argparse.Namespace):
-    """Default configuration for a (standard) CARE network.
+    """Default configuration for a CARE model.
 
     This configuration is meant to be used with :class:`CARE`
     and related models (e.g., :class:`IsotropicCARE`).

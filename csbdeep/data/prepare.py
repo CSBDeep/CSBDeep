@@ -171,7 +171,7 @@ class Resizer():
         div_n : int
             Resized image must be evenly divisible by this value.
         exclude : int or list(int) or None
-            Indicates axes to exclude (can be ``None``),
+            Indicates axis indices to exclude (can be ``None``),
             e.g. channel dimension.
 
         Returns
@@ -190,9 +190,9 @@ class Resizer():
         x : :class:`numpy.ndarray`
             Raw input image.
         exclude : int or list(int) or None
-            Indicates axes to exclude (can be ``None``),
+            Indicates axis indices to exclude (can be ``None``),
             e.g. channel dimension.
-            Afert ignoring the exlcudes axes,
+            Afert ignoring the excludes axis indices,
             note that the shape of x must be same as in :func:`before`.
 
         Returns

@@ -9,7 +9,7 @@ from .utils import normalize
 
 
 def plot_history(history,*keys,**kwargs):
-    """ TODO """
+    """Plot (Keras) training history returned by :func:`CARE.train`."""
     import matplotlib.pyplot as plt
 
     logy = kwargs.pop('logy',False)
@@ -33,6 +33,7 @@ def plot_history(history,*keys,**kwargs):
 
 
 def plot_some(*arr, **kwargs):
+    """Quickly plot multiple images at once."""
 
     title_list = kwargs.pop('title_list',None)
     pmin = kwargs.pop('pmin',0)
@@ -87,15 +88,24 @@ def _plot_some(arr, title_list=None, pmin=0, pmax=100, cmap='magma', **imshow_kw
 
 
 def to_color(arr, pmin=1, pmax=99.8, gamma=1., colors=((0, 1, 0), (1, 0, 1), (0, 1, 1))):
-    """
-    converts a 2d or 3d stack to a colored image (maximal 3 channels)
+    """Converts a 2D or 3D stack to a colored image (maximal 3 channels).
 
-    :param arr: ndarray, 2d or 3d input data
-    :param pmin: lower percentile, pass -1 if no lower normalization is required
-    :param pmax: upper percentile, pass -1 if no upper normalization is required
-    :param gamma: gamma correction
-    :param colors: list of colors (r,g,b) for each channel of the input
-    :return:
+    Parameters
+    ----------
+    arr : numpy.ndarray
+        2D or 3D input data
+    pmin : float
+        lower percentile, pass -1 if no lower normalization is required
+    pmax : float
+        upper percentile, pass -1 if no upper normalization is required
+    gamma : float
+        gamma correction
+    colors : list
+        list of colors (r,g,b) for each channel of the input
+
+    Returns
+    -------
+    numpy.ndarray
         colored image
     """
     if not arr.ndim in (2,3):

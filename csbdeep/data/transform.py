@@ -64,8 +64,8 @@ def anisotropic_distortions(
     ):
     """Simulate anisotropic distortions.
 
-    Modify the first image (obtained from input generator) along the one axis to mimic the
-    distortions that typically occur due to low resolution along Z axis.
+    Modify the first image (obtained from input generator) along one axis to mimic the
+    distortions that typically occur due to low resolution along the Z axis.
     Note that the modified image is finally upscaled to obtain the same resolution
     as the unmodified input image and is yielded as the 'source' image (see :class:`RawData`).
     The mask from the input generator is simply passed through.
@@ -75,8 +75,8 @@ def anisotropic_distortions(
     1. Convolution with PSF
     2. Poisson noise
     3. Gaussian noise
-    4. Subsampling along X axis
-    5. Upsampling along X axis (to former size).
+    4. Subsampling along ``subsample_axis``
+    5. Upsampling along ``subsample_axis`` (to former size).
 
 
     Parameters
@@ -86,17 +86,15 @@ def anisotropic_distortions(
     psf : :class:`numpy.ndarray` or None
         Point spread function (PSF) that is supposed to mimic blurring
         of the microscope due to reduced axial resolution. Set to ``None`` to disable.
-        Note that convolution with the PSF is applied separately for each channel, i.e.
-        the PSF must have the same number of channels as the image it is applied to.
     psf_axes : str or None
-        Axes of the psf. If ``None``, psf axes are assumed to be the same as of the image
+        Axes of the PSF. If ``None``, psf axes are assumed to be the same as of the image
         that it is applied to.
     poisson_noise : bool
-        Flag to indicate whether Poisson noise should be added to the image.
+        Flag to indicate whether Poisson noise should be applied to the image.
     gauss_sigma : float
         Standard deviation of white Gaussian noise to be added to the image.
     subsample_axis : str
-        Subsampling image axis (default 'X').
+        Subsampling image axis (default X).
     yield_target : str
         Which image from the input generator should be yielded by the generator ('source' or 'target').
         If 'source', the unmodified input/source image (from which the distorted image is computed)
@@ -105,14 +103,13 @@ def anisotropic_distortions(
     crop_threshold : float
         The subsample factor must evenly divide the image size along the subsampling axis to prevent
         potential image misalignment. If this is not the case the subsample factors are
-        modified and the raw image will be cropped along the subsampling axis
+        modified and the raw image may be cropped along the subsampling axis
         up to a fraction indicated by `crop_threshold`.
 
     Returns
     -------
     Transform
-        Returns a :class:`Transform` object to be used with :func:`create_patches` to
-        create training data for an isotropic reconstruction CARE network.
+        Returns a :class:`Transform` object intended to be used with :func:`create_patches`.
 
     Raises
     ------
@@ -303,13 +300,10 @@ def anisotropic_distortions(
 def permute_axes(axes):
     """Transformation to permute images axes.
 
-    Note that input images must have compatible axes, i.e.
-    they must be a permutation of the target axis.
-
     Parameters
     ----------
     axes : str
-        Target axis, to which the input images will be permuted.
+        Target axes, to which the input images will be permuted.
 
     Returns
     -------
