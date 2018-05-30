@@ -49,9 +49,11 @@ def load_training_data(file, validation_split=0, axes=None, n_images=None, verbo
     """Load training data from file in ``.npz`` format.
 
     The data file is expected to have the keys:
+
     - ``X``    : Array of training input images.
     - ``Y``    : Array of corresponding target images.
     - ``axes`` : Axes of the training images.
+
 
     Parameters
     ----------

@@ -45,7 +45,7 @@ def linkcode_resolve(domain, info):
     if not info['module']:
         return None
     filename = info['module'].replace('.', '/')
-    return "https://github.com/mpicbg-csbd/CSBDeep_code/tree/master/%s.py" % filename
+    return "https://github.com/csbdeep/csbdeep/tree/master/%s.py" % filename
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -64,7 +64,7 @@ master_doc = 'index'
 # General information about the project.
 project = u'CSBDeep'
 copyright = u'2018, CSBD'
-author = u'Martin Weigert, Uwe Schmidt'
+author = u'Uwe Schmidt, Martin Weigert'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

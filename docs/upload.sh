@@ -3,11 +3,6 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 OUTPUTDIR="$DIR/build/html"
 
-# FTP_HOST=ftp.uweschmidt.org
-# FTP_USER=111766-27-uwe
-# FTP_TARGET_DIR=/webseiten/csbdeep.uweschmidt.org
-# lftp ftp://$FTP_USER@$FTP_HOST -e "set ssl:verify-certificate no ; mirror -R $OUTPUTDIR $FTP_TARGET_DIR ; quit"
-
 FTP_HOST=home18440447.1and1-data.host
 FTP_USER=p6831244-fjug
 FTP_TARGET_DIR=/doc

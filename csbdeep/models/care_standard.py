@@ -271,9 +271,9 @@ class CARE(object):
             Raw input image
         axes : str
             Axes of the input ``img``.
-        normalizer : :class:`csbdeep.predict.Normalizer` or None
+        normalizer : :class:`csbdeep.data.Normalizer` or None
             Normalization of input image before prediction and (potentially) transformation back after prediction.
-        resizer : :class:`csbdeep.predict.Resizer` or None
+        resizer : :class:`csbdeep.data.Resizer` or None
             If necessary, input image is resized to enable neural network prediction and result is (possibly)
             resized to yield original image size.
         n_tiles : int
@@ -302,7 +302,7 @@ class CARE(object):
 
         Returns
         -------
-        :class:`csbdeep.probability.ProbabilisticPrediction`
+        :class:`csbdeep.internals.probability.ProbabilisticPrediction`
             Returns the probability distribution of the restored image.
 
         Raises
