@@ -299,12 +299,6 @@ def create_patches(
     n_patches = n_images * n_patches_per_image
     n_required_memory_bytes = 2 * n_patches*np.prod(patch_size) * 4
 
-    save_file is None or isinstance(save_file,string_types) or _raise(ValueError())
-    if save_file is not None:
-        # append .npz suffix
-        if os.path.splitext(save_file)[1] != '.npz':
-            save_file += '.npz'
-
     ## memory check
     _memory_check(n_required_memory_bytes)
 
@@ -360,7 +354,7 @@ def create_patches(
         Y = np.moveaxis(Y, 1+channel, 1)
 
     if save_file is not None:
-        print('Saving data to %s.' % save_file)
+        print('Saving data to %s.' % str(save_file))
         save_training_data(save_file, X, Y, axes)
 
     return X,Y,axes

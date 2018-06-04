@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, unicode_literals, absolute_import, division
 from six.moves import range, zip, map, reduce, filter
+from six import string_types
 
 import numpy as np
 from tifffile import imsave
 import warnings
 
-from ..utils import _raise, axes_check_and_normalize, axes_dict, move_image_axes, move_channel_for_backend, backend_channels_last
+from ..utils import _raise, Path, axes_check_and_normalize, axes_dict, move_image_axes, move_channel_for_backend, backend_channels_last
 
 
 
@@ -148,6 +149,10 @@ def save_training_data(file, X, Y, axes):
         Axes of the extracted patches.
 
     """
+    isinstance(file,(Path,string_types)) or _raise(ValueError())
+    file = Path(file).with_suffix('.npz')
+    file.parent.mkdir(parents=True,exist_ok=True)
+
     axes = axes_check_and_normalize(axes)
     len(axes) == X.ndim or _raise(ValueError())
-    np.savez(file, X=X, Y=Y, axes=axes)
+    np.savez(str(file), X=X, Y=Y, axes=axes)
