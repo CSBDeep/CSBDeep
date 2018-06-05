@@ -5,9 +5,9 @@ Please first `install TensorFlow <https://www.tensorflow.org/install/>`_
 by following the official instructions.
 
 .. Note::
-   We strongly recommend to use TensorFlow on a Linux system with a modern GPU from Nvidia.
-   
-   TensorFlow (currently) does not provide stable GPU versions for Windows/Mac and without  a GPU, training and prediction will be *much* slower (~30-60x times, even when using a 40 CPU core workstation).
+   We strongly recommend to use TensorFlow on a Linux system with a modern GPU from Nvidia,
+   since it is difficult to install with a GPU on Windows/Mac.
+   Without a GPU, training and prediction will be *much* slower (~30-60 times, even when using a computer with 40 CPU cores).
 
 Second, we suggest to `install Jupyter <http://jupyter.org/install>`_ to be able to
 run our provided example notebooks that contain step-by-step instructions on how to use this package.
