@@ -1,5 +1,5 @@
-# CSBDeep_code
+# CSBDeep – a toolbox for CARE
 
-Work in progress. 
+This is the CSBDeep Python package, which provides a toolbox for content-aware restoration (CARE) of (fluorescence) microscopy images, based on deep learning via Keras and TensorFlow.
 
-Please go to the documentation at http://csbdeep.bioimagecomputing.com/doc/.
+Please see the documentation at http://csbdeep.bioimagecomputing.com/doc/.
