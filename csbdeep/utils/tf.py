@@ -65,7 +65,7 @@ def export_SavedModel(model, outpath, meta={}, format='zip'):
 
     Parameters
     ----------
-    model : :class:`keras.Model`
+    model : :class:`keras.models.Model`
         Keras model to be exported.
     outpath : str
         Path of the file/folder that the model will exported to.
@@ -100,7 +100,7 @@ def export_SavedModel(model, outpath, meta={}, format='zip'):
 
 
     ## checks
-    isinstance(model,keras.Model) or _raise(ValueError("'model' must be a Keras model."))
+    isinstance(model,keras.models.Model) or _raise(ValueError("'model' must be a Keras model."))
     # supported_formats = tuple(['dir']+[name for name,description in shutil.get_archive_formats()])
     supported_formats = 'dir','zip'
     format in supported_formats or _raise(ValueError("Unsupported format '%s', must be one of %s." % (format,str(supported_formats))))

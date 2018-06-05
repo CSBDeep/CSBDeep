@@ -3,8 +3,8 @@ Installation
 
 Please first `install TensorFlow <https://www.tensorflow.org/install/>`_
 by following the official instructions.
-If possible, we strongly recommend to use TensorFlow with GPU support.
-To that end, we suggest a Linux system with a modern GPU from Nvidia.
+If at all possible, we strongly recommend to use TensorFlow on a Linux system with a modern GPU from Nvidia.
+Without a GPU, everything will be *much* slower.
 
 Second, we suggest to `install Jupyter <http://jupyter.org/install>`_ to be able to
 run our provided example notebooks that contain step-by-step instructions on how to use this package.
