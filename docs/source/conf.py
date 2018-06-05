@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
 #
-# biobeam documentation build configuration file, created by
-# sphinx-quickstart on Wed Jun 29 19:00:27 2016.
-#
 # This file is execfile()d with the current directory set to its
 # containing dir.
 #
@@ -138,23 +135,6 @@ html_theme = 'sphinx_rtd_theme'
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
-#html_theme_options = {}
-# html_theme_options = {
-#     #"logo": "logo_biobeam_transp_red.png",
-#     "description": "CSBDeep",
-#     "logo_name":"false",
-#     "logo_text_align":"center",
-#     "github_type": "follow",
-#     'github_user': 'mpicbg-csbd',
-#     'github_repo': 'CSBDeep_code',
-#     #"github_banner": "true",
-#     "github_button": "true",
-#     "show_related": "true",
-#     "sidebar_link":"link",
-#     "page_width":"1400px",
-# #    "font_family": "minion pro",
-
-# }
 
 # Add any paths that contain custom themes here, relative to this directory.
 #html_theme_path = []
@@ -270,17 +250,6 @@ latex_elements = {
 #'figure_align': 'htbp',
 }
 
-# Grouping the document tree into LaTeX files. List of tuples
-# (source start file, target name, title,
-#  author, documentclass [howto, manual, or own class]).
-# latex_documents = [
-#     (master_doc, 'biobeam.tex', u'biobeam Documentation',
-#      u'Martin Weigert', 'howto'),
-# ]
-
-# The name of an image file (relative to this directory) to place at the top of
-# the title page.
-# latex_logo = "../../artwork/logo_biobeam_transp_red.png"
 
 # For "manual" documents, if this is true, then toplevel headings are parts,
 # not chapters.
@@ -304,12 +273,6 @@ latex_toplevel_sectioning = "section"
 
 # -- Options for manual page output ---------------------------------------
 
-# One entry per manual page. List of tuples
-# (source start file, name, description, authors, manual section).
-# man_pages = [
-#     (master_doc, 'biobeam', u'biobeam Documentation',
-#      [author], 1)
-# ]
 
 # If true, show URL addresses after external links.
 #man_show_urls = False
@@ -320,11 +283,6 @@ latex_toplevel_sectioning = "section"
 # Grouping the document tree into Texinfo files. List of tuples
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
-# texinfo_documents = [
-#     (master_doc, 'biobeam', u'biobeam Documentation',
-#      author, 'biobeam', 'One line description of project.',
-#      'Miscellaneous'),
-# ]
 
 # Documents to append as an appendix to all manuals.
 #texinfo_appendices = []
