@@ -1,16 +1,31 @@
 from __future__ import absolute_import
 from setuptools import setup, find_packages
+from os import path
 
-exec (open('csbdeep/version.py').read())
+_dir = path.abspath(path.dirname(__file__))
+
+with open(path.join(_dir,'csbdeep','version.py')) as f:
+    exec(f.read())
+
+with open(path.join(_dir,'README.md'), encoding='utf-8') as f:
+    long_description = f.read()
+
 
 setup(name='csbdeep',
       version=__version__,
       description='CSBDeep - a toolbox for Content-aware Image Restoration (CARE)',
-      url='https://github.com/csbdeep/csbdeep',
+      long_description=long_description,
+      long_description_content_type='text/markdown',
+      url='http://csbdeep.bioimagecomputing.com/',
       author='Uwe Schmidt, Martin Weigert',
       author_email='uschmidt@mpi-cbg.de, mweigert@mpi-cbg.de',
       license='BSD 3-Clause License',
       packages=find_packages(),
+
+      project_urls={
+          'Documentation': 'http://csbdeep.bioimagecomputing.com/doc/',
+          'Repository': 'https://github.com/csbdeep/csbdeep',
+      },
 
       classifiers=[
           'Development Status :: 4 - Beta',
