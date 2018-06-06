@@ -5,7 +5,7 @@ The details of training data generation vary depending on the
 intended image restoration task (see :doc:`models`).
 We recommend to start with one of our `examples`_.
 
-.. _`examples`: https://github.com/csbdeep/csbdeep/tree/master/examples
+.. _`examples`: http://csbdeep.bioimagecomputing.com/examples/
 
 We first explain the process for a standard CARE model.
 To that end, we need to specify matching pairs of raw *source* and *target* images,
