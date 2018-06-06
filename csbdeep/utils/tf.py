@@ -61,7 +61,7 @@ def export_SavedModel(model, outpath, meta={}, format='zip'):
     See `Your Model in Fiji`_ to learn how to use the exported model with our CSBDeep Fiji plugins.
 
     .. _SavedModel: https://www.tensorflow.org/programmers_guide/saved_model#structure_of_a_savedmodel_directory
-    .. _`Your Model in Fiji`: https://github.com/CSBDeep/CSBDeep/wiki/Your-Model-in-Fiji
+    .. _`Your Model in Fiji`: https://github.com/CSBDeep/CSBDeep_website/wiki/Your-Model-in-Fiji
 
     Parameters
     ----------

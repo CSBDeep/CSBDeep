@@ -17,7 +17,7 @@ For example, a standard (denoising) CARE model can be instantiated via
 :func:`csbdeep.models.CARE.train` method.
 After training, the learned model can be exported via
 :func:`csbdeep.models.CARE.export_TF` to be used with our
-`Fiji Plugin <https://github.com/CSBDeep/CSBDeep/wiki/Your-Model-in-Fiji>`_.
+`Fiji Plugin <https://github.com/CSBDeep/CSBDeep_website/wiki/Your-Model-in-Fiji>`_.
 
 **Example**
 

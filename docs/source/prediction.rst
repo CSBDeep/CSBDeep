@@ -7,7 +7,7 @@ we can apply it to raw images that we want to restore.
 .. note::
     Alternatively, you can call :func:`csbdeep.models.CARE.export_TF`
     to export the model and use it with our
-    `Fiji Plugin <https://github.com/CSBDeep/CSBDeep/wiki/Your-Model-in-Fiji>`_.
+    `Fiji Plugin <https://github.com/CSBDeep/CSBDeep_website/wiki/Your-Model-in-Fiji>`_.
 
 We first create a CARE model with the same name that we have previously
 used for training it. By not providing a configuration (``config = None``), it will
