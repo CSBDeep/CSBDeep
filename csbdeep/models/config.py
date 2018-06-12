@@ -112,7 +112,10 @@ class Config(argparse.Namespace):
         self.unet_kern_size        = 5 if self.n_dim==2 else 3
         self.unet_n_first          = 32
         self.unet_last_activation  = 'linear'
-        self.unet_input_shape      = self.n_dim*(None,) + (self.n_channel_in,)
+        if backend_channels_last():
+            self.unet_input_shape  = self.n_dim*(None,) + (self.n_channel_in,)
+        else:
+            self.unet_input_shape  = (self.n_channel_in,) + self.n_dim*(None,)
 
         self.train_loss            = 'laplace' if self.probabilistic else 'mae'
         self.train_epochs          = 100
