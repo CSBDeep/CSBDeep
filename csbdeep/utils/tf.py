@@ -82,7 +82,7 @@ def export_SavedModel(model, outpath, meta={}, format='zip'):
     """
 
     def export_to_dir(dirname):
-        if len(model.input_layers) > 1 or len(model.output_layers) > 1:
+        if len(model.inputs) > 1 or len(model.outputs) > 1:
             warnings.warn('Not tested with multiple input or output layers.')
         builder = tf.saved_model.builder.SavedModelBuilder(dirname)
         signature = tf.saved_model.signature_def_utils.predict_signature_def(
