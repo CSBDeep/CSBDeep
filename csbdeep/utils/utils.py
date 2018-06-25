@@ -105,7 +105,24 @@ def compose(*funcs):
 def download_and_extract_zip_file(url, targetdir='.', verbose=True):
     import csv
     from six.moves.urllib.request import urlretrieve
+    from six.moves.urllib.parse import urlparse
     from zipfile import ZipFile
+
+    res = urlparse(url)
+    if res.scheme in ('','file'):
+        url = Path(res.path).resolve().as_uri()
+        # local file, 'urlretrieve' will not make a copy
+        # -> don't delete 'downloaded' file
+        delete = False
+    else:
+        delete = True
+
+    # verbosity levels:
+    # - 0: no messages
+    # - 1: status messages
+    # - 2: status messages and list of all files
+    if isinstance(verbose,bool):
+        verbose *= 2
 
     log = (print) if verbose else (lambda *a,**k: None)
 
@@ -123,8 +140,9 @@ def download_and_extract_zip_file(url, targetdir='.', verbose=True):
         except:
             return True
         finally:
-            try: os.unlink(filepath)
-            except: pass
+            if delete:
+                try: os.unlink(filepath)
+                except: pass
 
         for size, relpath in contents:
             size, relpath = int(size.strip()), relpath.strip()
@@ -150,15 +168,16 @@ def download_and_extract_zip_file(url, targetdir='.', verbose=True):
                 log(' extracting...',end='')
                 zip_file.extractall(str(targetdir))
                 provided = zip_file.namelist()
-            log(' done.\n')
+            log(' done.')
         finally:
-            try: os.unlink(filepath)
-            except: pass
+            if delete:
+                try: os.unlink(filepath)
+                except: pass
     else:
-        log('Files found, nothing to download.\n')
+        log('Files found, nothing to download.')
 
-    if verbose:
-        log(str(targetdir)+':')
+    if verbose > 1:
+        log('\n'+str(targetdir)+':')
         consume(map(lambda x: log('-',Path(x)), provided))
 
 
