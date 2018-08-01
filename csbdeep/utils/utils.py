@@ -225,7 +225,7 @@ def move_image_axes(x, fr, to, adjust_singletons=False):
                 # remove singleton axis
                 slices[i] = 0
                 fr = fr.replace(a,'')
-        x = x[slices]
+        x = x[tuple(slices)]
         # add dummy axes present in 'to'
         for i,a in enumerate(to):
             if (a not in fr):

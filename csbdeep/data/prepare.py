@@ -281,7 +281,7 @@ class PadAndCropResizer(Resizer):
         for i in self._normalize_exclude(exclude, x.ndim):
             crop.insert(i,slice(None))
         len(crop) == x.ndim or _raise(ValueError())
-        return x[crop]
+        return x[tuple(crop)]
 
 
 # class CropResizer(Resizer):
