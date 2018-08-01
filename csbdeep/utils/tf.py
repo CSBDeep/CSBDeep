@@ -202,6 +202,9 @@ class CARETensorBoard(Callback):
             else:
                 output_layer = Lambda(lambda x: x[...,:sep])(self.model.output)
 
+        # normalize to (0,1) such that image display in tensorboard is best
+        output_layer = Lambda(lambda x: (x-K.min(x))/(K.max(x)-K.min(x)+K.epsilon()))(output_layer)
+        
         if self.prob_out:
             # scale images
             if n_dim_out > 4:
@@ -213,28 +216,6 @@ class CARETensorBoard(Callback):
                     scale_layer = Lambda(lambda x: K.concatenate([x[...,sep:],x[...,-1:]], axis=-1))(self.model.output)
                 else:
                     scale_layer = Lambda(lambda x: x[...,sep:])(self.model.output)
-
-        #
-        #     n_channels = self.model.input_shape[0]
-        #     if n_channels > 1:
-        #         #input_layer  = Lambda(lambda x: x[n_channels // 2:n_channels // 2 + 1, :, :, :])(self.model.input)
-        #         input_layer = Lambda(lambda x: K.max(x, axis = 0))(self.model.input)
-        #     else:
-        #         input_layer = self.model.input
-        # #
-        # if K.image_dim_ordering() == "tf":
-        #     n_channels = self.model.input_shape[-1]
-        #     if n_channels>1:
-        #         input_layer = Lambda(lambda x: x[:, :, :, n_channels // 2:n_channels // 2 + 1])(self.model.input)
-        #     else:
-        #         input_layer = self.model.input
-        # else:
-        #     n_channels = self.model.input_shape[0]
-        #     if n_channels > 1:
-        #         #input_layer  = Lambda(lambda x: x[n_channels // 2:n_channels // 2 + 1, :, :, :])(self.model.input)
-        #         input_layer = Lambda(lambda x: K.max(x, axis = 0))(self.model.input)
-        #     else:
-        #         input_layer = self.model.input
 
         tf_sums.append(tf.summary.image('input', input_layer, max_outputs=self.n_images))
         if self.prob_out:
