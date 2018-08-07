@@ -326,6 +326,9 @@ def create_patches(
     Y = np.empty_like(X)
 
     for i, (x,y,_axes,mask) in tqdm(enumerate(image_pairs),total=n_images):
+        if i >= n_images:
+            warnings.warn('more raw images (or transformations thereof) than expected, skipping excess images.')
+            break
         if i==0:
             axes = axes_check_and_normalize(_axes,len(patch_size))
             channel = axes_dict(axes)['C']
