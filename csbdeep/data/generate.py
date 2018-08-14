@@ -10,7 +10,7 @@ from tqdm import tqdm
 from ..utils import _raise, Path, consume, compose, normalize_mi_ma, axes_dict, axes_check_and_normalize
 from ..io import save_training_data
 
-from .transform import Transform, permute_axes
+from .transform import Transform, permute_axes, broadcast_target
 
 
 
@@ -363,6 +363,88 @@ def create_patches(
     return X,Y,axes
 
 
+def create_patches_reduced_target(
+        raw_data,
+        patch_size,
+        n_patches_per_image,
+        reduction_axes,
+        target_axes = None, # TODO: this should rather be part of RawData and also exposed to transforms
+        **kwargs,
+    ):
+    """Create normalized training data to be used for neural network training.
+
+    In contrast to :func:`create_patches`, it is assumed that the target image has reduced
+    dimensionality (i.e. size 1) along one or several axes (`reduction_axes`).
+
+    Parameters
+    ----------
+    raw_data : :class:`RawData`
+        See :func:`create_patches`.
+    patch_size : tuple
+        See :func:`create_patches`.
+    n_patches_per_image : int
+        See :func:`create_patches`.
+    reduction_axes : str
+        Axes where the target images have a reduced dimension (i.e. size 1) compared to the source images.
+    target_axes : str
+        Axes of the raw target images. If ``None``, will be assumed to be equal to that of the raw source images.
+    kwargs : dict
+        Additional parameters as in :func:`create_patches`.
+
+    Returns
+    -------
+    tuple(:class:`numpy.ndarray`, :class:`numpy.ndarray`, str)
+        See :func:`create_patches`. Note that the shape of the target data will be 1 along all reduction axes.
+
+    """
+    reduction_axes = axes_check_and_normalize(reduction_axes,disallowed='S')
+
+    transforms = kwargs.get('transforms')
+    if transforms is None:
+        transforms = []
+    transforms = list(transforms)
+    transforms.insert(0,broadcast_target(target_axes))
+    kwargs['transforms'] = transforms
+
+    save_file = kwargs.pop('save_file',None)
+
+    if any(s is None for s in patch_size):
+        tf = Transform(*zip(*transforms))
+        image_pairs = compose(*tf.generator)(raw_data.generator())
+        x,y,axes,mask = next(image_pairs) # get the first entry from the generator
+        patch_size = list(patch_size)
+        for i,(a,s) in enumerate(zip(axes,patch_size)):
+            if s is not None: continue
+            a in reduction_axes or _raise(ValueError("entry of patch_size is None for non reduction axis %s." % a))
+            patch_size[i] = x.shape[i]
+        patch_size = tuple(patch_size)
+        del x,y,axes,mask
+
+    X,Y,axes = create_patches (
+        raw_data            = raw_data,
+        patch_size          = patch_size,
+        n_patches_per_image = n_patches_per_image,
+        **kwargs
+    )
+
+    ax = axes_dict(axes)
+    for a in reduction_axes:
+        a in axes or _raise(ValueError("reduction axis %d not present in extracted patches" % a))
+        n_dims = Y.shape[ax[a]]
+        if n_dims == 1:
+            warnings.warn("extracted target patches already have dimensionality 1 along reduction axis %s." % a)
+        else:
+            t = np.take(Y,(1,),axis=ax[a])
+            Y = np.take(Y,(0,),axis=ax[a])
+            i = np.random.choice(Y.size,size=100)
+            if not np.all(t.flat[i]==Y.flat[i]):
+                warnings.warn("extracted target patches vary along reduction axis %s." % a)
+
+    if save_file is not None:
+        print('Saving data to %s.' % str(Path(save_file)))
+        save_training_data(save_file, X, Y, axes)
+
+    return X,Y,axes
 
 
 # Misc

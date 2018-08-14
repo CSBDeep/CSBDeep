@@ -226,6 +226,8 @@ def anisotropic_distortions(
             else:
                 target = y
 
+            img.shape == target.shape or _raise(ValueError())
+
             axes = axes_check_and_normalize(axes)
             _normalize_data = _make_normalize_data(axes)
             # print(axes, img.shape)
@@ -353,3 +355,30 @@ def crop_images(slices):
             yield x[slices], y[slices], axes, (mask[slices] if mask is not None else None)
 
     return Transform('Crop images (%s)' % str(slices), _generator, 1)
+
+
+
+def broadcast_target(target_axes=None):
+    """Transformation to broadcast the target image to the shape of the source image.
+
+    Parameters
+    ----------
+    target_axes : str
+        Axes of the target image before broadcasting.
+        If `None`, assumed to be the same as for the source image.
+
+    Returns
+    -------
+    Transform
+        Returns a :class:`Transform` object whose `generator` will
+        perform broadcasting of `y` to match the shape of `x`.
+
+    """
+    def _generator(inputs):
+        for x, y, axes_x, mask in inputs:
+            if target_axes is not None:
+                axes_y = axes_check_and_normalize(target_axes,length=y.ndim)
+                y = move_image_axes(y, axes_y, axes_x, True)
+            yield x, np.broadcast_to(y,x.shape), axes_x, mask
+
+    return Transform('Broadcast target image to the shape of source', _generator, 1)
