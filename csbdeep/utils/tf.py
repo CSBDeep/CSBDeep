@@ -119,6 +119,27 @@ def export_SavedModel(model, outpath, meta={}, format='zip'):
 
 
 
+def tf_normalize(x, pmin=1, pmax=99.8, axis = None,clip = False):
+    assert pmin<pmax
+    mi = tf.contrib.distributions.percentile(x,pmin, axis = axis, keep_dims = True)
+    ma = tf.contrib.distributions.percentile(x,pmax, axis = axis, keep_dims = True)
+    y = (x-mi)/(ma-mi+K.epsilon())
+    if clip:
+        y = K.clip(y,0,1.0)
+    return y
+
+def tf_normalize_layer(layer, n_channels_out, n_dim_out):
+    if n_dim_out > 4:
+        out = Lambda(lambda x: tf_normalize(K.max(K.max(x, axis=1), axis=-1, keepdims=True),1,99.8,axis = (1,2,3), clip =True))(layer)
+    else:
+        if n_channels_out > 3:
+            out = Lambda(lambda x: tf_normalize(K.max(x, axis=-1, keepdims=True), clip = True))(layer)
+        elif n_channels_out ==2:
+            out = Lambda(lambda x: tf_normalize(K.concatenate([x,x[...,:1]],axis = -1), clip = True))(layer)       
+        else:
+            out = Lambda(lambda x: tf_normalize(x, axis = (1,2), clip = True))(layer)
+    return out
+
 
 class CARETensorBoard(Callback):
     """ TODO """
@@ -167,21 +188,11 @@ class CARETensorBoard(Callback):
         n_channels_in = self.model.input_shape[-1]
         n_dim_in = len(self.model.input_shape)
 
-        # FIXME: not fully baked, eg. n_dim==5 multichannel doesnt work
-
-        if n_dim_in > 4:
-            # print("tensorboard shape: %s"%str(self.model.input_shape))
-            input_layer = Lambda(lambda x: K.max(K.max(x, axis=1), axis=-1, keepdims=True))(self.model.input)
-        else:
-            if n_channels_in > 3:
-                input_layer = Lambda(lambda x: K.max(x, axis=-1, keepdims=True))(self.model.input)
-            elif n_channels_in == 2:
-                input_layer = Lambda(lambda x: K.concatenate([x,x[...,:1]], axis=-1))(self.model.input)
-            else:
-                input_layer = self.model.input
-
         n_channels_out = self.model.output_shape[-1]
         n_dim_out = len(self.model.output_shape)
+
+        # FIXME: not fully baked, eg. n_dim==5 multichannel doesnt work
+
 
         sep = n_channels_out
         if self.prob_out:
@@ -192,19 +203,15 @@ class CARETensorBoard(Callback):
             n_channels_out % 2 == 0 or _raise(ValueError())
             sep = sep // 2
 
-        if n_dim_out > 4:
-            output_layer = Lambda(lambda x: K.max(K.max(x[...,:sep], axis=1), axis=-1, keepdims=True))(self.model.output)
-        else:
-            if sep > 3:
-                output_layer = Lambda(lambda x: K.max(x[...,:sep], axis=-1, keepdims=True))(self.model.output)
-            elif sep == 2:
-                output_layer = Lambda(lambda x: K.concatenate([x[...,:sep],x[...,:1]], axis=-1))(self.model.output)
-            else:
-                output_layer = Lambda(lambda x: x[...,:sep])(self.model.output)
+        input_layer = tf_normalize_layer(self.model.input,
+                                           n_channels_in,
+                                           n_dim_in)
 
-        # normalize to (0,1) such that image display in tensorboard is best
-        output_layer = Lambda(lambda x: (x-K.min(x))/(K.max(x)-K.min(x)+K.epsilon()))(output_layer)
-        
+        output_layer = tf_normalize_layer(self.model.output[...,:sep],
+                                            n_channels_out,
+                                            n_dim_out)
+
+                         
         if self.prob_out:
             # scale images
             if n_dim_out > 4:
