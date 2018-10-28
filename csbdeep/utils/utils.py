@@ -189,6 +189,7 @@ def axes_check_and_normalize(axes,length=None,disallowed=None,return_allowed=Fal
     S(ample), T(ime), C(hannel), Z, Y, X
     """
     allowed = 'STCZYX'
+    axes is not None or _raise(ValueError('axis cannot be None.'))
     axes = str(axes).upper()
     consume(a in allowed or _raise(ValueError("invalid axis '%s', must be one of %s."%(a,list(allowed)))) for a in axes)
     disallowed is None or consume(a not in disallowed or _raise(ValueError("disallowed axis '%s'."%a)) for a in axes)

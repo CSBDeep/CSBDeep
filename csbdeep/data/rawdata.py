@@ -18,8 +18,8 @@ class RawData(namedtuple('RawData' ,('generator' ,'size' ,'description'))):
         where `x` is a source image (e.g., with low SNR) with `y` being the corresponding target image
         (e.g., with high SNR); `mask` can either be `None` or a boolean array that denotes which
         pixels are eligible to extracted in :func:`create_patches`. Note that `x`, `y`, and `mask`
-        must all be of type :class:`numpy.ndarray` with the same shape, where the string `axes`
-        indicates the order and presence of axes of all three arrays.
+        must all be of type :class:`numpy.ndarray` and are assumed to have the same shape, where the
+        string `axes` indicates the order and presence of axes of all three arrays.
     size : int
         Number of tuples that the `generator` will yield.
     description : str
@@ -41,7 +41,7 @@ class RawData(namedtuple('RawData' ,('generator' ,'size' ,'description'))):
         target_dir : str
             Folder name relative to `basepath` that contains the target images (e.g., with high SNR).
         axes : str
-            Semantics of axes of loaded images (must be same for all images).
+            Semantics of axes of loaded images (assumed to be the same for all images).
         pattern : str
             Glob-style pattern to match the desired TIFF images.
 
@@ -57,8 +57,6 @@ class RawData(namedtuple('RawData' ,('generator' ,'size' ,'description'))):
         ------
         FileNotFoundError
             If an image found in `target_dir` does not exist in all `source_dirs`.
-        ValueError
-            If corresponding images do not have the same size (raised by returned :func:`RawData.generator`).
 
         Example
         --------
@@ -81,23 +79,22 @@ class RawData(namedtuple('RawData' ,('generator' ,'size' ,'description'))):
 
         """
         p = Path(basepath)
-        image_names = [f.name for f in ( p /target_dir).glob(pattern)]
+        image_names = [f.name for f in (p/target_dir).glob(pattern)]
         len(image_names) > 0 or _raise(FileNotFoundError("'target_dir' doesn't exist or didn't find any images in it."))
         consume ((
-            ( p / s /n).exists() or _raise(FileNotFoundError( p / s /n))
+            (p/s/n).exists() or _raise(FileNotFoundError(p/s/n))
             for s in source_dirs for n in image_names
         ))
         axes = axes_check_and_normalize(axes)
-        xy_name_pairs = [( p / source_dir /n, p/ target_dir / n) for source_dir in source_dirs for n in image_names]
+        xy_name_pairs = [(p/source_dir/n, p/target_dir/n) for source_dir in source_dirs for n in image_names]
         n_images = len(xy_name_pairs)
         description = "{p}: target='{o}', sources={s}, axes='{a}', pattern='{pt}'".format(p=basepath, s=list(source_dirs),
-                                                                                        o=target_dir, a=axes, pt=pattern)
+                                                                                          o=target_dir, a=axes, pt=pattern)
 
         def _gen():
             for fx, fy in xy_name_pairs:
                 x, y = imread(str(fx)), imread(str(fy))
-                # x,y = x[:,256:-256,256:-256],y[:,256:-256,256:-256] #tmp
-                x.shape == y.shape or _raise(ValueError())
+                # x.shape == y.shape or _raise(ValueError())
                 len(axes) >= x.ndim or _raise(ValueError())
                 yield x, y, axes[-x.ndim:], None
 
@@ -106,11 +103,11 @@ class RawData(namedtuple('RawData' ,('generator' ,'size' ,'description'))):
 
 
     @staticmethod
-    def from_arrays(X ,Y, axes = "CZYX"):
+    def from_arrays(X, Y, axes='CZYX'):
         """Get pairs of corresponding images from numpy arrays."""
 
-        if X.shape != Y.shape:
-            raise ValueError("X and Y should be of same shape!")
+        # if X.shape != Y.shape:
+        #     raise ValueError("X and Y should be of same shape!")
 
         def _gen():
             for x, y in zip(X ,Y):
