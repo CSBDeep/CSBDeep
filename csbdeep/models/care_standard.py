@@ -166,7 +166,8 @@ class CARE(object):
 
         if self.config.train_checkpoint is not None:
             from keras.callbacks import ModelCheckpoint
-            self.callbacks.append(ModelCheckpoint(str(self.logdir / self.config.train_checkpoint), save_best_only=True, save_weights_only=True))
+            self.callbacks.append(ModelCheckpoint(str(self.logdir / self.config.train_checkpoint), save_best_only=True,  save_weights_only=True))
+            self.callbacks.append(ModelCheckpoint(str(self.logdir / 'weights_now.h5'),             save_best_only=False, save_weights_only=True))
 
         if self.config.train_tensorboard:
             from ..utils.tf import CARETensorBoard
@@ -243,6 +244,11 @@ class CARE(object):
 
         if self.config.train_checkpoint is not None:
             self.load_weights(self.config.train_checkpoint)
+            try:
+                # remove temporary weights
+                (self.logdir / 'weights_now.h5').unlink()
+            except FileNotFoundError:
+                pass
 
         return history
 
