@@ -243,7 +243,8 @@ class CARE(object):
         self.keras_model.save_weights(str(self.logdir / 'weights_last.h5'))
 
         if self.config.train_checkpoint is not None:
-            self.load_weights(self.config.train_checkpoint)
+            print()
+            self._find_and_load_weights(self.config.train_checkpoint)
             try:
                 # remove temporary weights
                 (self.logdir / 'weights_now.h5').unlink()
