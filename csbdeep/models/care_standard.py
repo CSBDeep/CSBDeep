@@ -5,6 +5,7 @@ import warnings
 
 import tensorflow as tf
 from six import string_types
+from functools import wraps
 
 from csbdeep.internals.probability import ProbabilisticPrediction
 from .config import Config
@@ -35,6 +36,7 @@ class CARE(object):
         Model name. Uses a timestamp if set to ``None`` (default).
     basedir : str
         Directory that contains (or will contain) a folder with the given model name.
+        Use ``None`` to disable saving (or loading) any data to (or from) disk (regardless of other parameters).
 
     Raises
     ------
@@ -68,20 +70,33 @@ class CARE(object):
             raise ValueError('Invalid configuration attributes: ' + ', '.join(invalid_attr))
 
         name is None or isinstance(name,string_types) or _raise(ValueError())
-        isinstance(basedir,(string_types,Path)) or _raise(ValueError())
+        basedir is None or isinstance(basedir,(string_types,Path)) or _raise(ValueError())
         self.config = config
-        self.basedir = Path(basedir)
-        self.name = name
+        self.name = name if name is not None else datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S.%f")
+        self.basedir = Path(basedir) if basedir is not None else None
         self._set_logdir()
         self._model_prepared = False
         self.keras_model = self._build()
         if config is None:
+            self.basedir is not None or _raise(ValueError())
             self._find_and_load_weights()
 
 
+    def suppress_without_basedir(warn):
+        def _suppress_without_basedir(f):
+            @wraps(f)
+            def wrapper(*args, **kwargs):
+                self = args[0]
+                if self.basedir is None:
+                    warn is False or _raise(UserWarning("Suppressing call of '%s' (due to basedir=None)." % f.__name__))
+                else:
+                    return f(*args, **kwargs)
+            return wrapper
+        return _suppress_without_basedir
+
+
+    @suppress_without_basedir(warn=False)
     def _set_logdir(self):
-        if self.name is None:
-            self.name = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S.%f")
         self.logdir = self.basedir / self.name
 
         config_file =  self.logdir / 'config.json'
@@ -101,6 +116,7 @@ class CARE(object):
             save_json(vars(self.config), str(config_file))
 
 
+    @suppress_without_basedir(warn=False)
     def _find_and_load_weights(self,prefer='best'):
         from itertools import chain
         # get all weight files and sort by modification time descending (newest first)
@@ -130,6 +146,7 @@ class CARE(object):
         )(self.config.unet_input_shape)
 
 
+    @suppress_without_basedir(warn=True)
     def load_weights(self, name='weights_best.h5'):
         """Load neural network weights from model folder.
 
@@ -164,14 +181,15 @@ class CARE(object):
             optimizer = Adam(lr=self.config.train_learning_rate)
         self.callbacks = train.prepare_model(self.keras_model, optimizer, self.config.train_loss, **kwargs)
 
-        if self.config.train_checkpoint is not None:
-            from keras.callbacks import ModelCheckpoint
-            self.callbacks.append(ModelCheckpoint(str(self.logdir / self.config.train_checkpoint), save_best_only=True,  save_weights_only=True))
-            self.callbacks.append(ModelCheckpoint(str(self.logdir / 'weights_now.h5'),             save_best_only=False, save_weights_only=True))
+        if self.basedir is not None:
+            if self.config.train_checkpoint is not None:
+                from keras.callbacks import ModelCheckpoint
+                self.callbacks.append(ModelCheckpoint(str(self.logdir / self.config.train_checkpoint), save_best_only=True,  save_weights_only=True))
+                self.callbacks.append(ModelCheckpoint(str(self.logdir / 'weights_now.h5'),             save_best_only=False, save_weights_only=True))
 
-        if self.config.train_tensorboard:
-            from ..utils.tf import CARETensorBoard
-            self.callbacks.append(CARETensorBoard(log_dir=str(self.logdir), prefix_with_timestamp=False, n_images=3, write_images=True, prob_out=self.config.probabilistic))
+            if self.config.train_tensorboard:
+                from ..utils.tf import CARETensorBoard
+                self.callbacks.append(CARETensorBoard(log_dir=str(self.logdir), prefix_with_timestamp=False, n_images=3, write_images=True, prob_out=self.config.probabilistic))
 
         if self.config.train_reduce_lr is not None:
             from keras.callbacks import ReduceLROnPlateau
@@ -240,20 +258,22 @@ class CARE(object):
                                                  epochs=epochs, steps_per_epoch=steps_per_epoch,
                                                  callbacks=self.callbacks, verbose=1)
 
-        self.keras_model.save_weights(str(self.logdir / 'weights_last.h5'))
+        if self.basedir is not None:
+            self.keras_model.save_weights(str(self.logdir / 'weights_last.h5'))
 
-        if self.config.train_checkpoint is not None:
-            print()
-            self._find_and_load_weights(self.config.train_checkpoint)
-            try:
-                # remove temporary weights
-                (self.logdir / 'weights_now.h5').unlink()
-            except FileNotFoundError:
-                pass
+            if self.config.train_checkpoint is not None:
+                print()
+                self._find_and_load_weights(self.config.train_checkpoint)
+                try:
+                    # remove temporary weights
+                    (self.logdir / 'weights_now.h5').unlink()
+                except FileNotFoundError:
+                    pass
 
         return history
 
 
+    @suppress_without_basedir(warn=True)
     def export_TF(self):
         """Export neural network via :func:`csbdeep.utils.tf.export_SavedModel`."""
         fout = self.logdir / 'TF_SavedModel.zip'
