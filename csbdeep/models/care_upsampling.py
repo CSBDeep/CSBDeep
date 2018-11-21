@@ -15,7 +15,7 @@ class UpsamplingCARE(CARE):
     (:func:`predict`, :func:`predict_probabilistic`) to first upsample Z before image restoration.
     """
 
-    def predict(self, img, axes, factor, normalizer=PercentileNormalizer(), resizer=PadAndCropResizer(), n_tiles=1):
+    def predict(self, img, axes, factor, normalizer=PercentileNormalizer(), resizer=PadAndCropResizer(), n_tiles=None):
         """Apply neural network to raw image with low-resolution Z axis.
 
         See :func:`CARE.predict` for documentation.
@@ -31,7 +31,7 @@ class UpsamplingCARE(CARE):
         return super(UpsamplingCARE, self).predict(img, axes, normalizer, resizer, n_tiles)
 
 
-    def predict_probabilistic(self, img, axes, factor, normalizer=PercentileNormalizer(), resizer=PadAndCropResizer(), n_tiles=1):
+    def predict_probabilistic(self, img, axes, factor, normalizer=PercentileNormalizer(), resizer=PadAndCropResizer(), n_tiles=None):
         """Apply neural network to raw image with low-resolution Z axis for probabilistic prediction.
 
         See :func:`CARE.predict_probabilistic` for documentation.

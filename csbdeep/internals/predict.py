@@ -1,7 +1,7 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
 from six.moves import range, zip, map, reduce, filter
 
-
+from tqdm import tqdm
 from ..utils import _raise, consume, move_channel_for_backend, backend_channels_last
 import warnings
 import numpy as np
@@ -36,12 +36,22 @@ def predict_direct(keras_model,x,channel_in=None,channel_out=0,single_sample=Tru
 
 
 
-def predict_tiled(keras_model,x,n_tiles,block_size,tile_overlap,channel_in=None,channel_out=0,**kwargs):
+def predict_tiled(keras_model,x,n_tiles,block_size,tile_overlap,channel_in=None,channel_out=0,pbar=None,**kwargs):
     """TODO."""
+
+    if all(t==1 for t in n_tiles):
+        pred = predict_direct(keras_model,x,channel_in=channel_in,channel_out=channel_out,**kwargs)
+        if pbar is not None:
+            pbar.update()
+        return pred
 
     # TODO: better check, write an axis normalization function that converts negative indices to positive ones
     channel_in  = (channel_in  + x.ndim) % x.ndim
     channel_out = (channel_out + x.ndim) % x.ndim
+
+    assert x.ndim == len(n_tiles)
+    assert n_tiles[channel_in] == 1
+    assert all(np.isscalar(t) and 1<=t and int(t)==t for t in n_tiles)
 
     def _remove_and_insert(x,a):
         # remove element at channel_in and insert a at channel_out
@@ -51,27 +61,26 @@ def predict_tiled(keras_model,x,n_tiles,block_size,tile_overlap,channel_in=None,
         lst.insert(channel_out,a)
         return tuple(lst)
 
-    # largest axis (that is not channel_in)
-    axis = [i for i in np.argsort(x.shape) if i != channel_in][-1]
+    # first axis > 1
+    axis = next(i for i,t in enumerate(n_tiles) if t>1)
 
-    if isinstance(n_tiles,(list,tuple)):
-        0 < len(n_tiles) <= x.ndim-(0 if channel_in is None else 1) or _raise(ValueError())
-        n_tiles, n_tiles_remaining = n_tiles[0], n_tiles[1:]
-    else:
-        n_tiles_remaining = []
+    n_block_overlap = int(np.ceil(1.*tile_overlap / block_size))
 
-    n_block_overlap = int(np.ceil(tile_overlap / block_size))
-    # n_block_overlap += -1
-    # n_block_overlap = 10
-    # print(tile_overlap,n_block_overlap)
+    n_tiles_remaining = list(n_tiles)
+    n_tiles_remaining[axis] = 1
 
     dst = None
-    for tile, s_src, s_dst in tile_iterator(x,axis=axis,n_tiles=n_tiles,block_size=block_size,n_block_overlap=n_block_overlap):
+    for tile, s_src, s_dst in tile_iterator(x,axis=axis,n_tiles=n_tiles[axis],block_size=block_size,n_block_overlap=n_block_overlap):
 
-        if len(n_tiles_remaining) == 0:
-            pred = predict_direct(keras_model,tile,channel_in=channel_in,channel_out=channel_out,**kwargs)
-        else:
-            pred = predict_tiled(keras_model,tile,n_tiles_remaining,block_size,tile_overlap,channel_in=channel_in,channel_out=channel_out,**kwargs)
+        pred = predict_tiled(keras_model,tile,n_tiles_remaining,block_size,tile_overlap,channel_in=channel_in,channel_out=channel_out,pbar=pbar,**kwargs)
+
+        # if any(t>1 for t in n_tiles_remaining):
+        #     pred = predict_tiled(keras_model,tile,n_tiles_remaining,block_size,tile_overlap,channel_in=channel_in,channel_out=channel_out,pbar=pbar,**kwargs)
+        # else:
+        #     # tmp
+        #     pred = tile
+        #     if pbar is not None:
+        #         pbar.update()
 
         if dst is None:
             dst_shape = _remove_and_insert(x.shape, pred.shape[channel_out])
@@ -172,4 +181,21 @@ def tile_overlap(n_depth, kern_size):
         return rf[n_depth, kern_size]
     except KeyError:
         raise ValueError('tile_overlap value for n_depth=%d and kern_size=%d not available.' % (n_depth, kern_size))
+
+
+
+class Progress(object):
+    def __init__(self, total, thr=1):
+        self.total = total
+        self.thr = thr
+        self.pbar = None
+    def update(self):
+        if self.total > self.thr:
+            if self.pbar is None:
+                self.pbar = tqdm(total=self.total)
+            self.pbar.update()
+            self.pbar.refresh()
+    def close(self):
+        if self.pbar is not None:
+            self.pbar.close()
 

@@ -3,6 +3,7 @@ from __future__ import print_function, unicode_literals, absolute_import, divisi
 import datetime
 import warnings
 
+import numpy as np
 import tensorflow as tf
 from six import string_types
 from functools import wraps
@@ -15,7 +16,7 @@ from ..utils.tf import export_SavedModel
 from ..version import __version__ as package_version
 from ..data import Normalizer, NoNormalizer, PercentileNormalizer
 from ..data import Resizer, NoResizer, PadAndCropResizer
-from ..internals.predict import predict_direct, predict_tiled, tile_overlap
+from ..internals.predict import predict_tiled, tile_overlap, Progress
 from ..internals import nets, train
 
 
@@ -289,7 +290,7 @@ class CARE(object):
         print("\nModel exported in TensorFlow's SavedModel format:\n%s" % str(fout.resolve()))
 
 
-    def predict(self, img, axes, normalizer=PercentileNormalizer(), resizer=PadAndCropResizer(), n_tiles=1):
+    def predict(self, img, axes, normalizer=PercentileNormalizer(), resizer=PadAndCropResizer(), n_tiles=None):
         """Apply neural network to raw image to predict restored image.
 
         Parameters
@@ -303,12 +304,14 @@ class CARE(object):
         resizer : :class:`csbdeep.data.Resizer` or None
             If necessary, input image is resized to enable neural network prediction and result is (possibly)
             resized to yield original image size.
-        n_tiles : int
+        n_tiles : iterable or None
             Out of memory (OOM) errors can occur if the input image is too large.
             To avoid this problem, the input image is broken up into (overlapping) tiles
             that can then be processed independently and re-assembled to yield the restored image.
-            This parameter denotes the number of tiles. Note that if the number of tiles is too low,
-            it is adaptively increased until OOM errors are avoided, albeit at the expense of runtime.
+            This parameter denotes a tuple of the number of tiles for every image axis.
+            Note that if the number of tiles is too low, it is adaptively increased until
+            OOM errors are avoided, albeit at the expense of runtime.
+            A value of ``None`` denotes that no tiling should initially be used.
 
         Returns
         -------
@@ -322,7 +325,7 @@ class CARE(object):
         return self._predict_mean_and_scale(img, axes, normalizer, resizer, n_tiles)[0]
 
 
-    def predict_probabilistic(self, img, axes, normalizer=PercentileNormalizer(), resizer=PadAndCropResizer(), n_tiles=1):
+    def predict_probabilistic(self, img, axes, normalizer=PercentileNormalizer(), resizer=PadAndCropResizer(), n_tiles=None):
         """Apply neural network to raw image to predict probability distribution for restored image.
 
         See :func:`predict` for parameter explanations.
@@ -343,7 +346,7 @@ class CARE(object):
         return ProbabilisticPrediction(mean, scale)
 
 
-    def _predict_mean_and_scale(self, img, axes, normalizer, resizer, n_tiles=1):
+    def _predict_mean_and_scale(self, img, axes, normalizer, resizer, n_tiles=None):
         """Apply neural network to raw image to predict restored image.
 
         See :func:`predict` for parameter explanations.
@@ -364,6 +367,27 @@ class CARE(object):
 
         self.config.n_channel_in == x.shape[channel] or _raise(ValueError())
 
+        if n_tiles is None:
+            n_tiles = [1]*img.ndim
+        try:
+            n_tiles = tuple(n_tiles)
+            img.ndim == len(n_tiles) or _raise(TypeError())
+        except TypeError:
+            raise ValueError("'n_tiles' must be an iterable of length %d" % img.ndim)
+
+        all(np.isscalar(t) and 1<=t and int(t)==t for t in n_tiles) or _raise(
+            ValueError("all values of 'n_tiles' must be integer values >= 1"))
+        n_tiles = tuple(map(int,n_tiles))
+        # assume that provided n_tiles refers to axes of raw input image
+        # hacky: move tiling axis around in the same way as the image was permuted
+        n_tiles = _permute_axes(np.empty(n_tiles)).shape
+        n_tiles[channel] == 1 or _raise(ValueError("entry of 'n_tiles' for channel axis must be 1"))
+        n_tiles_limited = self._limit_tiling(x.shape,n_tiles)
+        if any(np.array(n_tiles) != np.array(n_tiles_limited)):
+            print("Limiting n_tiles to %s" % str(_permute_axes(np.empty(n_tiles_limited),undo=True).shape))
+        n_tiles = n_tiles_limited
+        overlap = tile_overlap(self.config.unet_n_depth, self.config.unet_kern_size)
+
         # normalize
         x = normalizer.before(x,self.config.axes)
         # resize: make divisible by power of 2 to allow downsampling steps in unet
@@ -371,18 +395,23 @@ class CARE(object):
         x = resizer.before(x,div_n,exclude=channel)
 
         done = False
+        progress = Progress(np.prod(n_tiles),1)
         while not done:
             try:
-                if n_tiles == 1:
-                    x = predict_direct(self.keras_model,x,channel_in=channel,channel_out=channel)
-                else:
-                    overlap = tile_overlap(self.config.unet_n_depth, self.config.unet_kern_size)
-                    x = predict_tiled(self.keras_model,x,channel_in=channel,channel_out=channel,
-                                      n_tiles=n_tiles,block_size=div_n,tile_overlap=overlap)
+                # raise tf.errors.ResourceExhaustedError(None,None,None) # tmp
+                x = predict_tiled(self.keras_model,x,channel_in=channel,channel_out=channel,
+                                  n_tiles=n_tiles,block_size=div_n,tile_overlap=overlap,pbar=progress)
                 done = True
+                progress.close()
             except tf.errors.ResourceExhaustedError:
-                n_tiles = max(4, 2*n_tiles)
-                print('Out of memory, retrying with n_tiles = %d' % n_tiles)
+                n_tiles_prev = list(n_tiles) # make a copy
+                tile_sizes_approx = np.array(x.shape) / np.array(n_tiles)
+                n_tiles[np.argmax(tile_sizes_approx)] *= 2
+                n_tiles = self._limit_tiling(x.shape,n_tiles)
+                if all(np.array(n_tiles) == np.array(n_tiles_prev)):
+                    raise MemoryError("Tile limit exceeded. Memory occupied by another process (notebook)?")
+                print('Out of memory, retrying with n_tiles = %s' % str(_permute_axes(np.empty(n_tiles),undo=True).shape))
+                progress.total = np.prod(n_tiles)
 
         n_channel_predicted = self.config.n_channel_out * (2 if self.config.probabilistic else 1)
         x.shape[channel] == n_channel_predicted or _raise(ValueError())
@@ -450,3 +479,9 @@ class CARE(object):
                               'number of input and output channels differ.')
 
         return normalizer, resizer
+
+    def _limit_tiling(self,img_shape,n_tiles):
+        img_shape, n_tiles = np.array(img_shape), np.array(n_tiles)
+        overlap = tile_overlap(self.config.unet_n_depth, self.config.unet_kern_size)
+        n_tiles_limit = np.ceil(img_shape / overlap) # reasonable but somewhat arbitrary choice
+        return [int(t) for t in np.minimum(n_tiles,n_tiles_limit)]
