@@ -491,6 +491,6 @@ class CARE(object):
 
     def _limit_tiling(self,img_shape,n_tiles):
         img_shape, n_tiles = np.array(img_shape), np.array(n_tiles)
-        overlap = tile_overlap(self.config.unet_n_depth, self.config.unet_kern_size)
-        n_tiles_limit = np.ceil(img_shape / overlap) # reasonable but somewhat arbitrary choice
+        block_size = 2 ** self.config.unet_n_depth
+        n_tiles_limit = np.ceil(img_shape / block_size) # each tile must be at least one block in size
         return [int(t) for t in np.minimum(n_tiles,n_tiles_limit)]

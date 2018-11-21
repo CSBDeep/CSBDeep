@@ -222,7 +222,7 @@ def test_model_predict_tiled():
             def _predict(imdims,axes,n_tiles):
                 img = rng.uniform(size=imdims)
                 # print(img.shape, axes)
-                mean,       scale       = model._predict_mean_and_scale(img, axes, normalizer, resizer, n_tiles=1)
+                mean,       scale       = model._predict_mean_and_scale(img, axes, normalizer, resizer, n_tiles=None)
                 mean_tiled, scale_tiled = model._predict_mean_and_scale(img, axes, normalizer, resizer, n_tiles=n_tiles)
                 assert mean.shape == mean_tiled.shape
                 if config.probabilistic:
@@ -238,31 +238,31 @@ def test_model_predict_tiled():
             div_n = 2**config.unet_n_depth
             imdims = [(d//div_n)*div_n for d in imdims]
 
-            n_blocks = np.max(imdims) // div_n
-            def _predict_wrapped(imdims,axes,n_tiles):
-                if 0 < n_tiles <= n_blocks:
-                    _predict(imdims,axes,n_tiles=n_tiles)
-                else:
-                    with pytest.warns(UserWarning):
-                        _predict(imdims,axes,n_tiles=n_tiles)
-
             imdims.insert(0,config.n_channel_in)
-            axes = config.axes.replace('C','')
-            # return _predict(imdims,'C'+axes,n_tiles=(3,4))
+            axes = 'C'+config.axes.replace('C','')
 
-            # tile one dimension
-            for n_tiles in (0,2,3,6,n_blocks+1):
+            for n_tiles in (
+                -1, 1.2,
+                [1]+[1.2]*config.n_dim,
+                [1]*config.n_dim, # missing value for channel axis
+                [2]+[1]*config.n_dim, # >1 tiles for channel axis
+            ):
+                with pytest.raises(ValueError):
+                    _predict(imdims,axes,n_tiles)
+
+            for n_tiles in [list(rng.randint(1,5,size=config.n_dim)) for _ in range(5)]:
+                # print(imdims,axes,[1]+n_tiles)
                 if config.n_channel_in == 1:
-                    _predict_wrapped(imdims[1:],axes,n_tiles)
-                _predict_wrapped(imdims,'C'+axes,n_tiles)
+                    _predict(imdims[1:],axes[1:],n_tiles)
+                _predict(imdims,axes,[1]+n_tiles)
 
-            # tile two dimensions
-            for n_tiles in product((2,4),(3,5)):
-                _predict(imdims,'C'+axes,n_tiles)
-
-            # tile three dimensions
-            if config.n_dim == 3:
-                _predict(imdims,'C'+axes,(2,3,4))
+            # legacy api: tile only largest dimension
+            n_blocks = np.max(imdims) // div_n
+            for n_tiles in (2,5,n_blocks+1):
+                with pytest.warns(UserWarning):
+                    if config.n_channel_in == 1:
+                        _predict(imdims[1:],axes[1:],n_tiles)
+                    _predict(imdims,axes,n_tiles)
 
 
 def test_tile_overlap():
