@@ -89,7 +89,7 @@ class CARE(object):
             def wrapper(*args, **kwargs):
                 self = args[0]
                 if self.basedir is None:
-                    warn is False or _raise(UserWarning("Suppressing call of '%s' (due to basedir=None)." % f.__name__))
+                    warn is False or warnings.warn("Suppressing call of '%s' (due to basedir=None)." % f.__name__)
                 else:
                     return f(*args, **kwargs)
             return wrapper
