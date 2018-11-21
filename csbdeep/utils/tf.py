@@ -119,25 +119,27 @@ def export_SavedModel(model, outpath, meta={}, format='zip'):
 
 
 
-def tf_normalize(x, pmin=1, pmax=99.8, axis = None,clip = False):
-    assert pmin<pmax
-    mi = tf.contrib.distributions.percentile(x,pmin, axis = axis, keep_dims = True)
-    ma = tf.contrib.distributions.percentile(x,pmax, axis = axis, keep_dims = True)
+def tf_normalize(x, pmin=1, pmax=99.8, axis=None, clip=False):
+    assert pmin < pmax
+    mi = tf.contrib.distributions.percentile(x,pmin, axis=axis, keep_dims=True)
+    ma = tf.contrib.distributions.percentile(x,pmax, axis=axis, keep_dims=True)
     y = (x-mi)/(ma-mi+K.epsilon())
     if clip:
         y = K.clip(y,0,1.0)
     return y
 
-def tf_normalize_layer(layer, n_channels_out, n_dim_out):
+def tf_normalize_layer(layer, n_channels_out, n_dim_out, pmin=1, pmax=99.8, clip=True):
+    def norm(x,axis=None):
+        return tf_normalize(x, pmin=pmin, pmax=pmax, axis=axis, clip=clip)
     if n_dim_out > 4:
-        out = Lambda(lambda x: tf_normalize(K.max(K.max(x, axis=1), axis=-1, keepdims=True),1,99.8,axis = (1,2,3), clip =True))(layer)
+        out = Lambda(lambda x: norm(K.max(K.max(x, axis=1), axis=-1, keepdims=True), axis=(1,2,3)))(layer)
     else:
         if n_channels_out > 3:
-            out = Lambda(lambda x: tf_normalize(K.max(x, axis=-1, keepdims=True), clip = True))(layer)
+            out = Lambda(lambda x: norm(K.max(x, axis=-1, keepdims=True)))(layer)
         elif n_channels_out ==2:
-            out = Lambda(lambda x: tf_normalize(K.concatenate([x,x[...,:1]],axis = -1), clip = True))(layer)       
+            out = Lambda(lambda x: norm(K.concatenate([x,x[...,:1]], axis=-1)))(layer)
         else:
-            out = Lambda(lambda x: tf_normalize(x, axis = (1,2), clip = True))(layer)
+            out = Lambda(lambda x: norm(x, axis=(1,2)))(layer)
     return out
 
 
@@ -203,26 +205,10 @@ class CARETensorBoard(Callback):
             n_channels_out % 2 == 0 or _raise(ValueError())
             sep = sep // 2
 
-        input_layer = tf_normalize_layer(self.model.input,
-                                           n_channels_in,
-                                           n_dim_in)
-
-        output_layer = tf_normalize_layer(self.model.output[...,:sep],
-                                            n_channels_out,
-                                            n_dim_out)
-
-                         
+        input_layer = tf_normalize_layer(self.model.input, n_channels_in, n_dim_in)
+        output_layer = tf_normalize_layer(self.model.output[...,:sep], sep, n_dim_out)
         if self.prob_out:
-            # scale images
-            if n_dim_out > 4:
-                scale_layer = Lambda(lambda x: K.max(K.max(x[...,sep:], axis=1), axis=-1, keepdims=True))(self.model.output)
-            else:
-                if sep > 3:
-                    scale_layer = Lambda(lambda x: K.max(x[...,sep:], axis=-1, keepdims=True))(self.model.output)
-                elif sep == 2:
-                    scale_layer = Lambda(lambda x: K.concatenate([x[...,sep:],x[...,-1:]], axis=-1))(self.model.output)
-                else:
-                    scale_layer = Lambda(lambda x: x[...,sep:])(self.model.output)
+            scale_layer = tf_normalize_layer(self.model.output[...,sep:], sep, n_dim_out, pmin=0, pmax=100)
 
         tf_sums.append(tf.summary.image('input', input_layer, max_outputs=self.n_images))
         if self.prob_out:
