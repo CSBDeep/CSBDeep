@@ -33,7 +33,7 @@ def parse_args():
     data.add_argument('--norm-pmin',          metavar='', type=float,    required=False,                         default=2,                                                help="'pmin' for PercentileNormalizer")
     data.add_argument('--norm-pmax',          metavar='', type=float,    required=False,                         default=99.8,                                             help="'pmax' for PercentileNormalizer")
     data.add_argument('--norm-undo',          metavar='', type=str2bool, required=False,  const=True, nargs='?', default=True,                                             help="'do_after' for PercentileNormalizer")
-    data.add_argument('--n-tiles',            metavar='', type=int,      required=False,                         default=1,                                                help="number of tiles for prediction")
+    data.add_argument('--n-tiles',            metavar='', type=int,      required=False,              nargs='+', default=None,                                             help="number of tiles for prediction")
 
     model = parser.add_argument_group("model")
     model.add_argument('--model-basedir',     metavar='', type=str,      required=False,                         default=None,                                             help="path to folder that contains CARE model")
@@ -128,7 +128,10 @@ def main():
 
         # load and predict restored image
         img = imread(str(file_in))
-        restored = model.predict(img, axes=args.input_axes, normalizer=normalizer, n_tiles=args.n_tiles)
+        n_tiles = args.n_tiles
+        if n_tiles is not None and len(n_tiles)==1:
+            n_tiles = n_tiles[0]
+        restored = model.predict(img, axes=args.input_axes, normalizer=normalizer, n_tiles=n_tiles)
 
         # restored image could be multi-channel even if input image is not
         axes_out = axes_check_and_normalize(args.input_axes)
