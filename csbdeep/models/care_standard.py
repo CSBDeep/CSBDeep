@@ -361,11 +361,22 @@ class CARE(object):
         normalizer, resizer = self._check_normalizer_resizer(normalizer, resizer)
         axes = axes_check_and_normalize(axes,img.ndim)
         _permute_axes = self._make_permute_axes(axes, self.config.axes)
+        def _permute_n_tiles(n,undo=False):
+            # hack: move tiling axis around in the same way as the image was permuted by creating an array
+            return _permute_axes(np.empty(n,np.bool),undo=undo).shape
 
         x = _permute_axes(img)
         channel = axes_dict(self.config.axes)['C']
 
         self.config.n_channel_in == x.shape[channel] or _raise(ValueError())
+
+        # to support old api: set scalar n_tiles value for the largest tiling axis
+        if np.isscalar(n_tiles) and int(n_tiles)==n_tiles and 1<=n_tiles:
+            largest_tiling_axis = [i for i in np.argsort(x.shape) if i != channel][-1]
+            _n_tiles = [n_tiles if i==largest_tiling_axis else 1 for i in range(x.ndim)]
+            n_tiles = _permute_n_tiles(_n_tiles,undo=True)
+            warnings.warn("n_tiles should be a tuple with an entry for each image axis")
+            print("Changing n_tiles to %s" % str(n_tiles))
 
         if n_tiles is None:
             n_tiles = [1]*img.ndim
@@ -373,18 +384,16 @@ class CARE(object):
             n_tiles = tuple(n_tiles)
             img.ndim == len(n_tiles) or _raise(TypeError())
         except TypeError:
-            raise ValueError("'n_tiles' must be an iterable of length %d" % img.ndim)
+            raise ValueError("n_tiles must be an iterable of length %d" % img.ndim)
 
         all(np.isscalar(t) and 1<=t and int(t)==t for t in n_tiles) or _raise(
-            ValueError("all values of 'n_tiles' must be integer values >= 1"))
+            ValueError("all values of n_tiles must be integer values >= 1"))
         n_tiles = tuple(map(int,n_tiles))
-        # assume that provided n_tiles refers to axes of raw input image
-        # hacky: move tiling axis around in the same way as the image was permuted
-        n_tiles = _permute_axes(np.empty(n_tiles)).shape
-        n_tiles[channel] == 1 or _raise(ValueError("entry of 'n_tiles' for channel axis must be 1"))
+        n_tiles = _permute_n_tiles(n_tiles)
+        n_tiles[channel] == 1 or _raise(ValueError("entry of n_tiles for channel axis must be 1"))
         n_tiles_limited = self._limit_tiling(x.shape,n_tiles)
         if any(np.array(n_tiles) != np.array(n_tiles_limited)):
-            print("Limiting n_tiles to %s" % str(_permute_axes(np.empty(n_tiles_limited),undo=True).shape))
+            print("Limiting n_tiles to %s" % str(_permute_n_tiles(n_tiles_limited,undo=True)))
         n_tiles = n_tiles_limited
         overlap = tile_overlap(self.config.unet_n_depth, self.config.unet_kern_size)
 
@@ -410,7 +419,7 @@ class CARE(object):
                 n_tiles = self._limit_tiling(x.shape,n_tiles)
                 if all(np.array(n_tiles) == np.array(n_tiles_prev)):
                     raise MemoryError("Tile limit exceeded. Memory occupied by another process (notebook)?")
-                print('Out of memory, retrying with n_tiles = %s' % str(_permute_axes(np.empty(n_tiles),undo=True).shape))
+                print('Out of memory, retrying with n_tiles = %s' % str(_permute_n_tiles(n_tiles,undo=True)))
                 progress.total = np.prod(n_tiles)
 
         n_channel_predicted = self.config.n_channel_out * (2 if self.config.probabilistic else 1)
