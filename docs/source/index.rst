@@ -36,4 +36,4 @@ Table of contents
    prediction
 
 
-**Last updated:** |today|
+.. **Last updated:** |today|
