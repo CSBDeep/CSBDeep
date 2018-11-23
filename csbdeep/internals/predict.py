@@ -186,9 +186,16 @@ def tile_overlap(n_depth, kern_size):
 
 class Progress(object):
     def __init__(self, total, thr=1):
+        self.pbar = None
         self.total = total
         self.thr = thr
-        self.pbar = None
+    @property
+    def total(self):
+        return self._total
+    @total.setter
+    def total(self, total):
+        self.close()
+        self._total = total
     def update(self):
         if self.total > self.thr:
             if self.pbar is None:
@@ -198,4 +205,4 @@ class Progress(object):
     def close(self):
         if self.pbar is not None:
             self.pbar.close()
-
+        self.pbar = None

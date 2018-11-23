@@ -124,7 +124,7 @@ class Config(argparse.Namespace):
         self.train_batch_size      = 16
         self.train_tensorboard     = True
         self.train_checkpoint      = 'weights_best.h5'
-        self.train_reduce_lr       = {'factor': 0.5, 'patience': 10}
+        self.train_reduce_lr       = {'factor': 0.5, 'patience': 10, 'min_delta': 0}
 
         # disallow setting 'n_dim' manually
         try:
