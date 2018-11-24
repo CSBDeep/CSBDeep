@@ -111,10 +111,14 @@ def main():
         model.load_weights(args.model_weights)
     normalizer = PercentileNormalizer(pmin=args.norm_pmin, pmax=args.norm_pmax, do_after=args.norm_undo)
 
+    n_tiles = args.n_tiles
+    if n_tiles is not None and len(n_tiles)==1:
+        n_tiles = n_tiles[0]
+
     processed = []
 
     # process all files
-    for file_in in tqdm(file_list, disable=args.quiet):
+    for file_in in tqdm(file_list, disable=args.quiet or (n_tiles is not None and np.prod(n_tiles)>1)):
         # construct output file name
         file_out = Path(args.output_dir) / args.output_name.format (
             file_path = str(file_in.relative_to(args.input_dir).parent),
@@ -128,9 +132,6 @@ def main():
 
         # load and predict restored image
         img = imread(str(file_in))
-        n_tiles = args.n_tiles
-        if n_tiles is not None and len(n_tiles)==1:
-            n_tiles = n_tiles[0]
         restored = model.predict(img, axes=args.input_axes, normalizer=normalizer, n_tiles=n_tiles)
 
         # restored image could be multi-channel even if input image is not
