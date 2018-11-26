@@ -444,9 +444,9 @@ class CARE(object):
             assert x.shape[axis] == 2*_n
             slices = [slice(None) for _ in x.shape]
             slices[axis] = slice(None,_n)
-            mean = x[slices]
+            mean = x[tuple(slices)]
             slices[axis] = slice(_n,None)
-            scale = x[slices]
+            scale = x[tuple(slices)]
         else:
             mean, scale = x, None
         return mean, scale
