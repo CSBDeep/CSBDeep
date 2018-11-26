@@ -369,7 +369,7 @@ def create_patches_reduced_target(
         n_patches_per_image,
         reduction_axes,
         target_axes = None, # TODO: this should rather be part of RawData and also exposed to transforms
-        **kwargs,
+        **kwargs
     ):
     """Create normalized training data to be used for neural network training.
 
