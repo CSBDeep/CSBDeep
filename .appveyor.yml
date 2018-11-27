@@ -1,0 +1,27 @@
+branches:
+  only:
+    - master
+
+environment:
+  matrix:
+    - PYTHON: "C:\\Python35-x64"
+      PYTHON_VERSION: "3.5.x"
+      PYTHON_ARCH: "64"
+    - PYTHON: "C:\\Python36-x64"
+      PYTHON_VERSION: "3.6.x"
+      PYTHON_ARCH: "64"
+
+init:
+  - echo %PYTHON% %PYTHON_VERSION% %PYTHON_ARCH%
+
+install:
+  - set PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%
+  - "python --version"
+  - "python -m pip install -U pip"
+  - "pip install tensorflow pytest"
+  - "pip install ."
+
+build: none
+
+test_script:
+  - "pytest -v --durations=50"
