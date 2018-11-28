@@ -4,7 +4,8 @@ from six.moves import zip
 from tifffile import imread
 from collections import namedtuple
 
-from ..utils import Path, _raise, consume, axes_check_and_normalize
+from ..utils import _raise, consume, axes_check_and_normalize
+from ..utils.six import Path, FileNotFoundError
 
 
 

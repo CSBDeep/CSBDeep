@@ -7,7 +7,8 @@ import numpy as np
 from tifffile import imsave
 import warnings
 
-from ..utils import _raise, Path, axes_check_and_normalize, axes_dict, move_image_axes, move_channel_for_backend, backend_channels_last
+from ..utils import _raise, axes_check_and_normalize, axes_dict, move_image_axes, move_channel_for_backend, backend_channels_last
+from ..utils.six import Path
 
 
 

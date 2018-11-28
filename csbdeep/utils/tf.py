@@ -13,7 +13,8 @@ from keras import backend as K
 from keras.callbacks import Callback
 from keras.layers import Lambda
 
-from .utils import _raise, is_tf_backend, save_json, tempfile, backend_channels_last
+from .utils import _raise, is_tf_backend, save_json, backend_channels_last
+from .six import tempfile
 
 
 
