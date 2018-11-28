@@ -91,10 +91,22 @@ def test_config():
     # train_steps_per_epoch = [400],
     # train_tensorboard     = [True],
 ))
-def test_model_build(tmpdir,config):
+def test_model_build_and_export(tmpdir,config):
     K.clear_session()
     def _build():
-        CARE(config,basedir=str(tmpdir))
+        with pytest.raises(FileNotFoundError):
+            CARE(None,basedir=str(tmpdir))
+
+        CARE(config,name='model',basedir=None)
+        with pytest.raises(ValueError):
+            CARE(None,basedir=None)
+
+        CARE(config,basedir=str(tmpdir)).export_TF()
+
+        with pytest.warns(UserWarning):
+            CARE(config,name='model',basedir=str(tmpdir))
+            CARE(config,name='model',basedir=str(tmpdir))
+            CARE(None,name='model',basedir=str(tmpdir))
     if config.is_valid():
         _build()
     else:
