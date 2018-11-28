@@ -5,19 +5,7 @@ import numpy as np
 import json
 import collections
 from six.moves import range, zip, map, reduce, filter
-
-try:
-    from pathlib import Path
-    Path().expanduser()
-except (ImportError,AttributeError):
-    from pathlib2 import Path
-
-try:
-    import tempfile
-    tempfile.TemporaryDirectory
-except (ImportError,AttributeError):
-    from backports import tempfile
-
+from .six import Path
 
 ###
 

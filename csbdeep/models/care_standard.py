@@ -11,7 +11,8 @@ from functools import wraps
 from csbdeep.internals.probability import ProbabilisticPrediction
 from .config import Config
 
-from ..utils import _raise, Path, load_json, save_json, axes_check_and_normalize, axes_dict, move_image_axes
+from ..utils import _raise, load_json, save_json, axes_check_and_normalize, axes_dict, move_image_axes
+from ..utils.six import Path, FileNotFoundError
 from ..utils.tf import export_SavedModel
 from ..version import __version__ as package_version
 from ..data import Normalizer, NoNormalizer, PercentileNormalizer

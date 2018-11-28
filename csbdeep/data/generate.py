@@ -7,7 +7,8 @@ import numpy as np
 import sys, os, warnings
 
 from tqdm import tqdm
-from ..utils import _raise, Path, consume, compose, normalize_mi_ma, axes_dict, axes_check_and_normalize
+from ..utils import _raise, consume, compose, normalize_mi_ma, axes_dict, axes_check_and_normalize
+from ..utils.six import Path
 from ..io import save_training_data
 
 from .transform import Transform, permute_axes, broadcast_target
