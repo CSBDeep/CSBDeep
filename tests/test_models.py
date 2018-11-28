@@ -13,6 +13,7 @@ from keras import backend as K
 from csbdeep.internals.nets import receptive_field_unet
 from csbdeep.models import Config, CARE
 from csbdeep.utils import axes_dict
+from csbdeep.utils.six import FileNotFoundError
 
 
 
