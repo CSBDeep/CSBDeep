@@ -69,6 +69,7 @@ class CARE(object):
         if config is not None and not config.is_valid():
             invalid_attr = config.is_valid(True)[1]
             raise ValueError('Invalid configuration attributes: ' + ', '.join(invalid_attr))
+        (not (config is None and basedir is None)) or _raise(ValueError())
 
         name is None or isinstance(name,string_types) or _raise(ValueError())
         basedir is None or isinstance(basedir,(string_types,Path)) or _raise(ValueError())
@@ -79,7 +80,6 @@ class CARE(object):
         self._model_prepared = False
         self.keras_model = self._build()
         if config is None:
-            self.basedir is not None or _raise(ValueError())
             self._find_and_load_weights()
 
 
