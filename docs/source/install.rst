@@ -3,6 +3,9 @@ Installation
 
 Please first `install TensorFlow <https://www.tensorflow.org/install/>`_
 by following the official instructions.
+For `GPU support <https://www.tensorflow.org/install/gpu>`_, it is very
+important to install the specific versions of CUDA and cuDNN that are
+compatible with the respective version of TensorFlow.
 
 .. Note::
    We strongly recommend to use TensorFlow on a Linux or Windows system with a modern
@@ -34,3 +37,12 @@ Finally, install the latest stable version of the CSBDeep package with **pip**: 
 .. Todo::
     - Enable installation via **conda** and `conda forge <https://conda-forge.org/>`_.
     - Provide `docker container <https://www.docker.com/what-docker>`_ to avoid potential installation issues.
+
+
+Alternative GPU-enabled Installation (Linux only)
+-------------------------------------------------
+
+Since installing TensorFlow with its dependencies (CUDA, cuDNN) can be challenging,
+we offer a ready-to-use `Docker container <https://hub.docker.com/r/tboo/csbdeep_gpu_docker/>`_
+as an alternative to get started more quickly.
+(`What is docker? <https://en.wikipedia.org/wiki/Docker_(software)>`_)
