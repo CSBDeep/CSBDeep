@@ -6,6 +6,8 @@ import numpy as np
 import argparse
 import warnings
 
+from distutils.version import LooseVersion
+import keras
 import keras.backend as K
 
 from ..utils import _raise, axes_check_and_normalize, axes_dict, backend_channels_last
@@ -124,8 +126,12 @@ class Config(argparse.Namespace):
         self.train_batch_size      = 16
         self.train_tensorboard     = True
         self.train_checkpoint      = 'weights_best.h5'
-        self.train_reduce_lr       = {'factor': 0.5, 'patience': 10, 'min_delta': 0}
 
+        # the parameter 'min_delta' was called 'epsilon' for keras<=2.1.5
+        min_delta_key = "epsilon" if LooseVersion(keras.__version__)<=LooseVersion("2.1.5") else "min_delta"
+
+        self.train_reduce_lr       = {'factor': 0.5, 'patience': 10, min_delta_key: 0}
+        
         # disallow setting 'n_dim' manually
         try:
             del kwargs['n_dim']
