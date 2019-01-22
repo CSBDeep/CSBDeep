@@ -450,8 +450,11 @@ def create_patches_reduced_target(
 
 # Misc
 
-def shuffle_inplace(*arrs):
-    rng = np.random.RandomState()
+def shuffle_inplace(*arrs,seed=None):
+    if seed is None:
+        rng = np.random
+    else:
+        rng = np.random.RandomState(seed=seed)
     state = rng.get_state()
     for a in arrs:
         rng.set_state(state)
