@@ -450,7 +450,8 @@ def create_patches_reduced_target(
 
 # Misc
 
-def shuffle_inplace(*arrs,seed=None):
+def shuffle_inplace(*arrs,**kwargs):
+    seed = kwargs.pop('seed', None)
     if seed is None:
         rng = np.random
     else:
