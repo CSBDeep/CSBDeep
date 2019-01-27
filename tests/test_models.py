@@ -11,7 +11,7 @@ from csbdeep.internals.predict import tile_overlap
 from keras import backend as K
 
 from csbdeep.internals.nets import receptive_field_unet
-from csbdeep.models import Config, CARE
+from csbdeep.models import Config, CARE, UpsamplingCARE, IsotropicCARE, ProjectionCARE
 from csbdeep.utils import axes_dict
 from csbdeep.utils.six import FileNotFoundError
 
@@ -172,11 +172,12 @@ def test_model_predict(tmpdir,config):
     def _predict(imdims,axes):
         img = rng.uniform(size=imdims)
         # print(img.shape, axes, config.n_channel_out)
-        mean, scale = model._predict_mean_and_scale(img, axes, normalizer, resizer)
         if config.probabilistic:
+            prob = model.predict_probabilistic(img, axes, normalizer, resizer)
+            mean, scale = prob.mean(), prob.scale()
             assert mean.shape == scale.shape
         else:
-            assert scale is None
+            mean = model.predict(img, axes, normalizer, resizer)
 
         if 'C' not in axes:
             if config.n_channel_out == 1:
@@ -288,3 +289,152 @@ def test_tile_overlap(n_depth, kern_size):
     assert sum(rf)+1 < img_size
     assert max(rf) == tile_overlap(n_depth,kern_size)
     # print("receptive field of n_depth %d and kernel size %d: %s"%(n_depth,kern_size,rf));
+
+
+
+@pytest.mark.parametrize('config', filter(lambda c: c.is_valid(), config_generator(
+    axes                  = ['ZYX'],
+    n_channel_in          = [1,2],
+    n_channel_out         = [1,2],
+    probabilistic         = [False,True],
+    # unet_residual         = [False,True],
+    unet_n_depth          = [1],
+
+    unet_kern_size        = [3],
+    unet_n_first          = [4],
+    unet_last_activation  = ['linear'],
+    # unet_input_shape      = [(None, None, 1)],
+)))
+@pytest.mark.parametrize('factor', (2.5,3))
+def test_model_upsampling_predict(tmpdir,config,factor):
+    rng = np.random.RandomState(42)
+
+    K.clear_session()
+    model = UpsamplingCARE(config,basedir=None)
+    axes = config.axes
+
+    def _predict(imdims,axes):
+        img = rng.uniform(size=imdims)
+        if config.probabilistic:
+            prob = model.predict_probabilistic(img, axes, factor, None, None)
+            mean, scale = prob.mean(), prob.scale()
+            assert mean.shape == scale.shape
+        else:
+            mean = model.predict(img, axes, factor, None, None)
+        a = axes_dict(axes)['Z']
+        assert imdims[a]*factor == mean.shape[a]
+
+    imdims = list(rng.randint(20,40,size=config.n_dim))
+    div_n = 2**(config.unet_n_depth+1)
+    imdims = [(d//div_n)*div_n for d in imdims]
+
+    if config.n_channel_in == 1:
+        _predict(imdims,axes=axes.replace('C',''))
+
+    channel = rng.randint(0,config.n_dim)
+    imdims.insert(channel,config.n_channel_in)
+    _axes = axes.replace('C','')
+    _axes = _axes[:channel]+'C'+_axes[channel:]
+    _predict(imdims,axes=_axes)
+
+
+
+@pytest.mark.parametrize('config', filter(lambda c: c.is_valid(), config_generator(
+    axes                  = ['YX'],
+    n_channel_in          = [1,2],
+    n_channel_out         = [1,2],
+    probabilistic         = [False,True],
+    # unet_residual         = [False,True],
+    unet_n_depth          = [1],
+
+    unet_kern_size        = [3],
+    unet_n_first          = [4],
+    unet_last_activation  = ['linear'],
+    # unet_input_shape      = [(None, None, 1)],
+)))
+@pytest.mark.parametrize('factor', (2.5,3))
+def test_model_isotropic_predict(tmpdir,config,factor):
+    rng = np.random.RandomState(42)
+
+    K.clear_session()
+    model = IsotropicCARE(config,basedir=None)
+    axes = config.axes+'Z'
+
+    def _predict(imdims,axes):
+        img = rng.uniform(size=imdims)
+        if config.probabilistic:
+            prob = model.predict_probabilistic(img, axes, factor, None, None)
+            mean, scale = prob.mean(), prob.scale()
+            assert mean.shape == scale.shape
+        else:
+            mean = model.predict(img, axes, factor, None, None)
+        a = axes_dict(axes)['Z']
+        assert imdims[a]*factor == mean.shape[a]
+
+    imdims = list(rng.randint(20,40,size=config.n_dim+1))
+    div_n = 2**(config.unet_n_depth+1)
+    imdims = [(d//div_n)*div_n for d in imdims]
+
+    if config.n_channel_in == 1:
+        _predict(imdims,axes=axes.replace('C',''))
+
+    channel = rng.randint(0,config.n_dim+1)
+    imdims.insert(channel,config.n_channel_in)
+    _axes = axes.replace('C','')
+    _axes = _axes[:channel]+'C'+_axes[channel:]
+    _predict(imdims,axes=_axes)
+
+
+
+@pytest.mark.parametrize('config', filter(lambda c: c.is_valid(), config_generator(
+    axes                  = ['ZYX'],
+    n_channel_in          = [1,2],
+    n_channel_out         = [1,2],
+    probabilistic         = [False,True],
+    # unet_residual         = [False,True],
+    unet_n_depth          = [1],
+
+    unet_kern_size        = [3],
+    unet_n_first          = [4],
+    unet_last_activation  = ['linear'],
+    # unet_input_shape      = [(None, None, 1)],
+)))
+def test_model_projection_predict(tmpdir,config):
+    rng = np.random.RandomState(42)
+
+    K.clear_session()
+    model = ProjectionCARE(config,basedir=None)
+    axes = config.axes
+
+    def _predict(imdims,axes):
+        img = rng.uniform(size=imdims)
+        if config.probabilistic:
+            prob = model.predict_probabilistic(img, axes, None, None)
+            mean, scale = prob.mean(), prob.scale()
+            assert mean.shape == scale.shape
+        else:
+            mean = model.predict(img, axes, None, None)
+
+        ax = axes_dict(axes)
+        shape_out = list(imdims)
+        if 'C' in axes:
+            shape_out[ax['C']] = config.n_channel_out
+        elif config.n_channel_out > 1:
+            shape_out.append(config.n_channel_out)
+
+        proj_axis = model._get_proj_model_params()[0]
+        del shape_out[ax[proj_axis]]
+
+        assert tuple(shape_out) == mean.shape
+
+    imdims = list(rng.randint(20,40,size=config.n_dim))
+    imdims = [(d//div_n)*div_n for d,div_n in zip(imdims,model._axes_div_by(axes))]
+
+    if config.n_channel_in == 1:
+        _predict(imdims,axes=axes.replace('C',''))
+
+    channel = rng.randint(0,config.n_dim)
+    imdims.insert(channel,config.n_channel_in)
+    _axes = axes.replace('C','')
+    _axes = _axes[:channel]+'C'+_axes[channel:]
+    _predict(imdims,axes=_axes)

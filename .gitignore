@@ -9,6 +9,7 @@ __pycache__/
 build/
 dist/
 docs/build/
+tests/htmlcov/
 
 *.npz
 *.tif*
