@@ -43,3 +43,4 @@ from .config import Config
 from .care_standard import CARE
 from .care_upsampling import UpsamplingCARE
 from .care_isotropic import IsotropicCARE
+from .care_projection import ProjectionCARE
