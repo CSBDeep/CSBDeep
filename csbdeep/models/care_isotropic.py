@@ -89,8 +89,7 @@ class IsotropicCARE(CARE):
         x_scaled = scale_z(x,factor)
 
         # resize: make (x,y,z) image dimensions divisible by power of 2 to allow downsampling steps in unet
-        div_n = 2 ** self.config.unet_n_depth
-        x_scaled = resizer.before(x_scaled,div_n,exclude=channel)
+        x_scaled = resizer.before(x_scaled, axes_tmp, self._axes_div_by(axes_tmp))
 
         # move channel to the end
         x_scaled = np.moveaxis(x_scaled, channel, -1)
@@ -112,14 +111,14 @@ class IsotropicCARE(CARE):
         u_rot1.shape[channel] == n_channel_predicted or _raise(ValueError())
         u_rot2.shape[channel] == n_channel_predicted or _raise(ValueError())
 
-        # move channel back to the front
+        # move channel back to the front (axes_tmp semantics)
         u1 = np.moveaxis(u1, channel, 0)
         u2 = np.moveaxis(u2, channel, 0)
         channel = 0
 
         # resize after prediction
-        u1 = resizer.after(u1,exclude=channel)
-        u2 = resizer.after(u2,exclude=channel)
+        u1 = resizer.after(u1, axes_tmp)
+        u2 = resizer.after(u2, axes_tmp)
 
         # combine u1 & u2
         mean1, scale1 = self._mean_and_scale_from_prediction(u1,axis=channel)
@@ -131,7 +130,7 @@ class IsotropicCARE(CARE):
             scale = np.maximum(scale1,scale2)
 
         if normalizer.do_after and self.config.n_channel_in==self.config.n_channel_out:
-            mean, scale = normalizer.after(mean, scale)
+            mean, scale = normalizer.after(mean, scale, axes_tmp)
 
         mean, scale = _permute_axes(mean,undo=True), _permute_axes(scale,undo=True)
 

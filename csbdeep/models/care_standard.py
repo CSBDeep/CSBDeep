@@ -236,14 +236,13 @@ class CARE(object):
             warnings.warn("small number of validation images (only %.1f%% of all images)" % (100*frac_val))
         axes = axes_check_and_normalize('S'+self.config.axes,X.ndim)
         ax = axes_dict(axes)
-        div_by = 2**self.config.unet_n_depth
-        axes_relevant = ''.join(a for a in 'XYZT' if a in axes)
-        for a in axes_relevant:
+
+        for a,div_by in zip(axes,self._axes_div_by(axes)):
             n = X.shape[ax[a]]
             if n % div_by != 0:
                 raise ValueError(
-                    "training images must be evenly divisible by %d along axes %s"
-                    " (axis %s has incompatible size %d)" % (div_by,axes_relevant,a,n)
+                    "training images must be evenly divisible by %d along axis %s"
+                    " (which has incompatible size %d)" % (div_by,a,n)
                 )
 
         if epochs is None:
@@ -284,7 +283,7 @@ class CARE(object):
             'version':       package_version,
             'probabilistic': self.config.probabilistic,
             'axes':          self.config.axes,
-            'axes_div_by':   [(2**self.config.unet_n_depth if a in 'XYZT' else 1) for a in self.config.axes],
+            'axes_div_by':   self._axes_div_by(self.config.axes),
             'tile_overlap':  tile_overlap(self.config.unet_n_depth, self.config.unet_kern_size),
         }
         export_SavedModel(self.keras_model, str(fout), meta=meta)
@@ -360,20 +359,38 @@ class CARE(object):
 
         """
         normalizer, resizer = self._check_normalizer_resizer(normalizer, resizer)
-        axes = axes_check_and_normalize(axes,img.ndim)
-        _permute_axes = self._make_permute_axes(axes, self.config.axes)
+        # axes = axes_check_and_normalize(axes,img.ndim)
+
+        # different kinds of axes
+        # -> typical case: net_axes_in = net_axes_out, img_axes_in = img_axes_out
+        img_axes_in = axes_check_and_normalize(axes,img.ndim)
+        net_axes_in = self.config.axes
+        net_axes_out = axes_check_and_normalize(self._axes_out)
+        len(net_axes_in) >= len(net_axes_out) or _raise(ValueError("more output than input axes"))
+        net_axes_lost = tuple(a for a in net_axes_in if a not in net_axes_out)
+        img_axes_out = ''.join(a for a in img_axes_in if a not in net_axes_lost)
+        # print(' -> '.join((img_axes_in, net_axes_in, net_axes_out, img_axes_out)))
+
+        _permute_axes = self._make_permute_axes(img_axes_in, net_axes_in, net_axes_out, img_axes_out)
+        # _permute_axes: (img_axes_in -> net_axes_in), undo: (net_axes_out -> img_axes_out)
+        x = _permute_axes(img)
+        # x has net_axes_in semantics
+        channel_in = axes_dict(net_axes_in)['C']
+        channel_out = axes_dict(net_axes_out)['C']
+        net_axes_in_div_by = self._axes_div_by(net_axes_in)
+        self.config.n_channel_in == x.shape[channel_in] or _raise(ValueError())
+
+        # TODO: refactor tiling stuff to make code more readable
+
+        _permute_axes_n_tiles = self._make_permute_axes(img_axes_in, net_axes_in)
+        # _permute_axes_n_tiles: (img_axes_in <-> net_axes_in) to convert n_tiles between img and net axes
         def _permute_n_tiles(n,undo=False):
             # hack: move tiling axis around in the same way as the image was permuted by creating an array
-            return _permute_axes(np.empty(n,np.bool),undo=undo).shape
-
-        x = _permute_axes(img)
-        channel = axes_dict(self.config.axes)['C']
-
-        self.config.n_channel_in == x.shape[channel] or _raise(ValueError())
+            return _permute_axes_n_tiles(np.empty(n,np.bool),undo=undo).shape
 
         # to support old api: set scalar n_tiles value for the largest tiling axis
         if np.isscalar(n_tiles) and int(n_tiles)==n_tiles and 1<=n_tiles:
-            largest_tiling_axis = [i for i in np.argsort(x.shape) if i != channel][-1]
+            largest_tiling_axis = [i for i in np.argsort(x.shape) if i != channel_in][-1]
             _n_tiles = [n_tiles if i==largest_tiling_axis else 1 for i in range(x.ndim)]
             n_tiles = _permute_n_tiles(_n_tiles,undo=True)
             warnings.warn("n_tiles should be a tuple with an entry for each image axis")
@@ -391,49 +408,50 @@ class CARE(object):
             ValueError("all values of n_tiles must be integer values >= 1"))
         n_tiles = tuple(map(int,n_tiles))
         n_tiles = _permute_n_tiles(n_tiles)
-        n_tiles[channel] == 1 or _raise(ValueError("entry of n_tiles for channel axis must be 1"))
-        n_tiles_limited = self._limit_tiling(x.shape,n_tiles)
+        n_tiles[channel_in] == 1 or _raise(ValueError("entry of n_tiles for channel axis must be 1"))
+        n_tiles_limited = self._limit_tiling(x.shape,n_tiles,net_axes_in_div_by)
         if any(np.array(n_tiles) != np.array(n_tiles_limited)):
             print("Limiting n_tiles to %s" % str(_permute_n_tiles(n_tiles_limited,undo=True)))
         n_tiles = n_tiles_limited
         overlap = tile_overlap(self.config.unet_n_depth, self.config.unet_kern_size)
 
-        # normalize
-        x = normalizer.before(x,self.config.axes)
-        # resize: make divisible by power of 2 to allow downsampling steps in unet
-        div_n = 2 ** self.config.unet_n_depth
-        x = resizer.before(x,div_n,exclude=channel)
+        # normalize & resize
+        x = normalizer.before(x, net_axes_in)
+        x = resizer.before(x, net_axes_in, net_axes_in_div_by)
 
         done = False
         progress = Progress(np.prod(n_tiles),1)
         while not done:
             try:
                 # raise tf.errors.ResourceExhaustedError(None,None,None) # tmp
-                x = predict_tiled(self.keras_model,x,channel_in=channel,channel_out=channel,
-                                  n_tiles=n_tiles,block_size=div_n,tile_overlap=overlap,pbar=progress)
+                x = predict_tiled(self.keras_model,x,channel_in=channel_in,channel_out=channel_out,
+                                  n_tiles=n_tiles,block_sizes=net_axes_in_div_by,tile_overlap=overlap,pbar=progress)
+                # x has net_axes_out semantics
                 done = True
                 progress.close()
             except tf.errors.ResourceExhaustedError:
                 n_tiles_prev = list(n_tiles) # make a copy
                 tile_sizes_approx = np.array(x.shape) / np.array(n_tiles)
                 n_tiles[np.argmax(tile_sizes_approx)] *= 2
-                n_tiles = self._limit_tiling(x.shape,n_tiles)
+                n_tiles = self._limit_tiling(x.shape,n_tiles,net_axes_in_div_by)
                 if all(np.array(n_tiles) == np.array(n_tiles_prev)):
                     raise MemoryError("Tile limit exceeded. Memory occupied by another process (notebook)?")
                 print('Out of memory, retrying with n_tiles = %s' % str(_permute_n_tiles(n_tiles,undo=True)))
                 progress.total = np.prod(n_tiles)
 
         n_channel_predicted = self.config.n_channel_out * (2 if self.config.probabilistic else 1)
-        x.shape[channel] == n_channel_predicted or _raise(ValueError())
+        x.shape[channel_out] == n_channel_predicted or _raise(ValueError())
 
-        x = resizer.after(x,exclude=channel)
+        x = resizer.after(x, net_axes_out)
 
-        mean, scale = self._mean_and_scale_from_prediction(x,axis=channel)
+        mean, scale = self._mean_and_scale_from_prediction(x,axis=channel_out)
+        # mean and scale have net_axes_out semantics
 
         if normalizer.do_after and self.config.n_channel_in==self.config.n_channel_out:
-            mean, scale = normalizer.after(mean, scale)
+            mean, scale = normalizer.after(mean, scale, net_axes_out)
 
         mean, scale = _permute_axes(mean,undo=True), _permute_axes(scale,undo=True)
+        # mean and scale have img_axes_out semantics
 
         return mean, scale
 
@@ -452,28 +470,30 @@ class CARE(object):
             mean, scale = x, None
         return mean, scale
 
-    def _make_permute_axes(self,axes_in,axes_out=None):
-        if axes_out is None:
-            axes_out = self.config.axes
-        channel_in  = axes_dict(axes_in) ['C']
-        channel_out = axes_dict(axes_out)['C']
-        assert channel_out is not None
+    def _make_permute_axes(self, img_axes_in, net_axes_in, net_axes_out=None, img_axes_out=None):
+        # img_axes_in -> net_axes_in ---NN--> net_axes_out -> img_axes_out
+        if net_axes_out is None:
+            net_axes_out = net_axes_in
+        if img_axes_out is None:
+            img_axes_out = img_axes_in
+        assert 'C' in net_axes_in and 'C' in net_axes_out
+        assert not 'C' in img_axes_in or 'C' in img_axes_out
 
         def _permute_axes(data,undo=False):
             if data is None:
                 return None
             if undo:
-                if channel_in is not None:
-                    return move_image_axes(data, axes_out, axes_in, True)
+                if 'C' in img_axes_in:
+                    return move_image_axes(data, net_axes_out, img_axes_out, True)
                 else:
                     # input is single-channel and has no channel axis
-                    data = move_image_axes(data, axes_out, axes_in+'C', True)
-                    # output is single-channel -> remove channel axis
+                    data = move_image_axes(data, net_axes_out, img_axes_out+'C', True)
                     if data.shape[-1] == 1:
+                        # output is single-channel -> remove channel axis
                         data = data[...,0]
                     return data
             else:
-                return move_image_axes(data, axes_in, axes_out, True)
+                return move_image_axes(data, img_axes_in, net_axes_in, True)
         return _permute_axes
 
     def _check_normalizer_resizer(self, normalizer, resizer):
@@ -490,8 +510,17 @@ class CARE(object):
 
         return normalizer, resizer
 
-    def _limit_tiling(self,img_shape,n_tiles):
-        img_shape, n_tiles = np.array(img_shape), np.array(n_tiles)
-        block_size = 2 ** self.config.unet_n_depth
-        n_tiles_limit = np.ceil(img_shape / block_size) # each tile must be at least one block in size
+    def _limit_tiling(self,img_shape,n_tiles,block_sizes):
+        img_shape, n_tiles, block_sizes = np.array(img_shape), np.array(n_tiles), np.array(block_sizes)
+        n_tiles_limit = np.ceil(img_shape / block_sizes) # each tile must be at least one block in size
         return [int(t) for t in np.minimum(n_tiles,n_tiles_limit)]
+
+    def _axes_div_by(self, query_axes):
+        query_axes = axes_check_and_normalize(query_axes)
+        # default: must be divisible by power of 2 to allow down/up-sampling steps in unet
+        pool_div_by = 2**self.config.unet_n_depth
+        return tuple((pool_div_by if a in 'XYZT' else 1) for a in query_axes)
+
+    @property
+    def _axes_out(self):
+        return self.config.axes

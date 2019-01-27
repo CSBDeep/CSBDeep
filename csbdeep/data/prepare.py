@@ -2,7 +2,7 @@ from __future__ import print_function, unicode_literals, absolute_import, divisi
 from six.moves import range, zip, map, reduce, filter
 
 
-from ..utils import _raise, consume, normalize_mi_ma, axes_dict
+from ..utils import _raise, consume, normalize_mi_ma, axes_dict, axes_check_and_normalize, move_image_axes
 import warnings
 import numpy as np
 
@@ -17,28 +17,25 @@ class Normalizer():
     """Abstract base class for normalization methods."""
 
     @abstractmethod
-    def before(self, img, axes):
+    def before(self, x, axes):
         """Normalization of the raw input image (method stub).
 
         Parameters
         ----------
-        img : :class:`numpy.ndarray`
+        x : :class:`numpy.ndarray`
             Raw input image.
         axes : str
-            Axes of ``img``.
+            Axes of input image x
 
         Returns
         -------
         :class:`numpy.ndarray`
             Normalized input image with suitable values for neural network input.
         """
-        pass
 
     @abstractmethod
-    def after(self, mean, scale):
+    def after(self, mean, scale, axes):
         """Possible adjustment of predicted restored image (method stub).
-
-        It is assumed that the image axes are the same as in the call to :func:`before`.
 
         Parameters
         ----------
@@ -47,18 +44,18 @@ class Normalizer():
             for probabilistic model.
         scale: :class:`numpy.ndarray` or None
             Per-pixel ``scale`` of Laplace distributions for probabilistic model (``None`` otherwise.)
+        axes : str
+            Axes of ``mean`` and ``scale``
 
         Returns
         -------
         :class:`numpy.ndarray`
-            Adjusted restored image.
+            Adjusted restored image(s).
         """
-        pass
 
     @abstractproperty
     def do_after(self):
         """bool : Flag to indicate whether :func:`after` should be called."""
-        pass
 
 
 class NoNormalizer(Normalizer):
@@ -76,13 +73,12 @@ class NoNormalizer(Normalizer):
     """
 
     def __init__(self, do_after=False):
-        """foo"""
         self._do_after = do_after
 
-    def before(self, img, axes):
-        return img
+    def before(self, x, axes):
+        return x
 
-    def after(self, mean, scale):
+    def after(self, mean, scale, axes):
         self.do_after or _raise(ValueError())
         return mean, scale
 
@@ -117,23 +113,22 @@ class PercentileNormalizer(Normalizer):
         self.dtype = dtype
         self.kwargs = kwargs
 
-    def before(self, img, axes):
+    def before(self, x, axes):
         """Percentile-based normalization of raw input image.
 
         See :func:`csbdeep.predict.Normalizer.before` for parameter descriptions.
         Note that percentiles are computed individually for each channel (if present in `axes`).
         """
-        len(axes) == img.ndim or _raise(ValueError())
-        channel = axes_dict(axes)['C']
-        axes = None if channel is None else tuple((d for d in range(img.ndim) if d != channel))
-        self.mi = np.percentile(img,self.pmin,axis=axes,keepdims=True).astype(self.dtype,copy=False)
-        self.ma = np.percentile(img,self.pmax,axis=axes,keepdims=True).astype(self.dtype,copy=False)
-        return normalize_mi_ma(img, self.mi, self.ma, dtype=self.dtype, **self.kwargs)
+        self.axes_before = axes_check_and_normalize(axes,x.ndim)
+        axis = tuple(d for d,a in enumerate(self.axes_before) if a != 'C')
+        self.mi = np.percentile(x,self.pmin,axis=axis,keepdims=True).astype(self.dtype,copy=False)
+        self.ma = np.percentile(x,self.pmax,axis=axis,keepdims=True).astype(self.dtype,copy=False)
+        return normalize_mi_ma(x, self.mi, self.ma, dtype=self.dtype, **self.kwargs)
 
-    def after(self, mean, scale):
+    def after(self, mean, scale, axes):
         """Undo percentile-based normalization to map restored image to similar range as input image.
 
-        See :func:`csbdeep.predict.Normalizer.before` for parameter descriptions.
+        See :func:`csbdeep.predict.Normalizer.after` for parameter descriptions.
 
         Raises
         ------
@@ -142,8 +137,11 @@ class PercentileNormalizer(Normalizer):
 
         """
         self.do_after or _raise(ValueError())
-        alpha = self.ma - self.mi
-        beta  = self.mi
+        self.axes_after = axes_check_and_normalize(axes,mean.ndim)
+        mi = move_image_axes(self.mi, self.axes_before, self.axes_after, True)
+        ma = move_image_axes(self.ma, self.axes_before, self.axes_after, True)
+        alpha = ma - mi
+        beta  = mi
         return (
             ( alpha*mean+beta ).astype(self.dtype,copy=False),
             ( alpha*scale     ).astype(self.dtype,copy=False) if scale is not None else None
@@ -161,57 +159,40 @@ class Resizer():
     """Abstract base class for resizing methods."""
 
     @abstractmethod
-    def before(self, x, div_n, exclude):
+    def before(self, x, axes, axes_div_by):
         """Resizing of the raw input image (method stub).
 
         Parameters
         ----------
         x : :class:`numpy.ndarray`
             Raw input image.
-        div_n : int
-            Resized image must be evenly divisible by this value.
-        exclude : int or list(int) or None
-            Indicates axis indices to exclude (can be ``None``),
-            e.g. channel dimension.
+        axes : str
+            Axes of input image x
+        axes_div_by : iterable of int
+            Resized image must be evenly divisible by the provided values for each axis.
 
         Returns
         -------
         :class:`numpy.ndarray`
             Resized input image.
         """
-        pass
 
     @abstractmethod
-    def after(self, x, exclude):
+    def after(self, x, axes):
         """Resizing of the restored image (method stub).
 
         Parameters
         ----------
         x : :class:`numpy.ndarray`
-            Raw input image.
-        exclude : int or list(int) or None
-            Indicates axis indices to exclude (can be ``None``),
-            e.g. channel dimension.
-            Afert ignoring the excludes axis indices,
-            note that the shape of x must be same as in :func:`before`.
+            Restored image.
+        axes : str
+            Axes of restored image x
 
         Returns
         -------
         :class:`numpy.ndarray`
-            Resized restored image image.
+            Resized restored image.
         """
-        pass
-
-
-    def _normalize_exclude(self, exclude, n_dim):
-        """Return normalized list of excluded axes."""
-        if exclude is None:
-            return []
-        exclude_list = [exclude] if np.isscalar(exclude) else list(exclude)
-        exclude_list = [d%n_dim for d in exclude_list]
-        len(exclude_list) == len(np.unique(exclude_list)) or _raise(ValueError())
-        all(( isinstance(d,int) and 0<=d<n_dim for d in exclude_list )) or _raise(ValueError())
-        return exclude_list
 
 
 class NoResizer(Resizer):
@@ -223,15 +204,15 @@ class NoResizer(Resizer):
         In :func:`before`, if image resizing is necessary.
     """
 
-    def before(self, x, div_n, exclude):
-        exclude = self._normalize_exclude(exclude, x.ndim)
-        consume ((
-            (s%div_n==0) or _raise(ValueError('%d (axis %d) is not divisible by %d.' % (s,i,div_n)))
-            for i,s in enumerate(x.shape) if (i not in exclude)
-        ))
+    def before(self, x, axes, axes_div_by):
+        axes = axes_check_and_normalize(axes,x.ndim)
+        consume (
+            (s%div_n==0) or _raise(ValueError('%d (axis %s) is not divisible by %d.' % (s,a,div_n)))
+            for a, div_n, s in zip(axes, axes_div_by, x.shape)
+        )
         return x
 
-    def after(self, x, exclude):
+    def after(self, x, axes):
         return x
 
 
@@ -256,47 +237,33 @@ class PadAndCropResizer(Resizer):
         self.mode = mode
         self.kwargs = kwargs
 
-    def before(self, x, div_n, exclude):
+    def before(self, x, axes, axes_div_by):
         """Pad input image.
 
         See :func:`csbdeep.predict.Resizer.before` for parameter descriptions.
         """
+        axes = axes_check_and_normalize(axes,x.ndim)
         def _split(v):
             a = v // 2
             return a, v-a
-        exclude = self._normalize_exclude(exclude, x.ndim)
-        self.pad = [_split((div_n-s%div_n)%div_n) if (i not in exclude) else (0,0) for i,s in enumerate(x.shape)]
+        self.pad = {
+            a : _split((div_n-s%div_n)%div_n)
+            for a, div_n, s in zip(axes, axes_div_by, x.shape)
+        }
         # print(self.pad)
-        x_pad = np.pad(x, self.pad, mode=self.mode, **self.kwargs)
-        for i in exclude:
-            del self.pad[i]
+        x_pad = np.pad(x, tuple(self.pad[a] for a in axes), mode=self.mode, **self.kwargs)
         return x_pad
 
-    def after(self, x, exclude):
+    def after(self, x, axes):
         """Crop restored image to retain size of input image.
 
         See :func:`csbdeep.predict.Resizer.after` for parameter descriptions.
         """
-        crop = [slice(p[0], -p[1] if p[1]>0 else None) for p in self.pad]
-        for i in self._normalize_exclude(exclude, x.ndim):
-            crop.insert(i,slice(None))
-        len(crop) == x.ndim or _raise(ValueError())
-        return x[tuple(crop)]
-
-
-# class CropResizer(Resizer):
-#     """TODO."""
-
-#     def before(self, x, div_n, exclude):
-#         """TODO."""
-#         div_n = x.ndim * [div_n]
-#         for i in self._normalize_exclude(exclude, x.ndim):
-#             div_n[i] = 1
-#         all((s>=i>=1 for s,i in zip(x.shape,div_n))) or _raise(ValueError())
-#         if all((i==1 for i in div_n)):
-#             return x
-#         return x[tuple((slice(0,(s//i)*i) for s,i in zip(x.shape,div_n)))]
-
-#     def after(self, x, exclude):
-#         """TODO."""
-#         return x
+        axes = axes_check_and_normalize(axes,x.ndim)
+        all(a in self.pad for a in axes) or _raise(ValueError())
+        crop = tuple (
+            slice(p[0], -p[1] if p[1]>0 else None)
+            for p in (self.pad[a] for a in axes)
+        )
+        # print(crop)
+        return x[crop]

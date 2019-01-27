@@ -36,7 +36,7 @@ def predict_direct(keras_model,x,channel_in=None,channel_out=0,single_sample=Tru
 
 
 
-def predict_tiled(keras_model,x,n_tiles,block_size,tile_overlap,channel_in=None,channel_out=0,pbar=None,**kwargs):
+def predict_tiled(keras_model,x,n_tiles,block_sizes,tile_overlap,channel_in=None,channel_out=0,pbar=None,**kwargs):
     """TODO."""
 
     if all(t==1 for t in n_tiles):
@@ -49,7 +49,7 @@ def predict_tiled(keras_model,x,n_tiles,block_size,tile_overlap,channel_in=None,
     channel_in  = (channel_in  + x.ndim) % x.ndim
     channel_out = (channel_out + x.ndim) % x.ndim
 
-    assert x.ndim == len(n_tiles)
+    assert x.ndim == len(n_tiles) == len(block_sizes)
     assert n_tiles[channel_in] == 1
     assert all(np.isscalar(t) and 1<=t and int(t)==t for t in n_tiles)
 
@@ -64,6 +64,7 @@ def predict_tiled(keras_model,x,n_tiles,block_size,tile_overlap,channel_in=None,
     # first axis > 1
     axis = next(i for i,t in enumerate(n_tiles) if t>1)
 
+    block_size = block_sizes[axis]
     n_block_overlap = int(np.ceil(1.*tile_overlap / block_size))
 
     n_tiles_remaining = list(n_tiles)
@@ -72,10 +73,10 @@ def predict_tiled(keras_model,x,n_tiles,block_size,tile_overlap,channel_in=None,
     dst = None
     for tile, s_src, s_dst in tile_iterator(x,axis=axis,n_tiles=n_tiles[axis],block_size=block_size,n_block_overlap=n_block_overlap):
 
-        pred = predict_tiled(keras_model,tile,n_tiles_remaining,block_size,tile_overlap,channel_in=channel_in,channel_out=channel_out,pbar=pbar,**kwargs)
+        pred = predict_tiled(keras_model,tile,n_tiles_remaining,block_sizes,tile_overlap,channel_in=channel_in,channel_out=channel_out,pbar=pbar,**kwargs)
 
         # if any(t>1 for t in n_tiles_remaining):
-        #     pred = predict_tiled(keras_model,tile,n_tiles_remaining,block_size,tile_overlap,channel_in=channel_in,channel_out=channel_out,pbar=pbar,**kwargs)
+        #     pred = predict_tiled(keras_model,tile,n_tiles_remaining,block_sizes,tile_overlap,channel_in=channel_in,channel_out=channel_out,pbar=pbar,**kwargs)
         # else:
         #     # tmp
         #     pred = tile
