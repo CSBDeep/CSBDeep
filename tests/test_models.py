@@ -207,11 +207,11 @@ def test_model_predict(tmpdir,config):
 
 @pytest.mark.parametrize('config', filter(lambda c: c.is_valid(), config_generator(
     axes                  = ['YX','ZYX'],
-    n_channel_in          = [1],
-    n_channel_out         = [1],
+    n_channel_in          = [1,2],
+    n_channel_out         = [1,2],
     probabilistic         = [False],
     # unet_residual         = [False,True],
-    unet_n_depth          = [1,2,3],
+    unet_n_depth          = [2,3],
     unet_kern_size        = [3,5],
 
     unet_n_first          = [4],
@@ -282,7 +282,7 @@ def test_model_predict_tiled(tmpdir,config):
 def test_tile_overlap(n_depth, kern_size):
     K.clear_session()
     img_size = 1280
-    rf_x, rf_y = receptive_field_unet(n_depth,kern_size,2,img_size)
+    rf_x, rf_y = receptive_field_unet(n_depth,kern_size,n_dim=2,img_size=img_size)
     assert rf_x == rf_y
     rf = rf_x
     assert np.abs(rf[0]-rf[1]) < 10
@@ -405,9 +405,13 @@ def test_model_projection_predict(tmpdir,config):
     K.clear_session()
     model = ProjectionCARE(config,basedir=None)
     axes = config.axes
+    proj_axis = model.proj_params.axis
 
     def _predict(imdims,axes):
         img = rng.uniform(size=imdims)
+        n_tiles = [1]*len(axes)
+        ax = axes_dict(axes)
+
         if config.probabilistic:
             prob = model.predict_probabilistic(img, axes, None, None)
             mean, scale = prob.mean(), prob.scale()
@@ -415,19 +419,28 @@ def test_model_projection_predict(tmpdir,config):
         else:
             mean = model.predict(img, axes, None, None)
 
-        ax = axes_dict(axes)
+            n_tiles[ax['X']] = 3
+            n_tiles[ax['Y']] = 2
+            mean_tiled = model.predict(img, axes, None, None, n_tiles=n_tiles)
+            error_max = np.max(np.abs(mean-mean_tiled))
+            # print(n_tiles, error_max)
+            assert error_max < 1e-3
+
+            with pytest.raises(ValueError):
+                n_tiles[ax[proj_axis]] = 2
+                model.predict(img, axes, None, None, n_tiles=n_tiles)
+
         shape_out = list(imdims)
         if 'C' in axes:
             shape_out[ax['C']] = config.n_channel_out
         elif config.n_channel_out > 1:
             shape_out.append(config.n_channel_out)
 
-        proj_axis = model._get_proj_model_params()[0]
         del shape_out[ax[proj_axis]]
-
         assert tuple(shape_out) == mean.shape
 
-    imdims = list(rng.randint(20,40,size=config.n_dim))
+    imdims = list(rng.randint(30,50,size=config.n_dim))
+    # imdims = [10,1024,1024]
     imdims = [(d//div_n)*div_n for d,div_n in zip(imdims,model._axes_div_by(axes))]
 
     if config.n_channel_in == 1:

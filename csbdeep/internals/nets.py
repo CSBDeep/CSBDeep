@@ -149,12 +149,16 @@ def common_unet_by_name(model):
 
 
 
-def receptive_field_unet(n_depth, kern_size, n_dim=2, img_size=1024):
+def receptive_field_unet(n_depth, kern_size, pool_size=2, n_dim=2, img_size=1024):
     """Receptive field for U-Net model (pre/post for each dimension)."""
     x = np.zeros((1,)+(img_size,)*n_dim+(1,))
     mid = tuple([s//2 for s in x.shape[1:-1]])
     x[(slice(None),) + mid + (slice(None),)] = 1
-    model = common_unet(n_dim=n_dim, n_depth=n_depth, kern_size=kern_size, n_first=8)(x.shape[1:])
+    model = custom_unet (
+        x.shape[1:],
+        n_depth=n_depth, kernel_size=[kern_size]*n_dim, pool_size=[pool_size]*n_dim,
+        n_filter_base=8, activation='linear', last_activation='linear',
+    )
     y  = model.predict(x)[0,...,0]
     y0 = model.predict(0*x)[0,...,0]
     ind = np.where(np.abs(y-y0)>0)

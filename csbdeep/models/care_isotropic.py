@@ -91,20 +91,19 @@ class IsotropicCARE(CARE):
         # resize: make (x,y,z) image dimensions divisible by power of 2 to allow downsampling steps in unet
         x_scaled = resizer.before(x_scaled, axes_tmp, self._axes_div_by(axes_tmp))
 
-        # move channel to the end
+        # move channel to the end (axes_predict semantics)
         x_scaled = np.moveaxis(x_scaled, channel, -1)
+        axes_predict = 'S' + axes_tmp[2:] + 'C'
         channel = -1
 
         # u1: first rotation and prediction
         x_rot1   = self._rotate(x_scaled, axis=1, copy=False)
-        u_rot1   = predict_direct(self.keras_model, x_rot1, channel_in=channel, channel_out=channel, single_sample=False,
-                                  batch_size=batch_size, verbose=0)
+        u_rot1   = predict_direct(self.keras_model, x_rot1, axes_predict, batch_size=batch_size, verbose=0)
         u1       = self._rotate(u_rot1, -1, axis=1, copy=False)
 
         # u2: second rotation and prediction
         x_rot2   = self._rotate(self._rotate(x_scaled, axis=2, copy=False), axis=0, copy=False)
-        u_rot2   = predict_direct(self.keras_model, x_rot2, channel_in=channel, channel_out=channel, single_sample=False,
-                                  batch_size=batch_size, verbose=0)
+        u_rot2   = predict_direct(self.keras_model, x_rot2, axes_predict, batch_size=batch_size, verbose=0)
         u2       = self._rotate(self._rotate(u_rot2, -1, axis=0, copy=False), -1, axis=2, copy=False)
 
         n_channel_predicted = self.config.n_channel_out * (2 if self.config.probabilistic else 1)

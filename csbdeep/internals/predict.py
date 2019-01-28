@@ -2,7 +2,7 @@ from __future__ import print_function, unicode_literals, absolute_import, divisi
 from six.moves import range, zip, map, reduce, filter
 
 from tqdm import tqdm
-from ..utils import _raise, consume, move_channel_for_backend, backend_channels_last
+from ..utils import _raise, consume, move_channel_for_backend, backend_channels_last, axes_check_and_normalize, axes_dict
 import warnings
 import numpy as np
 
@@ -19,7 +19,7 @@ def to_tensor(x,channel=None,single_sample=True):
 
 
 
-def from_tensor(x,channel=0,single_sample=True):
+def from_tensor(x,channel=-1,single_sample=True):
     return np.moveaxis((x[0] if single_sample else x), (-1 if backend_channels_last() else 1), channel)
 
 
@@ -29,43 +29,67 @@ def tensor_num_channels(x):
 
 
 
-def predict_direct(keras_model,x,channel_in=None,channel_out=0,single_sample=True,**kwargs):
+def predict_direct(keras_model,x,axes_in,axes_out=None,**kwargs):
     """TODO."""
-    return from_tensor(keras_model.predict(to_tensor(x,channel=channel_in,single_sample=single_sample),**kwargs),
-                       channel=channel_out,single_sample=single_sample)
+    if axes_out is None:
+        axes_out = axes_in
+    ax_in, ax_out = axes_dict(axes_in), axes_dict(axes_out)
+    channel_in, channel_out = ax_in['C'], ax_out['C']
+    single_sample = ax_in['S'] is None
+    len(axes_in) == x.ndim or _raise(ValueError())
+    x = to_tensor(x,channel=channel_in,single_sample=single_sample)
+    pred = from_tensor(keras_model.predict(x,**kwargs),channel=channel_out,single_sample=single_sample)
+    len(axes_out) == pred.ndim or _raise(ValueError())
+    return pred
 
 
 
-def predict_tiled(keras_model,x,n_tiles,block_sizes,tile_overlap,channel_in=None,channel_out=0,pbar=None,**kwargs):
+def predict_tiled(keras_model,x,n_tiles,block_sizes,tile_overlaps,axes_in,axes_out=None,pbar=None,**kwargs):
     """TODO."""
 
     if all(t==1 for t in n_tiles):
-        pred = predict_direct(keras_model,x,channel_in=channel_in,channel_out=channel_out,**kwargs)
+        pred = predict_direct(keras_model,x,axes_in,axes_out,**kwargs)
         if pbar is not None:
             pbar.update()
         return pred
 
-    # TODO: better check, write an axis normalization function that converts negative indices to positive ones
-    channel_in  = (channel_in  + x.ndim) % x.ndim
-    channel_out = (channel_out + x.ndim) % x.ndim
+    ###
+
+    if axes_out is None:
+        axes_out = axes_in
+    axes_in, axes_out = axes_check_and_normalize(axes_in,x.ndim), axes_check_and_normalize(axes_out)
+    assert 'S' not in axes_in
+    assert 'C' in axes_in and 'C' in axes_out
+    ax_in, ax_out = axes_dict(axes_in), axes_dict(axes_out)
+    channel_in, channel_out = ax_in['C'], ax_out['C']
+
+    assert set(axes_out).issubset(set(axes_in))
+    axes_lost = set(axes_in).difference(set(axes_out))
+
+    def _to_axes_out(seq,elem):
+        # assumption: prediction size is same as input size along all axes, except for channel (and lost axes)
+        assert len(seq) == len(axes_in)
+        # 1. re-order 'seq' from axes_in to axes_out semantics
+        seq = [seq[ax_in[a]] for a in axes_out]
+        # 2. replace value at channel position with 'elem'
+        seq[ax_out['C']] = elem
+        return tuple(seq)
+
+    ###
 
     assert x.ndim == len(n_tiles) == len(block_sizes)
     assert n_tiles[channel_in] == 1
+    assert all(n_tiles[ax_in[a]] == 1 for a in axes_lost)
     assert all(np.isscalar(t) and 1<=t and int(t)==t for t in n_tiles)
-
-    def _remove_and_insert(x,a):
-        # remove element at channel_in and insert a at channel_out
-        lst = list(x)
-        if channel_in is not None:
-            del lst[channel_in]
-        lst.insert(channel_out,a)
-        return tuple(lst)
 
     # first axis > 1
     axis = next(i for i,t in enumerate(n_tiles) if t>1)
 
     block_size = block_sizes[axis]
-    n_block_overlap = int(np.ceil(1.*tile_overlap / block_size))
+    tile_overlap = tile_overlaps[axis]
+    n_block_overlap = int(np.ceil(1.* tile_overlap / block_size))
+
+    # print(f"axis={axis},n_tiles={n_tiles[axis]},block_size={block_size},tile_overlap={tile_overlap},n_block_overlap={n_block_overlap}")
 
     n_tiles_remaining = list(n_tiles)
     n_tiles_remaining[axis] = 1
@@ -73,10 +97,10 @@ def predict_tiled(keras_model,x,n_tiles,block_sizes,tile_overlap,channel_in=None
     dst = None
     for tile, s_src, s_dst in tile_iterator(x,axis=axis,n_tiles=n_tiles[axis],block_size=block_size,n_block_overlap=n_block_overlap):
 
-        pred = predict_tiled(keras_model,tile,n_tiles_remaining,block_sizes,tile_overlap,channel_in=channel_in,channel_out=channel_out,pbar=pbar,**kwargs)
+        pred = predict_tiled(keras_model,tile,n_tiles_remaining,block_sizes,tile_overlaps,axes_in,axes_out,pbar=pbar,**kwargs)
 
         # if any(t>1 for t in n_tiles_remaining):
-        #     pred = predict_tiled(keras_model,tile,n_tiles_remaining,block_sizes,tile_overlap,channel_in=channel_in,channel_out=channel_out,pbar=pbar,**kwargs)
+        #     pred = predict_tiled(keras_model,tile,n_tiles_remaining,block_sizes,tile_overlaps,axes_in,axes_out,pbar=pbar,**kwargs)
         # else:
         #     # tmp
         #     pred = tile
@@ -84,11 +108,11 @@ def predict_tiled(keras_model,x,n_tiles,block_sizes,tile_overlap,channel_in=None
         #         pbar.update()
 
         if dst is None:
-            dst_shape = _remove_and_insert(x.shape, pred.shape[channel_out])
+            dst_shape = _to_axes_out(x.shape, pred.shape[channel_out])
             dst = np.empty(dst_shape, dtype=x.dtype)
 
-        s_src = _remove_and_insert(s_src, slice(None))
-        s_dst = _remove_and_insert(s_dst, slice(None))
+        s_src = _to_axes_out(s_src, slice(None))
+        s_dst = _to_axes_out(s_dst, slice(None))
 
         dst[s_dst] = pred[s_src]
 
@@ -108,10 +132,10 @@ def tile_iterator(x,axis,n_tiles,block_size,n_block_overlap):
     n_tiles : int
         Number of tiles for axis of x
     block_size : int
-        axis of x is assumed to be ebenly divisible by block_size
+        axis of x is assumed to be evenly divisible by block_size
         all tiles are aligned with the block_size
     n_block_overlap : int
-        tiles will overlap a this many blocks
+        tiles will overlap this many blocks
 
     """
     n = x.shape[axis]
@@ -146,7 +170,7 @@ def tile_iterator(x,axis,n_tiles,block_size,n_block_overlap):
     # print([(_st-_pre,_st+_sz+_post) for (_st,_sz,(_pre,_post)) in zip(tile_starts,tile_sizes,off)])
 
     def to_slice(t):
-        sl = [slice(None) for _ in x.shape]
+        sl = [slice(None)] * x.ndim
         sl[axis] = slice(
             t[0]*block_size,
             t[1]*block_size if t[1]!=0 else None)
@@ -172,16 +196,21 @@ def tile_iterator(x,axis,n_tiles,block_size,n_block_overlap):
 
 
 
-def tile_overlap(n_depth, kern_size):
-    rf = {(1, 3):   9, (1, 5):  17, (1, 7): 25,
-          (2, 3):  22, (2, 5):  43, (2, 7): 62,
-          (3, 3):  46, (3, 5):  92, (3, 7): 138,
-          (4, 3):  94, (4, 5): 188, (4, 7): 282,
-          (5, 3): 190, (5, 5): 380, (5, 7): 570}
+def tile_overlap(n_depth, kern_size, pool_size=2):
+    rf = {(1, 3, 2):    9, (1, 5, 2):   17, (1, 7, 2):   25,
+          (2, 3, 2):   22, (2, 5, 2):   43, (2, 7, 2):   62,
+          (3, 3, 2):   46, (3, 5, 2):   92, (3, 7, 2):  138,
+          (4, 3, 2):   94, (4, 5, 2):  188, (4, 7, 2):  282,
+          (5, 3, 2):  190, (5, 5, 2):  380, (5, 7, 2):  570,
+          #
+          (1, 3, 4):   14, (1, 5, 4):   27, (1, 7, 4):   38,
+          (2, 3, 4):   58, (2, 5, 4):  116, (2, 7, 4):  158,
+          (3, 3, 4):  234, (3, 5, 4):  468, (3, 7, 4):  638,
+          (4, 3, 4):  938, (4, 5, 4): 1876, (4, 7, 4): 2558}
     try:
-        return rf[n_depth, kern_size]
+        return rf[n_depth, kern_size, pool_size]
     except KeyError:
-        raise ValueError('tile_overlap value for n_depth=%d and kern_size=%d not available.' % (n_depth, kern_size))
+        raise ValueError('tile_overlap value for n_depth=%d, kern_size=%d, pool_size=%d not available.' % (n_depth, kern_size, pool_size))
 
 
 

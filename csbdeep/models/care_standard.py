@@ -284,7 +284,7 @@ class CARE(object):
             'probabilistic': self.config.probabilistic,
             'axes':          self.config.axes,
             'axes_div_by':   self._axes_div_by(self.config.axes),
-            'tile_overlap':  tile_overlap(self.config.unet_n_depth, self.config.unet_kern_size),
+            'tile_overlap':  self._axes_tile_overlap(self.config.axes),
         }
         export_SavedModel(self.keras_model, str(fout), meta=meta)
         print("\nModel exported in TensorFlow's SavedModel format:\n%s" % str(fout.resolve()))
@@ -366,18 +366,22 @@ class CARE(object):
         img_axes_in = axes_check_and_normalize(axes,img.ndim)
         net_axes_in = self.config.axes
         net_axes_out = axes_check_and_normalize(self._axes_out)
-        len(net_axes_in) >= len(net_axes_out) or _raise(ValueError("more output than input axes"))
-        net_axes_lost = tuple(a for a in net_axes_in if a not in net_axes_out)
+        set(net_axes_out).issubset(set(net_axes_in)) or _raise(ValueError("different kinds of output than input axes"))
+        net_axes_lost = set(net_axes_in).difference(set(net_axes_out))
         img_axes_out = ''.join(a for a in img_axes_in if a not in net_axes_lost)
         # print(' -> '.join((img_axes_in, net_axes_in, net_axes_out, img_axes_out)))
+        tiling_axes = net_axes_out.replace('C','') # axes eligible for tiling
 
         _permute_axes = self._make_permute_axes(img_axes_in, net_axes_in, net_axes_out, img_axes_out)
         # _permute_axes: (img_axes_in -> net_axes_in), undo: (net_axes_out -> img_axes_out)
         x = _permute_axes(img)
         # x has net_axes_in semantics
+        x_tiling_axis = tuple(axes_dict(net_axes_in)[a] for a in tiling_axes) # numerical axis ids for x
+
         channel_in = axes_dict(net_axes_in)['C']
         channel_out = axes_dict(net_axes_out)['C']
         net_axes_in_div_by = self._axes_div_by(net_axes_in)
+        net_axes_in_overlaps = self._axes_tile_overlap(net_axes_in)
         self.config.n_channel_in == x.shape[channel_in] or _raise(ValueError())
 
         # TODO: refactor tiling stuff to make code more readable
@@ -390,7 +394,7 @@ class CARE(object):
 
         # to support old api: set scalar n_tiles value for the largest tiling axis
         if np.isscalar(n_tiles) and int(n_tiles)==n_tiles and 1<=n_tiles:
-            largest_tiling_axis = [i for i in np.argsort(x.shape) if i != channel_in][-1]
+            largest_tiling_axis = [i for i in np.argsort(x.shape) if i in x_tiling_axis][-1]
             _n_tiles = [n_tiles if i==largest_tiling_axis else 1 for i in range(x.ndim)]
             n_tiles = _permute_n_tiles(_n_tiles,undo=True)
             warnings.warn("n_tiles should be a tuple with an entry for each image axis")
@@ -408,12 +412,13 @@ class CARE(object):
             ValueError("all values of n_tiles must be integer values >= 1"))
         n_tiles = tuple(map(int,n_tiles))
         n_tiles = _permute_n_tiles(n_tiles)
-        n_tiles[channel_in] == 1 or _raise(ValueError("entry of n_tiles for channel axis must be 1"))
+        (all(n_tiles[i] == 1 for i in range(x.ndim) if i not in x_tiling_axis) or
+            _raise(ValueError("entry of n_tiles > 1 only allowed for axes '%s'" % tiling_axes)))
         n_tiles_limited = self._limit_tiling(x.shape,n_tiles,net_axes_in_div_by)
         if any(np.array(n_tiles) != np.array(n_tiles_limited)):
             print("Limiting n_tiles to %s" % str(_permute_n_tiles(n_tiles_limited,undo=True)))
         n_tiles = n_tiles_limited
-        overlap = tile_overlap(self.config.unet_n_depth, self.config.unet_kern_size)
+
 
         # normalize & resize
         x = normalizer.before(x, net_axes_in)
@@ -424,15 +429,17 @@ class CARE(object):
         while not done:
             try:
                 # raise tf.errors.ResourceExhaustedError(None,None,None) # tmp
-                x = predict_tiled(self.keras_model,x,channel_in=channel_in,channel_out=channel_out,
-                                  n_tiles=n_tiles,block_sizes=net_axes_in_div_by,tile_overlap=overlap,pbar=progress)
+                x = predict_tiled(self.keras_model,x,axes_in=net_axes_in,axes_out=net_axes_out,
+                                  n_tiles=n_tiles,block_sizes=net_axes_in_div_by,tile_overlaps=net_axes_in_overlaps,pbar=progress)
                 # x has net_axes_out semantics
                 done = True
                 progress.close()
             except tf.errors.ResourceExhaustedError:
+                # TODO: how to test this code?
                 n_tiles_prev = list(n_tiles) # make a copy
                 tile_sizes_approx = np.array(x.shape) / np.array(n_tiles)
-                n_tiles[np.argmax(tile_sizes_approx)] *= 2
+                t = [i for i in np.argsort(tile_sizes_approx) if i in x_tiling_axis][-1]
+                n_tiles[t] *= 2
                 n_tiles = self._limit_tiling(x.shape,n_tiles,net_axes_in_div_by)
                 if all(np.array(n_tiles) == np.array(n_tiles_prev)):
                     raise MemoryError("Tile limit exceeded. Memory occupied by another process (notebook)?")
@@ -520,6 +527,11 @@ class CARE(object):
         # default: must be divisible by power of 2 to allow down/up-sampling steps in unet
         pool_div_by = 2**self.config.unet_n_depth
         return tuple((pool_div_by if a in 'XYZT' else 1) for a in query_axes)
+
+    def _axes_tile_overlap(self, query_axes):
+        query_axes = axes_check_and_normalize(query_axes)
+        overlap = tile_overlap(self.config.unet_n_depth, self.config.unet_kern_size)
+        return tuple((overlap if a in 'XYZT' else None) for a in query_axes)
 
     @property
     def _axes_out(self):
