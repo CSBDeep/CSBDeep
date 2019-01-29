@@ -45,4 +45,4 @@ Alternative GPU-enabled Installation (Linux only)
 Since installing TensorFlow with its dependencies (CUDA, cuDNN) can be challenging,
 we offer a ready-to-use `Docker container <https://hub.docker.com/r/tboo/csbdeep_gpu_docker/>`_
 as an alternative to get started more quickly.
-(`What is docker? <https://en.wikipedia.org/wiki/Docker_(software)>`_)
+(`What is Docker? <https://en.wikipedia.org/wiki/Docker_(software)>`_)

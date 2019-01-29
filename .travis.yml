@@ -44,7 +44,7 @@ matrix:
       python: 3.6
       if: branch = master
       # lowest supported keras version, last tensorflow release that supports CUDA 8
-      env: TENSORFLOW='tensorflow==1.4.1' KERAS='keras==2.1.6'
+      env: TENSORFLOW='tensorflow==1.4.1' KERAS='keras==2.1.2'
       ###########
 
 install:

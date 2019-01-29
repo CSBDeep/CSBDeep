@@ -9,7 +9,8 @@ __pycache__/
 build/
 dist/
 docs/build/
-tests/htmlcov/
+htmlcov/
+.coverage
 
 *.npz
 *.tif*
