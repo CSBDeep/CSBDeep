@@ -23,9 +23,9 @@ class ProjectionCARE(CARE):
             return self._proj_params
         except AttributeError:
             p = {}
-            p['axis']    = vars(self.config).get('axis', 'Z')
-            p['n_depth'] = vars(self.config).get('n_depth', 2)
-            p['n_filt']  = vars(self.config).get('n_filt', 8)
+            p['axis']    = vars(self.config).get('proj_axis', 'Z')
+            p['n_depth'] = vars(self.config).get('proj_n_depth', 2)
+            p['n_filt']  = vars(self.config).get('proj_n_filt', 8)
             p['axis']    = axes_check_and_normalize(p['axis'],length=1)
 
             ax = axes_dict(self.config.axes)
@@ -33,8 +33,8 @@ class ProjectionCARE(CARE):
             self.config.axes[-1] == 'C' or _raise(ValueError())
             ax[p['axis']] is not None or _raise(ValueError())
 
-            p['kern'] = vars(self.config).get('kern', tuple(3 if d==ax[p['axis']] else 5 for d in range(3)))
-            p['pool'] = vars(self.config).get('pool', tuple(1 if d==ax[p['axis']] else 4 for d in range(3)))
+            p['kern'] = vars(self.config).get('proj_kern', tuple(3 if d==ax[p['axis']] else 5 for d in range(3)))
+            p['pool'] = vars(self.config).get('proj_pool', tuple(1 if d==ax[p['axis']] else 4 for d in range(3)))
             len(self.config.axes)-1 == len(p['pool']) == len(p['kern']) or _raise(ValueError())
 
             self._proj_params = namedtuple('ProjectionParameters',p.keys())(*p.values())

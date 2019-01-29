@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import print_function, unicode_literals, absolute_import, division
 
 import datetime
@@ -72,7 +73,7 @@ class CARE(object):
             raise ValueError('Invalid configuration attributes: ' + ', '.join(invalid_attr))
         (not (config is None and basedir is None)) or _raise(ValueError())
 
-        name is None or isinstance(name,string_types) or _raise(ValueError())
+        name is None or (isinstance(name,string_types) and len(name)>0) or _raise(ValueError())
         basedir is None or isinstance(basedir,(string_types,Path)) or _raise(ValueError())
         self.config = config
         self.name = name if name is not None else datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S.%f")
@@ -82,6 +83,12 @@ class CARE(object):
         self.keras_model = self._build()
         if config is None:
             self._find_and_load_weights()
+
+
+    def __repr__(self):
+        return (f"{self.__class__.__name__}({self.name}): {self.config.axes} → {self._axes_out}\n"
+                f"├─ Directory: {self.logdir.resolve() if self.basedir is not None else None}\n"
+                f"└─ {self.config}")
 
 
     def suppress_without_basedir(warn):
