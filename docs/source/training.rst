@@ -61,15 +61,9 @@ Other models
 ------------
 
 Training other CARE models
-(:class:`csbdeep.models.IsotropicCARE`, :class:`csbdeep.models.UpsamplingCARE`)
+(:class:`csbdeep.models.IsotropicCARE`,
+:class:`csbdeep.models.UpsamplingCARE`,
+:class:`csbdeep.models.ProjectionCARE`)
 currently does not differ from that of a
 standard model. What changes is the way in which the training data is
 generated (see :doc:`datagen`).
-
-.. .. autoclass:: csbdeep.models.IsotropicCARE
-..     :members: train
-..     :noindex:
-
-.. .. autoclass:: csbdeep.models.UpsamplingCARE
-..     :members: train
-..     :noindex:

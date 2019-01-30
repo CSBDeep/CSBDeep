@@ -41,7 +41,13 @@ computed on the raw images, which tends to lead to more robust CARE networks in 
 If not specified otherwise, patches which are purely background are also excluded
 from being extracted, since they do not contain interesting structures.
 
+If the target images have fewer axes than the source images, please use the function
+:func:`csbdeep.data.create_patches`. Examples:
+(a) Target image is a projection of the source image along an axis (see :class:`csbdeep.models.ProjectionCARE` and `example <http://csbdeep.bioimagecomputing.com/examples/projection>`_).
+(b) Multiple channels in the source image, but no separate channels in the target image.
+
 .. autofunction:: csbdeep.data.create_patches
+.. autofunction:: csbdeep.data.create_patches_reduced_target
 
 Supporting functions:
 
@@ -71,7 +77,7 @@ Transforms
 ----------
 
 A :class:`csbdeep.data.Transform` can be used to modify and augment the set of raw images
-before they are being use in :func:`csbdeep.data.create_patches` to generate training data.
+before they are being used in :func:`csbdeep.data.create_patches` to generate training data.
 
 .. autoclass:: csbdeep.data.Transform
     :members:

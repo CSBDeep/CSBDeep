@@ -32,9 +32,7 @@ on how to use this package.
 .. note::
     This is an early version of the software.
     Several features are still missing, including the use of network
-    ensembles and the application for surface projection.
-    Furthermore, creating training data via simulation is currently
-    not implemented.
+    ensembles and creating training data via simulation.
 
 
 Table of contents

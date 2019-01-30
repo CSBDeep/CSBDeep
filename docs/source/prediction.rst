@@ -45,6 +45,8 @@ for details and options).
 .. autoclass:: csbdeep.models.UpsamplingCARE
     :members:
 
+.. autoclass:: csbdeep.models.ProjectionCARE
+
 Return type for probabilistic prediction:
 
 .. autoclass:: csbdeep.internals.probability.ProbabilisticPrediction
