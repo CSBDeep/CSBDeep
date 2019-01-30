@@ -326,7 +326,7 @@ def create_patches(
     X = np.empty((n_patches,)+tuple(patch_size),dtype=np.float32)
     Y = np.empty_like(X)
 
-    for i, (x,y,_axes,mask) in tqdm(enumerate(image_pairs),total=n_images):
+    for i, (x,y,_axes,mask) in tqdm(enumerate(image_pairs),total=n_images,disable=(not verbose)):
         if i >= n_images:
             warnings.warn('more raw images (or transformations thereof) than expected, skipping excess images.')
             break
@@ -410,7 +410,13 @@ def create_patches_reduced_target(
     save_file = kwargs.pop('save_file',None)
 
     if any(s is None for s in patch_size):
-        tf = Transform(*zip(*transforms))
+        patch_axes = kwargs.get('patch_axes')
+        if patch_axes is not None:
+            _transforms = list(transforms)
+            _transforms.append(permute_axes(patch_axes))
+        else:
+            _transforms = transforms
+        tf = Transform(*zip(*_transforms))
         image_pairs = compose(*tf.generator)(raw_data.generator())
         x,y,axes,mask = next(image_pairs) # get the first entry from the generator
         patch_size = list(patch_size)

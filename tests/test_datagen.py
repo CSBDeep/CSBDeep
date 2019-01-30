@@ -5,9 +5,9 @@ from six.moves import range, zip, map, reduce, filter
 import numpy as np
 import pytest
 from tifffile import imread, imsave
-from csbdeep.data import RawData, create_patches
+from csbdeep.data import RawData, create_patches, create_patches_reduced_target
 from csbdeep.io import load_training_data
-from csbdeep.utils import Path, move_image_axes, backend_channels_last
+from csbdeep.utils import Path, axes_dict, move_image_axes, backend_channels_last
 
 
 
@@ -43,6 +43,68 @@ def test_create_patches():
     _create((32,48,32),'ZYX',(16,32,8),'ZYX')
     _create((32,48,32),'ZYX',(16,32,8),'YXZ')
     _create((32,48,32),'ZYX',(16,32,1,8),'YXCZ')
+
+
+
+def test_create_patches_reduced_target():
+    rng = np.random.RandomState(42)
+    def get_data(n_images, axes, shape):
+        red_n = rng.choice(len(axes)-1)+1
+        red_axes = ''.join(rng.choice(tuple(axes),red_n,replace=False))
+        keepdims = rng.choice((True,False))
+
+        def _gen():
+            for i in range(n_images):
+                x = rng.uniform(size=shape)
+                y = np.mean(x,axis=tuple(axes_dict(axes)[a] for a in red_axes),keepdims=keepdims)
+                yield x, y, axes, None
+        return RawData(_gen, n_images, ''), red_axes, keepdims
+
+    n_images, n_patches_per_image = 2, 4
+    def _create(red_none,img_size,img_axes,patch_size,patch_axes):
+        raw_data, red_axes, keepdims = get_data(n_images, img_axes, img_size)
+        # change patch_size to (img_size or None) for red_axes
+        patch_size = list(patch_size)
+        for a in red_axes:
+            patch_size[axes_dict(img_axes if patch_axes is None else patch_axes)[a]] = (
+                None if red_none else img_size[axes_dict(img_axes)[a]]
+            )
+        X,Y,XYaxes = create_patches_reduced_target (
+            raw_data            = raw_data,
+            patch_size          = patch_size,
+            patch_axes          = patch_axes,
+            n_patches_per_image = n_patches_per_image,
+            reduction_axes      = red_axes,
+            target_axes         = rng.choice((None,img_axes)) if keepdims else ''.join(a for a in img_axes if a not in red_axes),
+            #
+            normalization       = lambda patches_x, patches_y, *args: (patches_x, patches_y),
+            verbose             = False,
+        )
+        assert len(X) == n_images*n_patches_per_image
+        _X = np.mean(X,axis=tuple(axes_dict(XYaxes)[a] for a in red_axes),keepdims=True)
+        err = np.max(np.abs(_X-Y))
+        assert err < 1e-5
+
+    for b in (True,False):
+        _create(b,(128,128),'YX',(32,32),'YX')
+        _create(b,(128,128),'YX',(32,32),None)
+        _create(b,(128,128),'YX',(32,32),'XY')
+        _create(b,(128,128),'YX',(32,32,1),'XYC')
+
+        _create(b,(32,48,32),'ZYX',(16,32,8),None)
+        _create(b,(32,48,32),'ZYX',(16,32,8),'ZYX')
+        _create(b,(32,48,32),'ZYX',(16,32,8),'YXZ')
+        _create(b,(32,48,32),'ZYX',(16,32,1,8),'YXCZ')
+
+        _create(b,(128,2,128),'YCX',(32,2,32),'YCX')
+        _create(b,(3,128,128),'CYX',(3,32,32),None)
+        _create(b,(128,128,4),'YXC',(4,32,32),'CXY')
+        _create(b,(128,128,5),'YXC',(32,32,5),'XYC')
+
+        _create(b,(32,48,2,32),'ZYCX',(16,32,2,8),None)
+        _create(b,(32,3,48,32),'ZCYX',(3,16,32,8),'CZYX')
+        _create(b,(4,32,48,32),'CZYX',(16,32,8,4),'YXZC')
+        _create(b,(32,48,32,2),'ZYXC',(16,32,2,8),'YXCZ')
 
 
 
