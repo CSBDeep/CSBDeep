@@ -3,6 +3,7 @@ from __future__ import print_function, unicode_literals, absolute_import, divisi
 from six.moves import zip
 from tifffile import imread
 from collections import namedtuple
+from itertools import chain
 
 from ..utils import _raise, consume, axes_check_and_normalize
 from ..utils.six import Path, FileNotFoundError
@@ -57,7 +58,7 @@ class RawData(namedtuple('RawData' ,('generator' ,'size' ,'description'))):
         Raises
         ------
         FileNotFoundError
-            If an image found in `target_dir` does not exist in all `source_dirs`.
+            If an image found in a `source_dir` does not exist in `target_dir`.
 
         Example
         --------
@@ -65,13 +66,14 @@ class RawData(namedtuple('RawData' ,('generator' ,'size' ,'description'))):
         data
         ├── GT
         │   ├── imageA.tif
-        │   └── imageB.tif
+        │   ├── imageB.tif
+        │   └── imageC.tif
         ├── source1
         │   ├── imageA.tif
         │   └── imageB.tif
         └── source2
             ├── imageA.tif
-            └── imageB.tif
+            └── imageC.tif
 
         >>> data = RawData.from_folder(basepath='data', source_dirs=['source1','source2'], target_dir='GT', axes='YX')
         >>> n_images = data.size
@@ -80,22 +82,17 @@ class RawData(namedtuple('RawData' ,('generator' ,'size' ,'description'))):
 
         """
         p = Path(basepath)
-        image_names = [f.name for f in (p/target_dir).glob(pattern)]
-        len(image_names) > 0 or _raise(FileNotFoundError("'target_dir' doesn't exist or didn't find any images in it."))
-        consume ((
-            (p/s/n).exists() or _raise(FileNotFoundError(p/s/n))
-            for s in source_dirs for n in image_names
-        ))
+        pairs = [(f, p/target_dir/f.name) for f in chain(*((p/source_dir).glob(pattern) for source_dir in source_dirs))]
+        len(pairs) > 0 or _raise(FileNotFoundError("Didn't find any images."))
+        consume(t.exists() or _raise(FileNotFoundError(t)) for s,t in pairs)
         axes = axes_check_and_normalize(axes)
-        xy_name_pairs = [(p/source_dir/n, p/target_dir/n) for source_dir in source_dirs for n in image_names]
-        n_images = len(xy_name_pairs)
+        n_images = len(pairs)
         description = "{p}: target='{o}', sources={s}, axes='{a}', pattern='{pt}'".format(p=basepath, s=list(source_dirs),
                                                                                           o=target_dir, a=axes, pt=pattern)
 
         def _gen():
-            for fx, fy in xy_name_pairs:
+            for fx, fy in pairs:
                 x, y = imread(str(fx)), imread(str(fy))
-                # x.shape == y.shape or _raise(ValueError())
                 len(axes) >= x.ndim or _raise(ValueError())
                 yield x, y, axes[-x.ndim:], None
 
@@ -106,9 +103,6 @@ class RawData(namedtuple('RawData' ,('generator' ,'size' ,'description'))):
     @staticmethod
     def from_arrays(X, Y, axes='CZYX'):
         """Get pairs of corresponding images from numpy arrays."""
-
-        # if X.shape != Y.shape:
-        #     raise ValueError("X and Y should be of same shape!")
 
         def _gen():
             for x, y in zip(X ,Y):

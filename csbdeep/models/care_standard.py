@@ -86,9 +86,14 @@ class CARE(object):
 
 
     def __repr__(self):
-        return (f"{self.__class__.__name__}({self.name}): {self.config.axes} → {self._axes_out}\n"
-                f"├─ Directory: {self.logdir.resolve() if self.basedir is not None else None}\n"
+        return (f"{self.__class__.__name__}({self.name}): {self.config.axes} → {self._axes_out}\n" +
+                f"├─ Directory: {self.logdir.resolve() if self.basedir is not None else None}\n" +
+                self._repr_extra() +
                 f"└─ {self.config}")
+
+
+    def _repr_extra(self):
+        return ""
 
 
     def suppress_without_basedir(warn):
