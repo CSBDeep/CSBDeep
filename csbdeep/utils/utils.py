@@ -71,6 +71,14 @@ def normalize_mi_ma(x, mi, ma, clip=False, eps=1e-20, dtype=np.float32):
     return x
 
 
+def normalize_minmse(x, target):
+    """Affine rescaling of x, such that the mean squared error to target is minimal."""
+    cov = np.cov(x.flatten(),target.flatten())
+    alpha = cov[0,1] / cov[0,0]
+    beta = target.mean() - alpha*x.mean()
+    return alpha*x + beta
+
+
 ###
 
 

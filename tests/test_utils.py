@@ -5,7 +5,7 @@ from six.moves import range, zip, map, reduce, filter
 import numpy as np
 import pytest
 from csbdeep.data import NoNormalizer, PercentileNormalizer, NoResizer, PadAndCropResizer
-# from csbdeep.utils import Path, axes_dict, move_image_axes, backend_channels_last
+from csbdeep.utils import normalize_minmse
 
 
 
@@ -73,3 +73,17 @@ def test_normalizer(axes):
         w = normalizer.after(v, None, axes)[0]
         w_pmin, w_pmax = _percentile(w,pmin), _percentile(w,pmax)
         assert np.allclose(u_pmin,w_pmin) and np.allclose(u_pmax,w_pmax)
+
+
+
+def test_normalize_minmse():
+    rng = np.random.RandomState(42)
+    for _ in range(50):
+        target = rng.uniform(-100,100,size=(32,32,32))
+        x = rng.uniform(-500,500)*target + rng.uniform(-500,500)
+        assert np.allclose(normalize_minmse(x,target),target)
+        x, target = x.astype(np.float32), target.astype(np.float32)
+        assert np.max(np.abs(normalize_minmse(x,target)-target)) < 1e-3
+
+
+
