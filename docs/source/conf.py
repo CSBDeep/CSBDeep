@@ -61,7 +61,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'CSBDeep'
-copyright = f'2018–{datetime.now().year}, CSBD'
+copyright = u'2018–{}, CSBD'.format(datetime.now().year)
 author = u'Uwe Schmidt, Martin Weigert'
 
 # The version info for the project you're documenting, acts as replacement for

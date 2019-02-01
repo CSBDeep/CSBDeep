@@ -42,7 +42,7 @@ If not specified otherwise, patches which are purely background are also exclude
 from being extracted, since they do not contain interesting structures.
 
 If the target images have fewer axes than the source images, please use the function
-:func:`csbdeep.data.create_patches`. Examples:
+:func:`csbdeep.data.create_patches_reduced_target`. Examples:
 (a) Target image is a projection of the source image along an axis (see :class:`csbdeep.models.ProjectionCARE` and `example <http://csbdeep.bioimagecomputing.com/examples/projection>`_).
 (b) Multiple channels in the source image, but no separate channels in the target image.
 

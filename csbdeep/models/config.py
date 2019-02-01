@@ -66,7 +66,7 @@ class Config(argparse.Namespace):
     train_checkpoint : str
         Name of checkpoint file for model weights (only best are saved); set to ``None`` to disable. Default: ``weights_best.h5``
     train_reduce_lr : dict
-        Parameter :class:`dict` of ReduceLROnPlateau_ callback; set to ``None`` to disable. Default: ``{'factor': 0.5, 'patience': 10}``
+        Parameter :class:`dict` of ReduceLROnPlateau_ callback; set to ``None`` to disable. Default: ``{'factor': 0.5, 'patience': 10, 'min_delta': 0}``
 
         .. _ReduceLROnPlateau: https://keras.io/callbacks/#reducelronplateau
     """

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import print_function, unicode_literals, absolute_import, division
 
 import numpy as np
@@ -29,8 +30,8 @@ class ProjectionCARE(CARE):
             p['axis']    = axes_check_and_normalize(p['axis'],length=1)
 
             ax = axes_dict(self.config.axes)
-            len(self.config.axes) == 4 or _raise(ValueError(f"model must take 3D input, but axes are {self.config.axes}."))
-            ax[p['axis']] is not None or _raise(ValueError(f"projection axis {p['axis']} not part of model axes {self.config.axes}"))
+            len(self.config.axes) == 4 or _raise(ValueError("model must take 3D input, but axes are {self.config.axes}.".format(self=self)))
+            ax[p['axis']] is not None or _raise(ValueError("projection axis {axis} not part of model axes {self.config.axes}".format(self=self,axis=p['axis'])))
             self.config.axes[-1] == 'C' or _raise(ValueError())
 
             p['kern'] = vars(self.config).get('proj_kern', tuple(3 if d==ax[p['axis']] else 5 for d in range(3)))
@@ -42,7 +43,7 @@ class ProjectionCARE(CARE):
 
 
     def _repr_extra(self):
-        return f"├─ {self.proj_params}\n"
+        return "├─ {self.proj_params}\n".format(self=self)
 
 
     def _build(self):

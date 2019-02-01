@@ -6,7 +6,7 @@ import warnings
 
 import numpy as np
 import tensorflow as tf
-from six import string_types
+from six import string_types, PY2
 from functools import wraps
 
 from csbdeep.internals.probability import ProbabilisticPrediction
@@ -86,10 +86,11 @@ class CARE(object):
 
 
     def __repr__(self):
-        return (f"{self.__class__.__name__}({self.name}): {self.config.axes} → {self._axes_out}\n" +
-                f"├─ Directory: {self.logdir.resolve() if self.basedir is not None else None}\n" +
-                self._repr_extra() +
-                f"└─ {self.config}")
+        s = ("{self.__class__.__name__}({self.name}): {self.config.axes} → {self._axes_out}\n".format(self=self) +
+             "├─ Directory: {}\n".format(self.logdir.resolve() if self.basedir is not None else None) +
+             self._repr_extra() +
+             "└─ {self.config}".format(self=self))
+        return s.encode('utf-8') if PY2 else s
 
 
     def _repr_extra(self):
