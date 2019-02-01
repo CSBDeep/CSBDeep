@@ -42,8 +42,17 @@ class ProjectionCARE(CARE):
             return self._proj_params
 
 
+
     def _repr_extra(self):
         return "├─ {self.proj_params}\n".format(self=self)
+
+
+
+    def _update_and_check_config(self):
+        assert self.config is not None
+        for k,v in self.proj_params._asdict().items():
+            setattr(self.config, 'proj_'+k, v)
+
 
 
     def _build(self):

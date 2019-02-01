@@ -78,7 +78,13 @@ class CARE(object):
         self.config = config
         self.name = name if name is not None else datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S.%f")
         self.basedir = Path(basedir) if basedir is not None else None
+        if config is not None:
+            # config was provided -> update before it is saved to disk
+            self._update_and_check_config()
         self._set_logdir()
+        if config is None:
+            # config was loaded from disk -> update it after loading
+            self._update_and_check_config()
         self._model_prepared = False
         self.keras_model = self._build()
         if config is None:
@@ -95,6 +101,10 @@ class CARE(object):
 
     def _repr_extra(self):
         return ""
+
+
+    def _update_and_check_config(self):
+        pass
 
 
     def suppress_without_basedir(warn):
