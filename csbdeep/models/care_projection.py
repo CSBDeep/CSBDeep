@@ -20,23 +20,28 @@ class ProjectionCARE(CARE):
 
     @property
     def proj_params(self):
+        assert self.config is not None
         try:
             return self._proj_params
         except AttributeError:
             p = {}
-            p['axis']    = vars(self.config).get('proj_axis', 'Z')
-            p['n_depth'] = vars(self.config).get('proj_n_depth', 2)
-            p['n_filt']  = vars(self.config).get('proj_n_filt', 8)
-            p['axis']    = axes_check_and_normalize(p['axis'],length=1)
+            p['axis']              = vars(self.config).get('proj_axis', 'Z')
+            p['n_depth']           = int(vars(self.config).get('proj_n_depth', 4))
+            p['n_filt']            = int(vars(self.config).get('proj_n_filt', 8))
+            p['n_conv_per_depth']  = int(vars(self.config).get('proj_n_conv_per_depth', 1))
+            p['axis']              = axes_check_and_normalize(p['axis'],length=1)
 
             ax = axes_dict(self.config.axes)
             len(self.config.axes) == 4 or _raise(ValueError("model must take 3D input, but axes are {self.config.axes}.".format(self=self)))
             ax[p['axis']] is not None or _raise(ValueError("projection axis {axis} not part of model axes {self.config.axes}".format(self=self,axis=p['axis'])))
             self.config.axes[-1] == 'C' or _raise(ValueError())
+            (p['n_depth'] > 0 and p['n_filt'] > 0 and p['n_conv_per_depth'] > 0) or _raise(ValueError())
 
-            p['kern'] = vars(self.config).get('proj_kern', tuple(3 if d==ax[p['axis']] else 5 for d in range(3)))
-            p['pool'] = vars(self.config).get('proj_pool', tuple(1 if d==ax[p['axis']] else 4 for d in range(3)))
+            p['kern'] = tuple(vars(self.config).get('proj_kern', (3 if d==ax[p['axis']] else 3 for d in range(3))))
+            p['pool'] = tuple(vars(self.config).get('proj_pool', (1 if d==ax[p['axis']] else 2 for d in range(3))))
             3 == len(p['pool']) == len(p['kern']) or _raise(ValueError())
+            all(isinstance(v,int) and v > 0 for v in p['kern']) or _raise(ValueError())
+            all(isinstance(v,int) and v > 0 for v in p['pool']) or _raise(ValueError())
 
             self._proj_params = namedtuple('ProjectionParameters',p.keys())(*p.values())
             return self._proj_params
@@ -62,14 +67,21 @@ class ProjectionCARE(CARE):
 
         # define surface projection network (3D -> 2D)
         inp = u = Input(self.config.unet_input_shape)
-        for i in range(proj.n_depth):
-            u = Conv3D(proj.n_filt, proj.kern, padding='same', activation='relu')(u)
+        def conv_layers(u):
+            for _ in range(proj.n_conv_per_depth):
+                u = Conv3D(proj.n_filt, proj.kern, padding='same', activation='relu')(u)
+            return u
+        # down
+        for _ in range(proj.n_depth):
+            u = conv_layers(u)
             u = MaxPooling3D(proj.pool)(u)
-        for i in range(proj.n_depth):
-            u = Conv3D(proj.n_filt, proj.kern, padding='same', activation='relu')(u)
+        # middle
+        u = conv_layers(u)
+        # up
+        for _ in range(proj.n_depth):
             u = UpSampling3D(proj.pool)(u)
-        u = Conv3D(proj.n_filt, proj.kern, padding='same', activation='relu')(u)
-        u = Conv3D(1,           proj.kern, padding='same', activation='linear')(u)
+            u = conv_layers(u)
+        u = Conv3D(1, proj.kern, padding='same', activation='linear')(u)
         # convert learned features along Z to surface probabilities
         # (add 1 to proj_axis because of batch dimension in tensorflow)
         u = Lambda(lambda x: softmax(x, axis=1+proj_axis))(u)
