@@ -214,7 +214,7 @@ class CARE(object):
 
             if self.config.train_tensorboard:
                 from ..utils.tf import CARETensorBoard
-                self.callbacks.append(CARETensorBoard(log_dir=str(self.logdir), prefix_with_timestamp=False, n_images=3, write_images=True, prob_out=self.config.probabilistic))
+                self.callbacks.append(CARETensorBoard(log_dir=str(self.logdir), prefix_with_timestamp=False, n_images=5, write_images=True, prob_out=self.config.probabilistic))
 
         if self.config.train_reduce_lr is not None:
             from keras.callbacks import ReduceLROnPlateau
@@ -298,9 +298,22 @@ class CARE(object):
 
 
     @suppress_without_basedir(warn=True)
-    def export_TF(self):
-        """Export neural network via :func:`csbdeep.utils.tf.export_SavedModel`."""
-        fout = self.logdir / 'TF_SavedModel.zip'
+    def export_TF(self, fname = None):
+        """Export neural network via :func:`csbdeep.utils.tf.export_SavedModel`.
+        
+        Parameters
+        ----------
+        fname: str or None
+            path of the created SavedModel archive (will end with ".zip")
+            if None, the "logdir/TF_SavedModel.zip" will be used 
+
+        """
+        
+        if fname is None:
+            fname = self.logdir / 'TF_SavedModel.zip'
+        else:
+            fname = Path(fname)
+            
         meta = {
             'type':          self.__class__.__name__,
             'version':       package_version,
@@ -309,8 +322,8 @@ class CARE(object):
             'axes_div_by':   self._axes_div_by(self.config.axes),
             'tile_overlap':  self._axes_tile_overlap(self.config.axes),
         }
-        export_SavedModel(self.keras_model, str(fout), meta=meta)
-        print("\nModel exported in TensorFlow's SavedModel format:\n%s" % str(fout.resolve()))
+        export_SavedModel(self.keras_model, str(fname), meta=meta)
+        print("\nModel exported in TensorFlow's SavedModel format:\n%s" % str(fname.resolve()))
 
 
     def predict(self, img, axes, normalizer=PercentileNormalizer(), resizer=PadAndCropResizer(), n_tiles=None):
@@ -554,7 +567,7 @@ class CARE(object):
     def _axes_tile_overlap(self, query_axes):
         query_axes = axes_check_and_normalize(query_axes)
         overlap = tile_overlap(self.config.unet_n_depth, self.config.unet_kern_size)
-        return tuple((overlap if a in 'XYZT' else None) for a in query_axes)
+        return tuple((overlap if a in 'XYZT' else 0) for a in query_axes)
 
     @property
     def _axes_out(self):
