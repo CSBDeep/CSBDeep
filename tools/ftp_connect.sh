@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 FTP_HOST=access763254689.webspace-data.io
 FTP_USER=u95689219-uschmidt

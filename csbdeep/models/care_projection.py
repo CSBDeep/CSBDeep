@@ -146,7 +146,7 @@ class ProjectionCARE(CARE):
             for a,a_proj_pool,a_proj_kern in zip(self.config.axes.replace('C',''),proj.pool,proj.kern)
             if a != proj.axis
         }
-        return tuple(overlap.get(a,None) for a in query_axes)
+        return tuple(overlap.get(a,0) for a in query_axes)
 
 
 

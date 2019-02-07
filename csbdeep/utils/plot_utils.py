@@ -46,9 +46,7 @@ def plot_some(*arr, **kwargs):
     x = np.ones((5,200,200))
     plot_some(x,x,x)
 
-
     """
-
     title_list = kwargs.pop('title_list',None)
     pmin = kwargs.pop('pmin',0)
     pmax = kwargs.pop('pmax',100)
@@ -70,23 +68,18 @@ def _plot_some(arr, title_list=None, pmin=0, pmax=100, cmap='magma', **imshow_kw
     :param pmax:
     :param imshow_kwargs:
     :return:
+
     """
-
     import matplotlib.pyplot as plt
-
     imshow_kwargs['cmap'] = cmap
 
-
     def make_acceptable(a):
-        a = np.asarray(a)
-        return a
-    
+        return np.asarray(a)
     def color_image(a):
         return np.stack(map(to_color,a)) if 1<a.shape[-1]<=3 else a
     def max_project(a):
         return np.max(a,axis=1) if (a.ndim==4 and not 1<=a.shape[-1]<=3) else a
 
-    
     arr = map(make_acceptable,arr)
     arr = map(color_image,arr)
     arr = map(max_project,arr)
