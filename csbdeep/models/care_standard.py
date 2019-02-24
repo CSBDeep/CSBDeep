@@ -67,7 +67,7 @@ class CARE(object):
     def __init__(self, config, name=None, basedir='.'):
         """See class docstring."""
 
-        config is None or isinstance(config,Config) or _raise(ValueError('Invalid configuration: %s' % str(config)))
+        config is None or isinstance(config,self._config_class) or _raise(ValueError('Invalid configuration: %s' % str(config)))
         if config is not None and not config.is_valid():
             invalid_attr = config.is_valid(True)[1]
             raise ValueError('Invalid configuration attributes: ' + ', '.join(invalid_attr))
@@ -128,7 +128,7 @@ class CARE(object):
         if self.config is None:
             if config_file.exists():
                 config_dict = load_json(str(config_file))
-                self.config = Config(**config_dict)
+                self.config = self._config_class(**config_dict)
                 if not self.config.is_valid():
                     invalid_attr = self.config.is_valid(True)[1]
                     raise ValueError('Invalid attributes in loaded config: ' + ', '.join(invalid_attr))
@@ -571,3 +571,7 @@ class CARE(object):
     @property
     def _axes_out(self):
         return self.config.axes
+
+    @property
+    def _config_class(self):
+        return Config
