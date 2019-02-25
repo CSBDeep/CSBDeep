@@ -129,18 +129,28 @@ def tf_normalize(x, pmin=1, pmax=99.8, axis=None, clip=False):
         y = K.clip(y,0,1.0)
     return y
 
-def tf_normalize_layer(layer, n_channels_out, n_dim_out, pmin=1, pmax=99.8, clip=True):
-    def norm(x,axis=None):
+
+def tf_normalize_layer(layer, pmin=1, pmax=99.8, clip=True):
+    def norm(x,axis):
         return tf_normalize(x, pmin=pmin, pmax=pmax, axis=axis, clip=clip)
+
+    shape = K.int_shape(layer)
+    n_channels_out = shape[-1]
+    n_dim_out = len(shape)
+
     if n_dim_out > 4:
-        out = Lambda(lambda x: norm(K.max(K.max(x, axis=1), axis=-1, keepdims=True), axis=(1,2,3)))(layer)
+        layer = Lambda(lambda x: K.max(x, axis=tuple(range(1,1+n_dim_out-4))))(layer)
+
+    assert 0 < n_channels_out
+
+    if n_channels_out == 1:
+        out = Lambda(lambda x: norm(x, axis=(1,2)))(layer)
+    elif n_channels_out == 2:
+        out = Lambda(lambda x: norm(K.concatenate([x,x[...,:1]], axis=-1), axis=(1,2,3)))(layer)
+    elif n_channels_out == 3:
+        out = Lambda(lambda x: norm(x, axis=(1,2,3)))(layer)
     else:
-        if n_channels_out > 3:
-            out = Lambda(lambda x: norm(K.max(x, axis=-1, keepdims=True)))(layer)
-        elif n_channels_out ==2:
-            out = Lambda(lambda x: norm(K.concatenate([x,x[...,:1]], axis=-1)))(layer)
-        else:
-            out = Lambda(lambda x: norm(x, axis=(1,2)))(layer)
+        out = Lambda(lambda x: norm(K.max(x, axis=-1, keepdims=True), axis=(1,2,3)))(layer)
     return out
 
 
@@ -153,9 +163,14 @@ class CARETensorBoard(Callback):
                  prob_out=False,
                  write_graph=False,
                  prefix_with_timestamp=True,
-                 write_images=False):
+                 write_images=False,
+                 image_for_inputs=None,  # write images for only these input indices
+                 image_for_outputs=None, # write images for only these output indices
+                 input_slices=None,      # list (of list) of slices to apply to `image_for_inputs` layers before writing image
+                 output_slices=None):    # list (of list) of slices to apply to `image_for_outputs` layers before writing image
         super(CARETensorBoard, self).__init__()
         is_tf_backend() or _raise(RuntimeError('TensorBoard callback only works with the TensorFlow backend.'))
+        backend_channels_last() or _raise(NotImplementedError())
 
         self.freq = freq
         self.image_freq = freq
@@ -164,6 +179,10 @@ class CARETensorBoard(Callback):
         self.write_graph = write_graph
         self.write_images = write_images
         self.n_images = n_images
+        self.image_for_inputs = image_for_inputs
+        self.image_for_outputs = image_for_outputs
+        self.input_slices = input_slices
+        self.output_slices = output_slices
         self.compute_histograms = compute_histograms
 
         if prefix_with_timestamp:
@@ -185,38 +204,51 @@ class CARETensorBoard(Callback):
                     tf_sums.append(tf.summary.histogram('{}_out'.format(layer.name),
                                                         layer.output))
 
-        # outputs
-        backend_channels_last() or _raise(NotImplementedError())
 
-        n_channels_in = self.model.input_shape[-1]
-        n_dim_in = len(self.model.input_shape)
+        n_inputs, n_outputs = len(self.model.inputs), len(self.model.outputs)
+        image_for_inputs  = np.arange(n_inputs)  if self.image_for_inputs  is None else self.image_for_inputs
+        image_for_outputs = np.arange(n_outputs) if self.image_for_outputs is None else self.image_for_outputs
 
-        n_channels_out = self.model.output_shape[-1]
-        n_dim_out = len(self.model.output_shape)
+        input_slices  = (slice(None),) if self.input_slices  is None else self.input_slices
+        output_slices = (slice(None),) if self.output_slices is None else self.output_slices
+        if isinstance(input_slices[0],slice): # apply same slices to all inputs
+            input_slices = [input_slices]*len(image_for_inputs)
+        if isinstance(output_slices[0],slice): # apply same slices to all outputs
+            output_slices = [output_slices]*len(image_for_outputs)
+        len(input_slices)  == len(image_for_inputs)  or _raise(ValueError())
+        len(output_slices) == len(image_for_outputs) or _raise(ValueError())
 
-        # FIXME: not fully baked, eg. n_dim==5 multichannel doesnt work
+        def _name(prefix, layer, i, n):
+            return '{prefix}{i}_{name}'.format (
+                prefix = prefix,
+                i      = (i if n > 1 else ''),
+                name   = ''.join(layer.name.split(':')[:-1]),
+            )
 
+        for i,sl in zip(image_for_inputs,input_slices):
+            # print('input', self.model.inputs[i], tuple(sl))
+            layer_name = _name('input', self.model.inputs[i], i, n_inputs)
+            input_layer = tf_normalize_layer(self.model.inputs[i][tuple(sl)])
+            tf_sums.append(tf.summary.image(layer_name, input_layer, max_outputs=self.n_images))
 
-        sep = n_channels_out
-        if self.prob_out:
-            # first half of output channels is mean, second half scale
-            # assert n_channels_in*2 == n_channels_out
-            # if n_channels_in*2 != n_channels_out:
-            #     raise ValueError('prob_out: must be two output channels for every input channel')
-            n_channels_out % 2 == 0 or _raise(ValueError())
-            sep = sep // 2
+        for i,sl in zip(image_for_outputs,output_slices):
+            # print('output', self.model.outputs[i], tuple(sl))
+            output_shape = self.model.output_shape if n_outputs==1 else self.model.output_shape[i]
+            n_channels_out = sep = output_shape[-1]
+            if self.prob_out: # first half of output channels is mean, second half scale
+                n_channels_out % 2 == 0 or _raise(ValueError())
+                sep = sep // 2
+            output_layer = tf_normalize_layer(self.model.outputs[i][...,:sep][tuple(sl)])
+            if self.prob_out:
+                scale_layer = tf_normalize_layer(self.model.outputs[i][...,sep:][tuple(sl)], pmin=0, pmax=100)
+                mean_name  = _name('mean',  self.model.outputs[i], i, n_outputs)
+                scale_name = _name('scale', self.model.outputs[i], i, n_outputs)
+                tf_sums.append(tf.summary.image(mean_name, output_layer, max_outputs=self.n_images))
+                tf_sums.append(tf.summary.image(scale_name, scale_layer, max_outputs=self.n_images))
+            else:
+                layer_name = _name('output', self.model.outputs[i], i, n_outputs)
+                tf_sums.append(tf.summary.image(layer_name, output_layer, max_outputs=self.n_images))
 
-        input_layer = tf_normalize_layer(self.model.input, n_channels_in, n_dim_in)
-        output_layer = tf_normalize_layer(self.model.output[...,:sep], sep, n_dim_out)
-        if self.prob_out:
-            scale_layer = tf_normalize_layer(self.model.output[...,sep:], sep, n_dim_out, pmin=0, pmax=100)
-
-        tf_sums.append(tf.summary.image('input', input_layer, max_outputs=self.n_images))
-        if self.prob_out:
-            tf_sums.append(tf.summary.image('mean', output_layer, max_outputs=self.n_images))
-            tf_sums.append(tf.summary.image('scale', scale_layer, max_outputs=self.n_images))
-        else:
-            tf_sums.append(tf.summary.image('output', output_layer, max_outputs=self.n_images))
 
         with tf.name_scope('merged'):
             self.merged = tf.summary.merge(tf_sums)
