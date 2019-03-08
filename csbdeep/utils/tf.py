@@ -206,7 +206,12 @@ class CARETensorBoard(Callback):
                                                         layer.output))
 
 
-        self.gt_outputs = [K.placeholder(shape=K.int_shape(x)) for x in self.model.outputs]
+        def _gt_shape(output_shape):
+            if not self.prob_out: return output_shape
+            output_shape[-1] % 2 == 0 or _raise(ValueError())
+            return list(output_shape[:-1]) + [output_shape[-1] // 2]
+        self.gt_outputs = [K.placeholder(shape=_gt_shape(K.int_shape(x))) for x in self.model.outputs]
+
         n_inputs, n_outputs = len(self.model.inputs), len(self.model.outputs)
         image_for_inputs  = np.arange(n_inputs)  if self.image_for_inputs  is None else self.image_for_inputs
         image_for_outputs = np.arange(n_outputs) if self.image_for_outputs is None else self.image_for_outputs
