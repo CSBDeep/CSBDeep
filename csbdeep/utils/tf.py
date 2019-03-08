@@ -176,6 +176,7 @@ class CARETensorBoard(Callback):
         self.image_freq = freq
         self.prob_out = prob_out
         self.merged = None
+        self.gt_outputs = None
         self.write_graph = write_graph
         self.write_images = write_images
         self.n_images = n_images
@@ -205,6 +206,7 @@ class CARETensorBoard(Callback):
                                                         layer.output))
 
 
+        self.gt_outputs = [K.placeholder(shape=K.int_shape(x)) for x in self.model.outputs]
         n_inputs, n_outputs = len(self.model.inputs), len(self.model.outputs)
         image_for_inputs  = np.arange(n_inputs)  if self.image_for_inputs  is None else self.image_for_inputs
         image_for_outputs = np.arange(n_outputs) if self.image_for_outputs is None else self.image_for_outputs
@@ -218,22 +220,29 @@ class CARETensorBoard(Callback):
         len(input_slices)  == len(image_for_inputs)  or _raise(ValueError())
         len(output_slices) == len(image_for_outputs) or _raise(ValueError())
 
-        def _name(prefix, layer, i, n):
-            return '{prefix}{i}_{name}'.format (
+        def _name(prefix, layer, i, n, show_layer_names=False):
+            return '{prefix}{i}{name}'.format (
                 prefix = prefix,
                 i      = (i if n > 1 else ''),
-                name   = ''.join(layer.name.split(':')[:-1]),
+                name   = '' if (layer is None or not show_layer_names) else '_'+''.join(layer.name.split(':')[:-1]),
             )
 
+        # inputs
         for i,sl in zip(image_for_inputs,input_slices):
             # print('input', self.model.inputs[i], tuple(sl))
-            layer_name = _name('input', self.model.inputs[i], i, n_inputs)
+            layer_name = _name('net_input', self.model.inputs[i], i, n_inputs)
             input_layer = tf_normalize_layer(self.model.inputs[i][tuple(sl)])
             tf_sums.append(tf.summary.image(layer_name, input_layer, max_outputs=self.n_images))
 
+        # outputs
         for i,sl in zip(image_for_outputs,output_slices):
             # print('output', self.model.outputs[i], tuple(sl))
             output_shape = self.model.output_shape if n_outputs==1 else self.model.output_shape[i]
+            # target
+            output_layer = tf_normalize_layer(self.gt_outputs[i][tuple(sl)])
+            layer_name = _name('net_target', self.model.outputs[i], i, n_outputs)
+            tf_sums.append(tf.summary.image(layer_name, output_layer, max_outputs=self.n_images))
+            # prediction
             n_channels_out = sep = output_shape[-1]
             if self.prob_out: # first half of output channels is mean, second half scale
                 n_channels_out % 2 == 0 or _raise(ValueError())
@@ -241,18 +250,17 @@ class CARETensorBoard(Callback):
             output_layer = tf_normalize_layer(self.model.outputs[i][...,:sep][tuple(sl)])
             if self.prob_out:
                 scale_layer = tf_normalize_layer(self.model.outputs[i][...,sep:][tuple(sl)], pmin=0, pmax=100)
-                mean_name  = _name('mean',  self.model.outputs[i], i, n_outputs)
-                scale_name = _name('scale', self.model.outputs[i], i, n_outputs)
+                mean_name  = _name('net_output_mean',  self.model.outputs[i], i, n_outputs)
+                scale_name = _name('net_output_scale', self.model.outputs[i], i, n_outputs)
                 tf_sums.append(tf.summary.image(mean_name, output_layer, max_outputs=self.n_images))
                 tf_sums.append(tf.summary.image(scale_name, scale_layer, max_outputs=self.n_images))
             else:
-                layer_name = _name('output', self.model.outputs[i], i, n_outputs)
+                layer_name = _name('net_output', self.model.outputs[i], i, n_outputs)
                 tf_sums.append(tf.summary.image(layer_name, output_layer, max_outputs=self.n_images))
 
 
         with tf.name_scope('merged'):
             self.merged = tf.summary.merge(tf_sums)
-            # self.merged = tf.summary.merge([foo])
 
         with tf.name_scope('summary_writer'):
             if self.write_graph:
@@ -274,7 +282,7 @@ class CARETensorBoard(Callback):
                     tensors = self.model.inputs + [K.learning_phase()]
                 else:
                     val_data = list(v[:self.n_images] for v in self.validation_data)
-                    tensors = self.model.inputs
+                    tensors = self.model.inputs + self.gt_outputs
                 feed_dict = dict(zip(tensors, val_data))
                 result = self.sess.run([self.merged], feed_dict=feed_dict)
                 summary_str = result[0]
