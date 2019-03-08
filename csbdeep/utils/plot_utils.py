@@ -76,9 +76,11 @@ def _plot_some(arr, title_list=None, pmin=0, pmax=100, cmap='magma', **imshow_kw
     def make_acceptable(a):
         return np.asarray(a)
     def color_image(a):
-        return np.stack(map(to_color,a)) if 1<a.shape[-1]<=3 else a
+        return np.stack(map(to_color,a)) if 1 < a.shape[-1] <= 3 else a
     def max_project(a):
-        return np.max(a,axis=1) if (a.ndim==4 and not 1<=a.shape[-1]<=3) else a
+        ndim_allowed = 2 + int(1 <= a.shape[-1] <= 3)
+        proj_axis = tuple(range(1, 1 + max(0, a[0].ndim - ndim_allowed)))
+        return np.max(a, axis=proj_axis)
 
     arr = map(make_acceptable,arr)
     arr = map(color_image,arr)
