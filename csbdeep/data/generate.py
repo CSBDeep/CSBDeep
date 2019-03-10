@@ -4,6 +4,7 @@ from six.moves import range, zip, map, reduce, filter
 from six import string_types
 
 import numpy as np
+import random
 import sys, os, warnings
 
 from tqdm import tqdm
@@ -65,7 +66,7 @@ def no_background_patches(threshold=0.4, percentile=99.9):
 
 ## Sample patches
 
-def sample_patches_from_multiple_stacks(datas, patch_size, n_samples, datas_mask=None, patch_filter=None, verbose=False):
+def sample_patches_from_multiple_stacks(datas, patch_size, n_samples, datas_mask=None, patch_filter=None, verbose=False, numpy_rng=True):
     """ sample matching patches of size `patch_size` from all arrays in `datas` """
 
     # TODO: some of these checks are already required in 'create_patches'
@@ -94,16 +95,25 @@ def sample_patches_from_multiple_stacks(datas, patch_size, n_samples, datas_mask
 
     border_slices = tuple([slice(s // 2, d - s + s // 2 + 1) for s, d in zip(patch_size, datas[0].shape)])
     valid_inds = np.where(patch_mask[border_slices])
+    n_valid = len(valid_inds[0])
 
-    if len(valid_inds[0]) == 0:
+    if n_valid == 0:
         raise ValueError("'patch_filter' didn't return any region to sample from")
 
-    valid_inds = [v + s.start for s, v in zip(border_slices, valid_inds)]
+    if numpy_rng:
+        # slow for large n_valid
+        sample_inds = np.random.choice(n_valid, n_samples, replace=(n_valid < n_samples))
+    else:
+        if n_valid < n_samples:
+            # sample with replacement
+            sample_inds = random.choices(range(n_valid), k=n_samples)
+        else:
+            # sample without replacement
+            sample_inds = random.sample(range(n_valid), n_samples)
 
-    # sample
-    sample_inds = np.random.choice(len(valid_inds[0]), n_samples, replace=len(valid_inds[0])<n_samples)
-
-    rand_inds = [v[sample_inds] for v in valid_inds]
+    # valid_inds = [v + s.start for s, v in zip(border_slices, valid_inds)] # slow for large n_valid
+    # rand_inds = [v[sample_inds] for v in valid_inds]
+    rand_inds = [v[sample_inds] + s.start for s, v in zip(border_slices, valid_inds)]
 
     # res = [np.stack([data[r[0] - patch_size[0] // 2:r[0] + patch_size[0] - patch_size[0] // 2,
     #                  r[1] - patch_size[1] // 2:r[1] + patch_size[1] - patch_size[1] // 2,
