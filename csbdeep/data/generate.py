@@ -4,11 +4,10 @@ from six.moves import range, zip, map, reduce, filter
 from six import string_types
 
 import numpy as np
-import random
 import sys, os, warnings
 
 from tqdm import tqdm
-from ..utils import _raise, consume, compose, normalize_mi_ma, axes_dict, axes_check_and_normalize
+from ..utils import _raise, consume, compose, normalize_mi_ma, axes_dict, axes_check_and_normalize, choice
 from ..utils.six import Path
 from ..io import save_training_data
 
@@ -100,21 +99,7 @@ def sample_patches_from_multiple_stacks(datas, patch_size, n_samples, datas_mask
     if n_valid == 0:
         raise ValueError("'patch_filter' didn't return any region to sample from")
 
-    # save state of 'random' and set seed using 'np.random'
-    state = random.getstate()
-    random.seed(np.random.randint(np.iinfo(int).min, np.iinfo(int).max))
-
-    # slow for large n_valid
-    # sample_inds = np.random.choice(n_valid, n_samples, replace=(n_valid < n_samples))
-    if n_valid < n_samples:
-        # sample with replacement
-        sample_inds = random.choices(range(n_valid), k=n_samples)
-    else:
-        # sample without replacement
-        sample_inds = random.sample(range(n_valid), n_samples)
-
-    # restore state of 'random'
-    random.setstate(state)
+    sample_inds = choice(range(n_valid), n_samples, replace=(n_valid < n_samples))
 
     # valid_inds = [v + s.start for s, v in zip(border_slices, valid_inds)] # slow for large n_valid
     # rand_inds = [v[sample_inds] for v in valid_inds]

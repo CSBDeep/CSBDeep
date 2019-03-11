@@ -4,6 +4,8 @@ import os
 import numpy as np
 import json
 import collections
+import platform
+import random
 from six.moves import range, zip, map, reduce, filter
 from .six import Path
 
@@ -241,3 +243,27 @@ def move_image_axes(x, fr, to, adjust_singletons=False):
     if fr == to:
         return x
     return np.moveaxis(x, [ax_from[a] for a in fr], [ax_to[a] for a in fr])
+
+
+###
+
+
+def choice(population, k=1, replace=True):
+    ver = platform.sys.version_info
+    if replace and (ver.major,ver.minor) in [(2,7),(3,5)]: # python 2.7 or 3.5
+        # slow if population is large and not a np.ndarray
+        return list(np.random.choice(population, k, replace=replace))
+    else:
+        try:
+            # save state of 'random' and set seed using 'np.random'
+            state = random.getstate()
+            random.seed(np.random.randint(np.iinfo(int).min, np.iinfo(int).max))
+            if replace:
+                # sample with replacement
+                return random.choices(population, k=k)
+            else:
+                # sample without replacement
+                return random.sample(population, k=k)
+        finally:
+            # restore state of 'random'
+            random.setstate(state)
