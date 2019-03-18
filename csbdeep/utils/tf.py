@@ -281,13 +281,16 @@ class CARETensorBoard(Callback):
             if epoch % self.freq == 0:
                 # TODO: implement batched calls to sess.run
                 # (current call will likely go OOM on GPU)
+
+                tensors = self.model.inputs + self.gt_outputs + self.model.sample_weights
+
                 if self.model.uses_learning_phase:
-                    cut_v_data = len(self.model.inputs)
-                    val_data = self.validation_data + [0]
-                    tensors = self.model.inputs + [K.learning_phase()]
+                    tensors += [K.learning_phase()]
+                    val_data = list(v[:self.n_images] for v in self.validation_data[:-1])
+                    val_data += self.validation_data[-1:]
                 else:
                     val_data = list(v[:self.n_images] for v in self.validation_data)
-                    tensors = self.model.inputs + self.gt_outputs
+
                 feed_dict = dict(zip(tensors, val_data))
                 result = self.sess.run([self.merged], feed_dict=feed_dict)
                 summary_str = result[0]
