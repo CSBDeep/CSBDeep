@@ -279,10 +279,11 @@ def test_model_predict_tiled(tmpdir,config):
 
 @pytest.mark.parametrize('n_depth', (1,2,3,4,5))
 @pytest.mark.parametrize('kern_size', (3,5,7))
-def test_tile_overlap(n_depth, kern_size):
+@pytest.mark.parametrize('pool_size', (1,2))
+def test_tile_overlap(n_depth, kern_size, pool_size):
     K.clear_session()
     img_size = 1280
-    rf_x, rf_y = receptive_field_unet(n_depth,kern_size,n_dim=2,img_size=img_size)
+    rf_x, rf_y = receptive_field_unet(n_depth,kern_size,pool_size,n_dim=2,img_size=img_size)
     assert rf_x == rf_y
     rf = rf_x
     assert np.abs(rf[0]-rf[1]) < 10
