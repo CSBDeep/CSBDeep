@@ -282,13 +282,13 @@ def test_model_predict_tiled(tmpdir,config):
 @pytest.mark.parametrize('pool_size', (1,2))
 def test_tile_overlap(n_depth, kern_size, pool_size):
     K.clear_session()
-    img_size = 1280
+    img_size = 1280 if pool_size > 1 else 160
     rf_x, rf_y = receptive_field_unet(n_depth,kern_size,pool_size,n_dim=2,img_size=img_size)
     assert rf_x == rf_y
     rf = rf_x
     assert np.abs(rf[0]-rf[1]) < 10
     assert sum(rf)+1 < img_size
-    assert max(rf) == tile_overlap(n_depth,kern_size)
+    assert max(rf) == tile_overlap(n_depth,kern_size,pool_size)
     # print("receptive field of n_depth %d and kernel size %d: %s"%(n_depth,kern_size,rf));
 
 

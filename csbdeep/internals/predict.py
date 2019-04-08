@@ -154,7 +154,7 @@ def tile_iterator(x,axis,n_tiles,block_size,n_block_overlap):
 
     # list of sizes for each tile
     tile_sizes = s*np.ones(n_tiles,int)
-    # distribute remaning blocks to tiles at beginning and end
+    # distribute remaining blocks to tiles at beginning and end
     if r > 0:
         tile_sizes[:r//2]      += 1
         tile_sizes[-(r-r//2):] += 1
