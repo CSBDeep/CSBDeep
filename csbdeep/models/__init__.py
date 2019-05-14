@@ -39,7 +39,8 @@ del K
 
 
 # imports
-from .config import Config
+from .config import BaseConfig, Config
+from .base_model import BaseModel
 from .care_standard import CARE
 from .care_upsampling import UpsamplingCARE
 from .care_isotropic import IsotropicCARE
