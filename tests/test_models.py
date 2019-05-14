@@ -11,18 +11,19 @@ from csbdeep.internals.predict import tile_overlap
 from keras import backend as K
 
 from csbdeep.internals.nets import receptive_field_unet
-from csbdeep.models import Config, CARE, UpsamplingCARE, IsotropicCARE, ProjectionCARE
+from csbdeep.models import Config, CARE, UpsamplingCARE, IsotropicCARE
+from csbdeep.models import ProjectionConfig, ProjectionCARE
 from csbdeep.utils import axes_dict
 from csbdeep.utils.six import FileNotFoundError
 
 
 
-def config_generator(**kwargs):
+def config_generator(cls=Config, **kwargs):
     assert 'axes' in kwargs
     keys, values = kwargs.keys(), kwargs.values()
     values = [v if isinstance(v,(list,tuple)) else [v] for v in values]
     for p in product(*values):
-        yield Config(**dict(zip(keys,p)))
+        yield cls(**dict(zip(keys,p)))
 
 
 
@@ -388,6 +389,7 @@ def test_model_isotropic_predict(tmpdir,config,factor):
 
 
 @pytest.mark.parametrize('config', filter(lambda c: c.is_valid(), config_generator(
+    ProjectionConfig,
     axes                  = ['ZYX'],
     n_channel_in          = [1,2],
     n_channel_out         = [1,2],
@@ -399,6 +401,7 @@ def test_model_isotropic_predict(tmpdir,config,factor):
     unet_n_first          = [4],
     unet_last_activation  = ['linear'],
     # unet_input_shape      = [(None, None, 1)],
+    proj_n_depth          = [2,4],
 )))
 def test_model_projection_predict(tmpdir,config):
     rng = np.random.RandomState(42)

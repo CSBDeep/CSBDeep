@@ -44,4 +44,4 @@ from .base_model import BaseModel
 from .care_standard import CARE
 from .care_upsampling import UpsamplingCARE
 from .care_isotropic import IsotropicCARE
-from .care_projection import ProjectionCARE
+from .care_projection import ProjectionConfig, ProjectionCARE
