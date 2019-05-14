@@ -1,20 +1,18 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, unicode_literals, absolute_import, division
 
-import datetime
 import warnings
 
 import numpy as np
 import tensorflow as tf
-from six import string_types, PY2
-from functools import wraps
+from six import string_types
 
 from csbdeep.internals.probability import ProbabilisticPrediction
 from .config import Config
-from .base_model import BaseModel
+from .base_model import BaseModel, suppress_without_basedir
 
-from ..utils import _raise, load_json, save_json, axes_check_and_normalize, axes_dict, move_image_axes
-from ..utils.six import Path, FileNotFoundError
+from ..utils import _raise, axes_check_and_normalize, axes_dict, move_image_axes
+from ..utils.six import Path
 from ..utils.tf import export_SavedModel
 from ..version import __version__ as package_version
 from ..data import Normalizer, NoNormalizer, PercentileNormalizer
@@ -67,98 +65,7 @@ class CARE(BaseModel):
 
     def __init__(self, config, name=None, basedir='.'):
         """See class docstring."""
-
         super(CARE, self).__init__(config=config, name=name, basedir=basedir)
-
-        # config is None or isinstance(config,self._config_class) or _raise(ValueError('Invalid configuration: %s' % str(config)))
-        # if config is not None and not config.is_valid():
-        #     invalid_attr = config.is_valid(True)[1]
-        #     raise ValueError('Invalid configuration attributes: ' + ', '.join(invalid_attr))
-        # (not (config is None and basedir is None)) or _raise(ValueError())
-
-        # name is None or (isinstance(name,string_types) and len(name)>0) or _raise(ValueError())
-        # basedir is None or isinstance(basedir,(string_types,Path)) or _raise(ValueError())
-        # self.config = config
-        # self.name = name if name is not None else datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S.%f")
-        # self.basedir = Path(basedir) if basedir is not None else None
-        # if config is not None:
-        #     # config was provided -> update before it is saved to disk
-        #     self._update_and_check_config()
-        # self._set_logdir()
-        # if config is None:
-        #     # config was loaded from disk -> update it after loading
-        #     self._update_and_check_config()
-        # self._model_prepared = False
-        # self.keras_model = self._build()
-        # if config is None:
-        #     self._find_and_load_weights()
-
-
-    # def __repr__(self):
-    #     s = ("{self.__class__.__name__}({self.name}): {self.config.axes} → {self._axes_out}\n".format(self=self) +
-    #          "├─ Directory: {}\n".format(self.logdir.resolve() if self.basedir is not None else None) +
-    #          self._repr_extra() +
-    #          "└─ {self.config}".format(self=self))
-    #     return s.encode('utf-8') if PY2 else s
-
-
-    # def _repr_extra(self):
-    #     return ""
-
-
-    # def _update_and_check_config(self):
-    #     pass
-
-
-    # def suppress_without_basedir(warn):
-    #     def _suppress_without_basedir(f):
-    #         @wraps(f)
-    #         def wrapper(*args, **kwargs):
-    #             self = args[0]
-    #             if self.basedir is None:
-    #                 warn is False or warnings.warn("Suppressing call of '%s' (due to basedir=None)." % f.__name__)
-    #             else:
-    #                 return f(*args, **kwargs)
-    #         return wrapper
-    #     return _suppress_without_basedir
-
-
-    # @suppress_without_basedir(warn=False)
-    # def _set_logdir(self):
-    #     self.logdir = self.basedir / self.name
-
-    #     config_file =  self.logdir / 'config.json'
-    #     if self.config is None:
-    #         if config_file.exists():
-    #             config_dict = load_json(str(config_file))
-    #             self.config = self._config_class(**config_dict)
-    #             if not self.config.is_valid():
-    #                 invalid_attr = self.config.is_valid(True)[1]
-    #                 raise ValueError('Invalid attributes in loaded config: ' + ', '.join(invalid_attr))
-    #         else:
-    #             raise FileNotFoundError("config file doesn't exist: %s" % str(config_file.resolve()))
-    #     else:
-    #         if self.logdir.exists():
-    #             warnings.warn('output path for model already exists, files may be overwritten: %s' % str(self.logdir.resolve()))
-    #         self.logdir.mkdir(parents=True, exist_ok=True)
-    #         save_json(vars(self.config), str(config_file))
-
-
-    # @suppress_without_basedir(warn=False)
-    # def _find_and_load_weights(self,prefer='best'):
-    #     from itertools import chain
-    #     # get all weight files and sort by modification time descending (newest first)
-    #     weights_ext   = ('*.h5','*.hdf5')
-    #     weights_files = chain(*(self.logdir.glob(ext) for ext in weights_ext))
-    #     weights_files = reversed(sorted(weights_files, key=lambda f: f.stat().st_mtime))
-    #     weights_files = list(weights_files)
-    #     if len(weights_files) == 0:
-    #         warnings.warn("Couldn't find any network weights (%s) to load." % ', '.join(weights_ext))
-    #         return
-    #     weights_preferred = list(filter(lambda f: prefer in f.name, weights_files))
-    #     weights_chosen = weights_preferred[0] if len(weights_preferred)>0 else weights_files[0]
-    #     print("Loading network weights from '%s'." % weights_chosen.name)
-    #     self.load_weights(weights_chosen.name)
 
 
     def _build(self):
@@ -172,18 +79,6 @@ class CARE(BaseModel):
             n_first         = self.config.unet_n_first,
             last_activation = self.config.unet_last_activation,
         )(self.config.unet_input_shape)
-
-
-    # @suppress_without_basedir(warn=True)
-    # def load_weights(self, name='weights_best.h5'):
-    #     """Load neural network weights from model folder.
-
-    #     Parameters
-    #     ----------
-    #     name : str
-    #         Name of HDF5 weight file (as saved during or after training).
-    #     """
-    #     self.keras_model.load_weights(str(self.logdir/name))
 
 
     def prepare_for_training(self, optimizer=None, **kwargs):
@@ -248,7 +143,6 @@ class CARE(BaseModel):
             See `Keras training history <https://keras.io/models/model/#fit>`_.
 
         """
-
         ((isinstance(validation_data,(list,tuple)) and len(validation_data)==2)
             or _raise(ValueError('validation_data must be a pair of numpy arrays')))
 
@@ -286,7 +180,7 @@ class CARE(BaseModel):
         return history
 
 
-    @BaseModel.suppress_without_basedir(warn=True)
+    @suppress_without_basedir(warn=True)
     def export_TF(self, fname=None):
         """Export neural network via :func:`csbdeep.utils.tf.export_SavedModel`.
 
@@ -501,46 +395,6 @@ class CARE(BaseModel):
             mean, scale = x, None
         return mean, scale
 
-    # def _make_permute_axes(self, img_axes_in, net_axes_in, net_axes_out=None, img_axes_out=None):
-    #     # img_axes_in -> net_axes_in ---NN--> net_axes_out -> img_axes_out
-    #     if net_axes_out is None:
-    #         net_axes_out = net_axes_in
-    #     if img_axes_out is None:
-    #         img_axes_out = img_axes_in
-    #     assert 'C' in net_axes_in and 'C' in net_axes_out
-    #     assert not 'C' in img_axes_in or 'C' in img_axes_out
-
-    #     def _permute_axes(data,undo=False):
-    #         if data is None:
-    #             return None
-    #         if undo:
-    #             if 'C' in img_axes_in:
-    #                 return move_image_axes(data, net_axes_out, img_axes_out, True)
-    #             else:
-    #                 # input is single-channel and has no channel axis
-    #                 data = move_image_axes(data, net_axes_out, img_axes_out+'C', True)
-    #                 if data.shape[-1] == 1:
-    #                     # output is single-channel -> remove channel axis
-    #                     data = data[...,0]
-    #                 return data
-    #         else:
-    #             return move_image_axes(data, img_axes_in, net_axes_in, True)
-    #     return _permute_axes
-
-    # def _check_normalizer_resizer(self, normalizer, resizer):
-    #     if normalizer is None:
-    #         normalizer = NoNormalizer()
-    #     if resizer is None:
-    #         resizer = NoResizer()
-    #     isinstance(resizer,Resizer) or _raise(ValueError())
-    #     isinstance(normalizer,Normalizer) or _raise(ValueError())
-    #     if normalizer.do_after:
-    #         if self.config.n_channel_in != self.config.n_channel_out:
-    #             warnings.warn('skipping normalization step after prediction because ' +
-    #                           'number of input and output channels differ.')
-
-    #     return normalizer, resizer
-
     def _limit_tiling(self,img_shape,n_tiles,block_sizes):
         img_shape, n_tiles, block_sizes = np.array(img_shape), np.array(n_tiles), np.array(block_sizes)
         n_tiles_limit = np.ceil(img_shape / block_sizes) # each tile must be at least one block in size
@@ -556,10 +410,6 @@ class CARE(BaseModel):
         query_axes = axes_check_and_normalize(query_axes)
         overlap = tile_overlap(self.config.unet_n_depth, self.config.unet_kern_size)
         return tuple((overlap if a in 'XYZT' else 0) for a in query_axes)
-
-    # @property
-    # def _axes_out(self):
-    #     return self.config.axes
 
     @property
     def _config_class(self):

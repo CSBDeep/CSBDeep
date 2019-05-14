@@ -5,34 +5,44 @@ import datetime
 import warnings
 
 import numpy as np
-# import tensorflow as tf
 from six import string_types, PY2
 from functools import wraps
 
-# from csbdeep.internals.probability import ProbabilisticPrediction
-# from .config import BaseConfig
-
+from .config import BaseConfig
 from ..utils import _raise, load_json, save_json, axes_check_and_normalize, axes_dict, move_image_axes
 from ..utils.six import Path, FileNotFoundError
-# from ..utils.tf import export_SavedModel
-# from ..version import __version__ as package_version
-from ..data import Normalizer, NoNormalizer#, PercentileNormalizer
-from ..data import Resizer, NoResizer#, PadAndCropResizer
-# from ..internals.predict import predict_tiled, tile_overlap, Progress
-# from ..internals import nets, train
+from ..data import Normalizer, NoNormalizer
+from ..data import Resizer, NoResizer
 
 from six import add_metaclass
 from abc import ABCMeta, abstractmethod, abstractproperty
+
+
+
+def suppress_without_basedir(warn):
+    def _suppress_without_basedir(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            self = args[0]
+            if self.basedir is None:
+                warn is False or warnings.warn("Suppressing call of '%s' (due to basedir=None)." % f.__name__)
+            else:
+                return f(*args, **kwargs)
+        return wrapper
+    return _suppress_without_basedir
+
 
 
 @add_metaclass(ABCMeta)
 class BaseModel(object):
     """Base model.
 
+    Subclasses must implement :func:`_build` and :func:`_config_class`.
+
     Parameters
     ----------
-    config : :class:`csbdeep.models.Config` or None
-        Valid configuration of CARE network (see :func:`Config.is_valid`).
+    config : Subclass of :class:`csbdeep.models.BaseConfig` or None
+        Valid configuration of a model (see :func:`BaseConfig.is_valid`).
         Will be saved to disk as JSON (``config.json``).
         If set to ``None``, will be loaded from disk (must exist).
     name : str or None
@@ -48,14 +58,10 @@ class BaseModel(object):
     ValueError
         Illegal arguments, including invalid configuration.
 
-    Example
-    -------
-    >>> model = CARE(config, 'my_model')
-
     Attributes
     ----------
-    config : :class:`csbdeep.models.Config`
-        Configuration of CARE network, as provided during instantiation.
+    config : :class:`csbdeep.models.BaseConfig`
+        Configuration of the model, as provided during instantiation.
     keras_model : `Keras model <https://keras.io/getting-started/functional-api-guide/>`_
         Keras neural network model.
     name : str
@@ -107,19 +113,6 @@ class BaseModel(object):
         pass
 
 
-    def suppress_without_basedir(warn):
-        def _suppress_without_basedir(f):
-            @wraps(f)
-            def wrapper(*args, **kwargs):
-                self = args[0]
-                if self.basedir is None:
-                    warn is False or warnings.warn("Suppressing call of '%s' (due to basedir=None)." % f.__name__)
-                else:
-                    return f(*args, **kwargs)
-            return wrapper
-        return _suppress_without_basedir
-
-
     @suppress_without_basedir(warn=False)
     def _set_logdir(self):
         self.logdir = self.basedir / self.name
@@ -160,7 +153,7 @@ class BaseModel(object):
 
     @abstractmethod
     def _build(self):
-        """ Create and return a Keras model """
+        """ Create and return a Keras model. """
 
 
     @suppress_without_basedir(warn=True)
@@ -252,4 +245,4 @@ class BaseModel(object):
 
     @abstractproperty
     def _config_class(self):
-        """ class of config to be used for this model """
+        """ Class of config to be used for this model. """
