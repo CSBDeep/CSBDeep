@@ -3,9 +3,10 @@ from six.moves import range, zip, map, reduce, filter
 
 from ..utils import _raise, backend_channels_last
 
+import keras.backend as K
 from keras.layers import Dropout, Activation, BatchNormalization
 from keras.layers import Conv2D, MaxPooling2D, UpSampling2D, Conv3D, MaxPooling3D, UpSampling3D
-from keras.layers.merge import Concatenate
+from keras.layers.merge import Concatenate, Add
 
 
 
@@ -124,3 +125,47 @@ def unet_block(n_depth=2, n_filter_base=16, kernel_size=(3,3), n_conv_per_depth=
         return layer
 
     return _func
+
+
+
+def resnet_block(n_filter, kernel_size=(3,3), pool=(1,1), n_conv_per_block=2,
+                 batch_norm=False, kernel_initializer='he_normal', activation='relu'):
+
+    n_conv_per_block >= 2 or _raise(ValueError('required: n_conv_per_block >= 2'))
+    len(pool) == len(kernel_size) or _raise(ValueError('kernel and pool sizes must match.'))
+    n_dim = len(kernel_size)
+    n_dim in (2,3) or _raise(ValueError('resnet_block only 2d or 3d.'))
+
+    conv_layer = Conv2D if n_dim == 2 else Conv3D
+    conv_kwargs = dict (
+        padding            = 'same',
+        use_bias           = not batch_norm,
+        kernel_initializer = kernel_initializer,
+    )
+    channel_axis = -1 if backend_channels_last() else 1
+
+    def f(inp):
+        x = conv_layer(n_filter, kernel_size, strides=pool, **conv_kwargs)(inp)
+        if batch_norm:
+            x = BatchNormalization(axis=channel_axis)(x)
+        x = Activation(activation)(x)
+
+        for _ in range(n_conv_per_block-2):
+            x = conv_layer(n_filter, kernel_size, **conv_kwargs)(x)
+            if batch_norm:
+                x = BatchNormalization(axis=channel_axis)(x)
+            x = Activation(activation)(x)
+
+        x = conv_layer(n_filter, kernel_size, **conv_kwargs)(x)
+        if batch_norm:
+            x = BatchNormalization(axis=channel_axis)(x)
+
+        if any(p!=1 for p in pool) or n_filter != K.int_shape(inp)[-1]:
+            # print("Resnet Block: Add projection layer to input")
+            inp = conv_layer(n_filter, (1,)*n_dim, strides=pool, **conv_kwargs)(inp)
+
+        x = Add()([inp, x])
+        x = Activation(activation)(x)
+        return x
+
+    return f
