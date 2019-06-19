@@ -53,6 +53,10 @@ class Normalizer():
             Adjusted restored image(s).
         """
 
+    def __call__(self, x, axes):
+        """Alias for :func:`before` to make this callable."""
+        return self.before(x, axes)
+
     @abstractproperty
     def do_after(self):
         """bool : Flag to indicate whether :func:`after` should be called."""
