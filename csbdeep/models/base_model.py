@@ -73,7 +73,9 @@ class BaseModel(object):
     def __init__(self, config, name=None, basedir='.'):
         """See class docstring."""
 
-        config is None or isinstance(config,self._config_class) or _raise(ValueError('Invalid configuration: %s' % str(config)))
+        config is None or isinstance(config,self._config_class) or _raise (
+            ValueError("Invalid configuration of type '%s', was expecting type '%s'." % (type(config).__name__, self._config_class.__name__))
+        )
         if config is not None and not config.is_valid():
             invalid_attr = config.is_valid(True)[1]
             raise ValueError('Invalid configuration attributes: ' + ', '.join(invalid_attr))
@@ -225,6 +227,7 @@ class BaseModel(object):
                 return move_image_axes(data, img_axes_in, net_axes_in, True)
         return _permute_axes
 
+
     def _check_normalizer_resizer(self, normalizer, resizer):
         if normalizer is None:
             normalizer = NoNormalizer()
@@ -239,9 +242,11 @@ class BaseModel(object):
 
         return normalizer, resizer
 
+
     @property
     def _axes_out(self):
         return self.config.axes
+
 
     @abstractproperty
     def _config_class(self):

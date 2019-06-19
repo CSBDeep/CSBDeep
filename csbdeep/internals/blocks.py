@@ -161,7 +161,6 @@ def resnet_block(n_filter, kernel_size=(3,3), pool=(1,1), n_conv_per_block=2,
             x = BatchNormalization(axis=channel_axis)(x)
 
         if any(p!=1 for p in pool) or n_filter != K.int_shape(inp)[-1]:
-            # print("Resnet Block: Add projection layer to input")
             inp = conv_layer(n_filter, (1,)*n_dim, strides=pool, **conv_kwargs)(inp)
 
         x = Add()([inp, x])

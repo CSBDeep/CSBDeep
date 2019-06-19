@@ -51,7 +51,7 @@ def limit_gpu_memory(fraction, allow_growth=False):
         K.tensorflow_backend.set_session(session)
         # print("[tf_limit]\t setting config.gpu_options.per_process_gpu_memory_fraction to ",config.gpu_options.per_process_gpu_memory_fraction)
     else:
-        warnings.warn('Too late too limit GPU memory, can only be done once and before any computation.')
+        warnings.warn('Too late to limit GPU memory, can only be done once and before any computation.')
 
 
 
