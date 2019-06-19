@@ -247,7 +247,7 @@ def tile_iterator(x,n_tiles,block_sizes,n_block_overlaps):
             if axis+1 == tile_in.ndim:
                 # remove None and negative slicing
                 src = [slice(s.start, size if s.stop is None else (s.stop if s.stop >= 0 else size + s.stop)) for s,size in zip(src,tile.shape)]
-                yield tile, src, dst
+                yield tile, tuple(src), tuple(dst)
             else:
                 # yield from _accumulate(tile, axis+1, src, dst)
                 for entry in  _accumulate(tile, axis+1, src, dst):
