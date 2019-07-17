@@ -95,7 +95,7 @@ def predict_tiled(keras_model,x,n_tiles,block_sizes,tile_overlaps,axes_in,axes_o
     n_tiles_remaining[axis] = 1
 
     dst = None
-    for tile, s_src, s_dst in tile_iterator(x,axis=axis,n_tiles=n_tiles[axis],block_size=block_size,n_block_overlap=n_block_overlap):
+    for tile, s_src, s_dst in tile_iterator_1d(x,axis=axis,n_tiles=n_tiles[axis],block_size=block_size,n_block_overlap=n_block_overlap):
 
         pred = predict_tiled(keras_model,tile,n_tiles_remaining,block_sizes,tile_overlaps,axes_in,axes_out,pbar=pbar,**kwargs)
 
@@ -120,7 +120,7 @@ def predict_tiled(keras_model,x,n_tiles,block_sizes,tile_overlaps,axes_in,axes_o
 
 
 
-def tile_iterator(x,axis,n_tiles,block_size,n_block_overlap):
+def tile_iterator_1d(x,axis,n_tiles,block_size,n_block_overlap):
     """Tile iterator for one dimension of array x.
 
     Parameters
@@ -193,6 +193,67 @@ def tile_iterator(x,axis,n_tiles,block_size,n_block_overlap):
 
         yield x[to_slice(tile_in)], to_slice(tile_crop), to_slice(tile_out)
         start += tile_sizes[i]
+
+
+
+def tile_iterator(x,n_tiles,block_sizes,n_block_overlaps):
+    """Tile iterator for n-d arrays.
+
+    Yields block-aligned tiles (`block_sizes`) that have at least
+    a certain amount of overlapping blocks (`n_block_overlaps`)
+    with their neighbors. Also yields slices that allow to map each
+    tile back to the original array x.
+
+    Notes
+    -----
+    - Tiles will not go beyond the array boundary (i.e. no padding).
+      This means the shape of x must be evenly divisible by the respective block_size.
+    - It is not guaranteed that all tiles have the same size.
+
+    Parameters
+    ----------
+    x : numpy.ndarray
+        Input array.
+    n_tiles : list/tuple of int
+        Number of tiles for each dimension of x.
+    block_sizes : list/tuple of int
+        Block sizes for each dimension of x.
+        The shape of x is assumed to be evenly divisible by block_sizes.
+        All tiles are aligned with block_sizes.
+    n_block_overlaps : list/tuple of int
+        Tiles will at least overlap this many blocks in each dimension.
+
+    Example
+    -------
+
+    Duplicate an array tile-by-tile:
+
+    >>> x = np.array(...)
+    >>> y = np.empty_like(x)
+    >>>
+    >>> for tile,s_src,s_dst in tile_iterator(x, n_tiles, block_sizes, n_block_overlaps):
+    >>>     y[s_dst] = tile[s_src]
+    >>>
+    >>> np.allclose(x,y)
+    True
+
+    """
+    assert x.ndim == len(n_tiles) == len(block_sizes) == len(n_block_overlaps)
+
+    def _accumulate(tile_in,axis,src,dst):
+        for tile, s_src, s_dst in tile_iterator_1d(tile_in, axis, n_tiles[axis], block_sizes[axis], n_block_overlaps[axis]):
+            src[axis] = s_src[axis]
+            dst[axis] = s_dst[axis]
+            if axis+1 == tile_in.ndim:
+                # remove None and negative slicing
+                src = [slice(s.start, size if s.stop is None else (s.stop if s.stop >= 0 else size + s.stop)) for s,size in zip(src,tile.shape)]
+                yield tile, tuple(src), tuple(dst)
+            else:
+                # yield from _accumulate(tile, axis+1, src, dst)
+                for entry in  _accumulate(tile, axis+1, src, dst):
+                    yield entry
+
+    return _accumulate(x, 0, [None]*x.ndim, [None]*x.ndim)
 
 
 

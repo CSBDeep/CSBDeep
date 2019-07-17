@@ -11,7 +11,7 @@ dist/
 docs/build/
 example_data
 htmlcov/
-.coverage
+.coverage*
 
 *.npz
 *.tif*

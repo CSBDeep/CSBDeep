@@ -214,7 +214,7 @@ def anisotropic_distortions(
             return slice(None) if v==0 else slice(v//2,-(v-v//2))
         slices = [slice(None) for _ in x.shape]
         slices[0] = _split_slice(x.shape[0]-size)
-        return x[slices]
+        return x[tuple(slices)]
 
 
     def _generator(inputs):

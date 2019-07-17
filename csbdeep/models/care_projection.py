@@ -10,9 +10,25 @@ from keras.layers.merge import Multiply
 from keras.activations import softmax
 
 from .care_standard import CARE
+from .config import Config
 from ..utils import _raise, axes_dict, axes_check_and_normalize
 from ..internals import nets
 from ..internals.predict import tile_overlap
+
+
+class ProjectionConfig(Config):
+
+    def __init__(self, axes='ZYX', n_channel_in=1, n_channel_out=1, probabilistic=False, allow_new_parameters=False, **kwargs):
+        super(ProjectionConfig, self).__init__(axes, n_channel_in, n_channel_out, probabilistic)
+        ax = axes_dict(self.axes)
+        self.proj_axis              = kwargs.get('proj_axis', 'Z')
+        self.proj_n_depth           = 4
+        self.proj_n_filt            = 8
+        self.proj_n_conv_per_depth  = 1
+        self.proj_kern              = tuple(3 if d==ax[self.proj_axis] else 3 for d in range(3))
+        self.proj_pool              = tuple(1 if d==ax[self.proj_axis] else 2 for d in range(3))
+        self.update_parameters(allow_new_parameters, **kwargs)
+
 
 
 class ProjectionCARE(CARE):
@@ -24,6 +40,7 @@ class ProjectionCARE(CARE):
         try:
             return self._proj_params
         except AttributeError:
+            # TODO: no need to be so cautious here, since there's now a dedicated ProjectionConfig class
             p = {}
             p['axis']              = vars(self.config).get('proj_axis', 'Z')
             p['n_depth']           = int(vars(self.config).get('proj_n_depth', 4))
@@ -153,3 +170,9 @@ class ProjectionCARE(CARE):
     @property
     def _axes_out(self):
         return ''.join(a for a in self.config.axes if a != self.proj_params.axis)
+
+
+
+    @property
+    def _config_class(self):
+        return ProjectionConfig

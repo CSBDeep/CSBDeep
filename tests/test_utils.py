@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 from csbdeep.data import NoNormalizer, PercentileNormalizer, NoResizer, PadAndCropResizer
 from csbdeep.utils import normalize_minmse
+from csbdeep.internals.predict import tile_iterator_1d, tile_iterator
 
 
 
@@ -87,3 +88,45 @@ def test_normalize_minmse():
 
 
 
+def test_tile_iterator_1d():
+    rng = np.random.RandomState(42)
+    for _ in range(50):
+        n = rng.randint(low=10,high=500)
+        block_size = rng.randint(low=1,high=(n-n//3))
+        n = block_size * (n // block_size)
+        n_blocks = n // block_size
+        n_block_overlap = rng.randint(low=0,high=n_blocks+1)
+        n_tiles = rng.randint(low=1,high=n_blocks+1)
+
+        x = rng.uniform(size=n)
+        y = np.empty_like(x)
+        c = 0
+        for tile,s_src,s_dst in tile_iterator_1d(x,0,n_tiles=n_tiles,block_size=block_size,n_block_overlap=n_block_overlap):
+            y[s_dst] = tile[s_src]
+            assert tile.shape[0] % block_size == 0
+            assert tile[s_src].shape[0] % block_size == 0
+            # TODO: good way to test overlap size?
+            c += 1
+
+        assert c == n_tiles
+        assert np.allclose(x,y)
+
+
+
+@pytest.mark.parametrize('n_dims', (1,2,3))
+def test_tile_iterator(n_dims):
+    rng = np.random.RandomState(42)
+    for _ in range(10):
+        n = rng.randint(low=10,high=300,size=n_dims)
+        n_blocks = list(rng.randint(low=1,high=10,size=n_dims))
+        block_size = [_n // _n_blocks for _n_blocks,_n in zip(n_blocks,n)]
+        n = [_block_size * (_n // _block_size) for _block_size,_n in zip(block_size,n)]
+        n_block_overlap = [rng.randint(low=0,high=_n_blocks+1) for _n_blocks in n_blocks]
+        n_tiles = [rng.randint(low=1,high=_n_blocks+1) for _n_blocks in n_blocks]
+
+        x = rng.uniform(size=n)
+        y = np.empty_like(x)
+        for tile,s_src,s_dst in tile_iterator(x,n_tiles,block_size,n_block_overlap):
+            y[s_dst] = tile[s_src]
+
+        assert np.allclose(x,y)
