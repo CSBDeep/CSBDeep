@@ -17,7 +17,7 @@ from ..utils.tf import export_SavedModel
 from ..version import __version__ as package_version
 from ..data import Normalizer, NoNormalizer, PercentileNormalizer
 from ..data import Resizer, NoResizer, PadAndCropResizer
-from ..internals.predict import predict_tiled, tile_overlap, Progress
+from ..internals.predict import predict_tiled, tile_overlap, Progress, total_n_tiles
 from ..internals import nets, train
 
 
@@ -304,6 +304,10 @@ class CARE(BaseModel):
 
         # TODO: refactor tiling stuff to make code more readable
 
+        def _total_n_tiles(n_tiles):
+            n_block_overlaps = [int(np.ceil(1.* tile_overlap / block_size)) for tile_overlap, block_size in zip(net_axes_in_overlaps, net_axes_in_div_by)]
+            return total_n_tiles(x,n_tiles=n_tiles,block_sizes=net_axes_in_div_by,n_block_overlaps=n_block_overlaps,guarantee='size')
+
         _permute_axes_n_tiles = self._make_permute_axes(img_axes_in, net_axes_in)
         # _permute_axes_n_tiles: (img_axes_in <-> net_axes_in) to convert n_tiles between img and net axes
         def _permute_n_tiles(n,undo=False):
@@ -332,10 +336,10 @@ class CARE(BaseModel):
         n_tiles = _permute_n_tiles(n_tiles)
         (all(n_tiles[i] == 1 for i in range(x.ndim) if i not in x_tiling_axis) or
             _raise(ValueError("entry of n_tiles > 1 only allowed for axes '%s'" % tiling_axes)))
-        n_tiles_limited = self._limit_tiling(x.shape,n_tiles,net_axes_in_div_by)
-        if any(np.array(n_tiles) != np.array(n_tiles_limited)):
-            print("Limiting n_tiles to %s" % str(_permute_n_tiles(n_tiles_limited,undo=True)))
-        n_tiles = n_tiles_limited
+        # n_tiles_limited = self._limit_tiling(x.shape,n_tiles,net_axes_in_div_by)
+        # if any(np.array(n_tiles) != np.array(n_tiles_limited)):
+        #     print("Limiting n_tiles to %s" % str(_permute_n_tiles(n_tiles_limited,undo=True)))
+        # n_tiles = n_tiles_limited
 
 
         # normalize & resize
@@ -343,7 +347,8 @@ class CARE(BaseModel):
         x = resizer.before(x, net_axes_in, net_axes_in_div_by)
 
         done = False
-        progress = Progress(np.prod(n_tiles),1)
+        progress = Progress(_total_n_tiles(n_tiles),1)
+        c = 0
         while not done:
             try:
                 # raise tf.errors.ResourceExhaustedError(None,None,None) # tmp
@@ -354,15 +359,18 @@ class CARE(BaseModel):
                 progress.close()
             except tf.errors.ResourceExhaustedError:
                 # TODO: how to test this code?
-                n_tiles_prev = list(n_tiles) # make a copy
+                # n_tiles_prev = list(n_tiles) # make a copy
                 tile_sizes_approx = np.array(x.shape) / np.array(n_tiles)
                 t = [i for i in np.argsort(tile_sizes_approx) if i in x_tiling_axis][-1]
                 n_tiles[t] *= 2
-                n_tiles = self._limit_tiling(x.shape,n_tiles,net_axes_in_div_by)
-                if all(np.array(n_tiles) == np.array(n_tiles_prev)):
-                    raise MemoryError("Tile limit exceeded. Memory occupied by another process (notebook)?")
+                # n_tiles = self._limit_tiling(x.shape,n_tiles,net_axes_in_div_by)
+                # if all(np.array(n_tiles) == np.array(n_tiles_prev)):
+                    # raise MemoryError("Tile limit exceeded. Memory occupied by another process (notebook)?")
+                if c >= 8:
+                    raise MemoryError("Giving up increasing number of tiles. Memory occupied by another process (notebook)?")
                 print('Out of memory, retrying with n_tiles = %s' % str(_permute_n_tiles(n_tiles,undo=True)))
-                progress.total = np.prod(n_tiles)
+                progress.total = _total_n_tiles(n_tiles)
+                c += 1
 
         n_channel_predicted = self.config.n_channel_out * (2 if self.config.probabilistic else 1)
         x.shape[channel_out] == n_channel_predicted or _raise(ValueError())
@@ -395,10 +403,10 @@ class CARE(BaseModel):
             mean, scale = x, None
         return mean, scale
 
-    def _limit_tiling(self,img_shape,n_tiles,block_sizes):
-        img_shape, n_tiles, block_sizes = np.array(img_shape), np.array(n_tiles), np.array(block_sizes)
-        n_tiles_limit = np.ceil(img_shape / block_sizes) # each tile must be at least one block in size
-        return [int(t) for t in np.minimum(n_tiles,n_tiles_limit)]
+    # def _limit_tiling(self,img_shape,n_tiles,block_sizes):
+    #     img_shape, n_tiles, block_sizes = np.array(img_shape), np.array(n_tiles), np.array(block_sizes)
+    #     n_tiles_limit = np.ceil(img_shape / block_sizes) # each tile must be at least one block in size
+    #     return [int(t) for t in np.minimum(n_tiles,n_tiles_limit)]
 
     def _axes_div_by(self, query_axes):
         query_axes = axes_check_and_normalize(query_axes)
