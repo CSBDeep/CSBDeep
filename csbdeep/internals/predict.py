@@ -187,9 +187,9 @@ class Tiling(object):
         self.n = n
         self.size = size
         self.overlap = overlap
-        tiles = [Tile(**self.__dict__, prev=None)]
+        tiles = [Tile(prev=None, **self.__dict__)]
         while not tiles[-1].at_end:
-            tiles.append(Tile(**self.__dict__, prev=tiles[-1]))
+            tiles.append(Tile(prev=tiles[-1], **self.__dict__))
         self.tiles = tiles
 
     def __len__(self):
