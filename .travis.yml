@@ -53,9 +53,9 @@ matrix:
     - os: linux
       python: 3.6
       if: branch = master
-      # env: TENSORFLOW='tensorflow<1.9'    KERAS='keras==2.2.0'  # causes segmentation fault, why?
+      # env: TENSORFLOW='tensorflow<1.9'    KERAS='keras==2.2.0' # causes segmentation fault, why?
       env: TENSORFLOW='tensorflow<1.8'    KERAS='keras==2.2.0'
-     - os: linux
+    - os: linux
       python: 3.6
       if: branch = master
       env: TENSORFLOW='tensorflow<1.8'    KERAS='keras==2.1.6'
@@ -69,14 +69,12 @@ matrix:
 install:
   - pip install $TENSORFLOW $KERAS
   - if [ -z $ONLY_INSTALL ]; then
-       pip install csbdeep;
-    else
        pip install .;
+    else
+       pip install csbdeep;
     fi
 
 script:
   - if [ -z $ONLY_INSTALL ]; then
-      echo "only installing";
-    else
       pytest -v --durations=50;
     fi
