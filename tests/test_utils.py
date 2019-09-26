@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from csbdeep.data import NoNormalizer, PercentileNormalizer, NoResizer, PadAndCropResizer
 from csbdeep.utils import normalize_minmse
-from csbdeep.internals.predict import tile_iterator_1d, tile_iterator
+from csbdeep.internals.predict import tile_iterator_1d, tile_iterator, total_n_tiles
 
 
 
@@ -88,7 +88,8 @@ def test_normalize_minmse():
 
 
 
-def test_tile_iterator_1d():
+@pytest.mark.parametrize('guarantee', ('size', 'n_tiles'))
+def test_tile_iterator_1d(guarantee):
     rng = np.random.RandomState(42)
     for _ in range(50):
         n = rng.randint(low=10,high=500)
@@ -101,20 +102,26 @@ def test_tile_iterator_1d():
         x = rng.uniform(size=n)
         y = np.empty_like(x)
         c = 0
-        for tile,s_src,s_dst in tile_iterator_1d(x,0,n_tiles=n_tiles,block_size=block_size,n_block_overlap=n_block_overlap):
+        tile_shape = None
+        actual_n_tiles = total_n_tiles(x,[n_tiles],[block_size],[n_block_overlap],guarantee=guarantee)
+        for tile,s_src,s_dst in tile_iterator_1d(x,0,n_tiles=n_tiles,block_size=block_size,n_block_overlap=n_block_overlap,guarantee=guarantee):
             y[s_dst] = tile[s_src]
             assert tile.shape[0] % block_size == 0
             assert tile[s_src].shape[0] % block_size == 0
+            if guarantee == 'size':
+                if tile_shape is None: tile_shape = tile.shape
+                assert tile_shape == tile.shape
             # TODO: good way to test overlap size?
             c += 1
 
-        assert c == n_tiles
+        assert c == actual_n_tiles
         assert np.allclose(x,y)
 
 
 
 @pytest.mark.parametrize('n_dims', (1,2,3))
-def test_tile_iterator(n_dims):
+@pytest.mark.parametrize('guarantee', ('size', 'n_tiles'))
+def test_tile_iterator(guarantee, n_dims):
     rng = np.random.RandomState(42)
     for _ in range(10):
         n = rng.randint(low=10,high=300,size=n_dims)
@@ -126,7 +133,11 @@ def test_tile_iterator(n_dims):
 
         x = rng.uniform(size=n)
         y = np.empty_like(x)
-        for tile,s_src,s_dst in tile_iterator(x,n_tiles,block_size,n_block_overlap):
+        c = 0
+        actual_n_tiles = total_n_tiles(x,n_tiles,block_size,n_block_overlap,guarantee=guarantee)
+        for tile,s_src,s_dst in tile_iterator(x,n_tiles,block_size,n_block_overlap,guarantee):
             y[s_dst] = tile[s_src]
+            c += 1
 
+        assert c == actual_n_tiles
         assert np.allclose(x,y)
