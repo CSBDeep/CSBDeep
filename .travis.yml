@@ -66,9 +66,9 @@ matrix:
 install:
   - pip install $TENSORFLOW $KERAS
   - if [ $ONLY_INSTALL == true ]; then
-       pip install csbdeep
+       pip install csbdeep;
     else
-       pip install .
+       pip install .;
     fi
 
 script:
