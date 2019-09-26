@@ -8,7 +8,7 @@
 language: python
 
 env:
-  - TENSORFLOW='tensorflow' KERAS='keras' 
+  - TENSORFLOW='tensorflow' KERAS='keras'
 
 matrix:
   include:
@@ -29,41 +29,41 @@ matrix:
     - os: linux
       python: 3.6
       if: branch = master
-      env: TENSORFLOW='tensorflow<1.15'   KERAS='keras==2.3.0' 
+      env: TENSORFLOW='tensorflow<1.15'   KERAS='keras==2.3.0'
     - os: linux
       python: 3.6
       if: branch = master
-      env: TENSORFLOW='tensorflow<1.14'   KERAS='keras==2.2.5' 
+      env: TENSORFLOW='tensorflow<1.14'   KERAS='keras==2.2.5'
     - os: linux
       python: 3.6
       if: branch = master
-      env: TENSORFLOW='tensorflow<1.13'   KERAS='keras==2.2.5' 
+      env: TENSORFLOW='tensorflow<1.13'   KERAS='keras==2.2.5'
     - os: linux
       python: 3.6
       if: branch = master
-      env: TENSORFLOW='tensorflow<1.12'   KERAS='keras==2.2.5' 
+      env: TENSORFLOW='tensorflow<1.12'   KERAS='keras==2.2.5'
     - os: linux
       python: 3.6
       if: branch = master
-      env: TENSORFLOW='tensorflow<1.11'   KERAS='keras==2.2.4' 
+      env: TENSORFLOW='tensorflow<1.11'   KERAS='keras==2.2.4'
     - os: linux
       python: 3.6
       if: branch = master
-      env: TENSORFLOW='tensorflow<1.10'   KERAS='keras==2.2.2' 
+      env: TENSORFLOW='tensorflow<1.10'   KERAS='keras==2.2.2'
     - os: linux
       python: 3.6
       if: branch = master
       # env: TENSORFLOW='tensorflow<1.9'    KERAS='keras==2.2.0'  # causes segmentation fault, why?
-      env: TENSORFLOW='tensorflow<1.8'    KERAS='keras==2.2.0' 
+      env: TENSORFLOW='tensorflow<1.8'    KERAS='keras==2.2.0'
      - os: linux
       python: 3.6
       if: branch = master
-      env: TENSORFLOW='tensorflow<1.8'    KERAS='keras==2.1.6' 
+      env: TENSORFLOW='tensorflow<1.8'    KERAS='keras==2.1.6'
     - os: linux
       python: 3.6
       if: branch = master
       # lowest supported keras version, last tensorflow release that supports CUDA 8
-      env: TENSORFLOW='tensorflow==1.4.1' KERAS='keras==2.1.2' 
+      env: TENSORFLOW='tensorflow==1.4.1' KERAS='keras==2.1.2'
       ###########
 
 install:
