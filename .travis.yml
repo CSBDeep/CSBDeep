@@ -8,7 +8,8 @@
 language: python
 
 env:
-  - TENSORFLOW='tensorflow' KERAS='keras'
+  - TENSORFLOW='tensorflow' KERAS='keras' ONLY_INSTALL=true
+  - TENSORFLOW='tensorflow' KERAS='keras' ONLY_INSTALL=false
 
 matrix:
   include:
@@ -64,7 +65,13 @@ matrix:
 
 install:
   - pip install $TENSORFLOW $KERAS
-  - pip install .
+  - if [ $ONLY_INSTALL == true ]; then
+       pip install csbdeep
+    else
+       pip install .
+    fi
 
 script:
-  - pytest -v --durations=50
+  - if [ $ONLY_INSTALL == false ]; then
+      pytest -v --durations=50;
+    fi

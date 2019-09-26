@@ -22,7 +22,9 @@ install:
   - "python --version"
   - "python -m pip install -U pip"
   - "pip install tensorflow pytest"
-  - "pip install ."
+  - "pip install csbdeep"
+  - "pip uninstall -y csbdeep"
+  - "pip install --no-cache-dir --force-reinstall ."
 
 build: none
 
