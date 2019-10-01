@@ -8,7 +8,7 @@
 language: python
 
 env:
-  - TENSORFLOW='tensorflow' KERAS='keras'
+  - TENSORFLOW='tensorflow<2' KERAS='keras'
 
 matrix:
   include:

@@ -1,8 +1,8 @@
 Installation
 ============
 
-Please first `install TensorFlow <https://www.tensorflow.org/install/>`_
-by following the official instructions. (**Do not choose a preview release version of TensorFlow 2.0.**)
+Please first `install TensorFlow 1.x <https://www.tensorflow.org/install/>`_
+(**not TensorFlow 2**) by following the official instructions.
 For `GPU support <https://www.tensorflow.org/install/gpu>`_, it is very
 important to install the specific versions of CUDA and cuDNN that are
 compatible with the respective version of TensorFlow.
