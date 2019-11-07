@@ -363,13 +363,13 @@ def tile_iterator(x,n_tiles,block_sizes,n_block_overlaps,guarantee='size'):
     ----------
     x : numpy.ndarray
         Input array.
-    n_tiles : list/tuple of int
+    n_tiles : int or sequence of ints
         Number of tiles for each dimension of x.
-    block_sizes : list/tuple of int
+    block_sizes : int or sequence of ints
         Block sizes for each dimension of x.
         The shape of x is assumed to be evenly divisible by block_sizes.
         All tiles are aligned with block_sizes.
-    n_block_overlaps : list/tuple of int
+    n_block_overlaps : int or sequence of ints
         Tiles will at least overlap this many blocks in each dimension.
     guarantee : str
         Can be either 'size' or 'n_tiles':
@@ -395,6 +395,10 @@ def tile_iterator(x,n_tiles,block_sizes,n_block_overlaps,guarantee='size'):
     True
 
     """
+    if np.isscalar(n_tiles): n_tiles = (n_tiles,)*x.ndim
+    if np.isscalar(block_sizes): block_sizes = (block_sizes,)*x.ndim
+    if np.isscalar(n_block_overlaps): n_block_overlaps = (n_block_overlaps,)*x.ndim
+
     assert x.ndim == len(n_tiles) == len(block_sizes) == len(n_block_overlaps)
 
     def _accumulate(tile_in,axis,src,dst):
