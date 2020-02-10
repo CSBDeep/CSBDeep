@@ -93,7 +93,7 @@ def unet_block(n_depth=2, n_filter_base=16, kernel_size=(3,3), n_conv_per_depth=
                 layer = conv_block(n_filter_base * 2 ** n, *kernel_size,
                                    dropout=dropout,
                                    activation=activation,
-                                   init = kernel_init,
+                                   init=kernel_init,
                                    batch_norm=batch_norm, name=_name("down_level_%s_no_%s" % (n, i)))(layer)
             skip_layers.append(layer)
             layer = pooling(pool, name=_name("max_%s" % n))(layer)
@@ -102,14 +102,14 @@ def unet_block(n_depth=2, n_filter_base=16, kernel_size=(3,3), n_conv_per_depth=
         for i in range(n_conv_per_depth - 1):
             layer = conv_block(n_filter_base * 2 ** n_depth, *kernel_size,
                                dropout=dropout,
-                               init = kernel_init,
+                               init=kernel_init,
                                activation=activation,
                                batch_norm=batch_norm, name=_name("middle_%s" % i))(layer)
 
         layer = conv_block(n_filter_base * 2 ** max(0, n_depth - 1), *kernel_size,
                            dropout=dropout,
                            activation=activation,
-                           init = kernel_init,
+                           init=kernel_init,
                            batch_norm=batch_norm, name=_name("middle_%s" % n_conv_per_depth))(layer)
 
         # ...and up with skip layers
@@ -118,13 +118,13 @@ def unet_block(n_depth=2, n_filter_base=16, kernel_size=(3,3), n_conv_per_depth=
             for i in range(n_conv_per_depth - 1):
                 layer = conv_block(n_filter_base * 2 ** n, *kernel_size,
                                    dropout=dropout,
-                                   init = kernel_init,
+                                   init=kernel_init,
                                    activation=activation,
                                    batch_norm=batch_norm, name=_name("up_level_%s_no_%s" % (n, i)))(layer)
 
             layer = conv_block(n_filter_base * 2 ** max(0, n - 1), *kernel_size,
                                dropout=dropout,
-                               init = kernel_init,
+                               init=kernel_init,
                                activation=activation if n > 0 else last_activation,
                                batch_norm=batch_norm, name=_name("up_level_%s_no_%s" % (n, n_conv_per_depth)))(layer)
 

@@ -127,7 +127,7 @@ class Tile(object):
         self.overlap = int(overlap)
         if self.n < self.size:
             assert prev is None
-            print("Truncating tile size from %d to %d." % (self.size, self.n))
+            # print("Truncating tile size from %d to %d." % (self.size, self.n))
             self.size = self.n
             self.overlap = 0
         assert self.size > 2*self.overlap
