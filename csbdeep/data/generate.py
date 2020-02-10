@@ -211,8 +211,6 @@ def norm_percentiles(percentiles=sample_percentiles(), relu_last=False):
 
     return _normalize
 
-def norm_copy(patches_x, patches_y, x, y, mask, channel):
-    return patches_x, patches_y
 
 def create_patches(
         raw_data,
@@ -294,7 +292,7 @@ def create_patches(
         transforms.append(Transform.identity())
 
     if normalization is None:
-        normalization = norm_copy
+        normalization = lambda patches_x, patches_y, x, y, mask, channel: (patches_x, patches_y)
 
     image_pairs, n_raw_images = raw_data.generator(), raw_data.size
     tf = Transform(*zip(*transforms)) # convert list of Transforms into Transform of lists
