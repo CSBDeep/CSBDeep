@@ -40,7 +40,7 @@ setup(name='csbdeep',
       ],
 
       install_requires=[
-          "numpy",
+          "numpy>=1.16.0",
           "scipy",
           "matplotlib",
           "six",
