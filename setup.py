@@ -40,16 +40,17 @@ setup(name='csbdeep',
       ],
 
       install_requires=[
-          "numpy>=1.16.0",
+          "numpy",
           "scipy",
           "matplotlib",
           "six",
           "keras>=2.1.2",
           "h5py",
+          "imagecodecs-lite<=2020; python_version<'3.6'",
           "tifffile",
           "tqdm",
-          "pathlib2;python_version<'3'",
-          "backports.tempfile;python_version<'3.4'",
+          "pathlib2; python_version<'3'",
+          "backports.tempfile; python_version<'3.4'",
       ],
 
       entry_points={
