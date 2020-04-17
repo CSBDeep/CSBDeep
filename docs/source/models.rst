@@ -18,8 +18,9 @@ models that are tailored to commonly-used imaging scenarios:
     - Improving SNR of fast time-lapses (e.g. of vesicle trafficking).
 
   Examples:
-    - `3D denoising <http://csbdeep.bioimagecomputing.com/examples/denoising3D>`_ (recommended starting point, even for 2D data)
+    - `2D denoising <http://csbdeep.bioimagecomputing.com/examples/denoising2D>`_
     - `2D denoising (probabilistic) <http://csbdeep.bioimagecomputing.com/examples/denoising2D_probabilistic>`_
+    - `3D denoising <http://csbdeep.bioimagecomputing.com/examples/denoising3D>`_
 
 
 :class:`csbdeep.models.UpsamplingCARE`
