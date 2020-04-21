@@ -340,6 +340,7 @@ class CARE(BaseModel):
         # if any(np.array(n_tiles) != np.array(n_tiles_limited)):
         #     print("Limiting n_tiles to %s" % str(_permute_n_tiles(n_tiles_limited,undo=True)))
         # n_tiles = n_tiles_limited
+        n_tiles = list(n_tiles)
 
 
         # normalize & resize
