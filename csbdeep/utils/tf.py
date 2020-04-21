@@ -42,7 +42,13 @@ def limit_gpu_memory(fraction, allow_growth=False):
     is_tf_backend() or _raise(NotImplementedError('Not using tensorflow backend.'))
     fraction is None or (np.isscalar(fraction) and 0<=fraction<=1) or _raise(ValueError('fraction must be between 0 and 1.'))
 
-    if K.tensorflow_backend._SESSION is None:
+    _session = None
+    try:
+        _session = K.tensorflow_backend._SESSION
+    except AttributeError:
+        pass
+
+    if _session is None:
         config = tf.ConfigProto()
         if fraction is not None:
             config.gpu_options.per_process_gpu_memory_fraction = fraction
