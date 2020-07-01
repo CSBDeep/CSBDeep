@@ -7,7 +7,12 @@ import warnings
 import shutil
 import datetime
 
-import tensorflow as tf
+try:
+    import tensorflow.compat.v1 as tf
+    # tf.disable_v2_behavior()
+except ModuleNotFoundError:
+    import tensorflow as tf
+
 import keras
 from keras import backend as K
 from keras.callbacks import Callback
@@ -15,6 +20,11 @@ from keras.layers import Lambda
 
 from .utils import _raise, is_tf_backend, save_json, backend_channels_last
 from .six import tempfile
+
+
+
+def _is_tf_1():
+    return tf.__version__.startswith('1.')
 
 
 
@@ -58,7 +68,6 @@ def limit_gpu_memory(fraction, allow_growth=False):
         # print("[tf_limit]\t setting config.gpu_options.per_process_gpu_memory_fraction to ",config.gpu_options.per_process_gpu_memory_fraction)
     else:
         warnings.warn('Too late to limit GPU memory, can only be done once and before any computation.')
-
 
 
 

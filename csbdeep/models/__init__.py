@@ -9,14 +9,16 @@ except ModuleNotFoundError as e:
     raise_from(RuntimeError('Please install TensorFlow: https://www.tensorflow.org/install/'), e)
 
 
-# for now, tensorflow >= 2.0 is not supported
-import tensorflow
+import tensorflow, keras, sys
 from distutils.version import LooseVersion
 _tf_version = LooseVersion(tensorflow.__version__)
+_keras_version = LooseVersion(keras.__version__)
 # print(_tf_version)
 if  _tf_version >= LooseVersion("2.0.0"):
-    raise ImportError("csbdeep only supports tensorflow < 2 for now (installed tensorflow version: %s)"%_tf_version)
-del tensorflow
+    print("Found TensorFlow 2 (version %s), which is not fully supported by CSBDeep at the moment (no TensorBoard and model export)." % _tf_version, file=sys.stderr)
+    if _keras_version < LooseVersion("2.3.0"):
+        raise ImportError("Found Keras version %s, but only versions >= 2.3.0 support TensorFlow 2." % _keras_version)
+del tensorflow, keras, LooseVersion, sys
 
 
 

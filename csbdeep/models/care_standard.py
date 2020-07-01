@@ -4,7 +4,11 @@ from __future__ import print_function, unicode_literals, absolute_import, divisi
 import warnings
 
 import numpy as np
-import tensorflow as tf
+try:
+    import tensorflow.compat.v1 as tf
+    # tf.disable_v2_behavior()
+except ModuleNotFoundError:
+    import tensorflow as tf
 from six import string_types
 
 from csbdeep.internals.probability import ProbabilisticPrediction
