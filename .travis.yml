@@ -23,6 +23,10 @@ matrix:
       ###########
     - os: linux
       python: 3.7
+      env: TENSORFLOW='tensorflow' KERAS='keras'
+      ###########
+    - os: linux
+      python: 3.7
       env: TENSORFLOW='tensorflow<2' KERAS='keras' ONLY_INSTALL=1
       ###########
     - os: linux
