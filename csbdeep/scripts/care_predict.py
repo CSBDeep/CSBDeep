@@ -95,7 +95,8 @@ def main():
 
     # delay imports after checking to all required arguments are provided
     from tifffile import imread, imsave
-    import keras.backend as K
+    from csbdeep.utils.tf import keras_import
+    K = keras_import('backend')
     from csbdeep.models import CARE
     from csbdeep.data import PercentileNormalizer
     sys.stdout.flush()

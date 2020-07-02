@@ -6,20 +6,33 @@ import os
 import warnings
 import shutil
 import datetime
+from importlib import import_module
 
 from tensorflow import __version__ as _tf_version
-_IS_TF_1 = _tf_version.startswith('1.')
+IS_TF_1 = _tf_version.startswith('1.')
+_KERAS = 'keras' if IS_TF_1 else 'tensorflow.keras'
 
-if _IS_TF_1:
+def keras_import(sub=None, *names):
+    if sub is None:
+        return import_module(f'{_KERAS}')
+    else:
+        mod = import_module(f'{_KERAS}.{sub}')
+        if len(names) == 0:
+            return mod
+        elif len(names) == 1:
+            return getattr(mod, names[0])
+        return tuple(getattr(mod, name) for name in names)
+
+if IS_TF_1:
     import tensorflow as tf
 else:
     import tensorflow.compat.v1 as tf
     # tf.disable_v2_behavior()
 
-import keras
-from keras import backend as K
-from keras.callbacks import Callback
-from keras.layers import Lambda
+keras = keras_import()
+K = keras_import('backend')
+Callback = keras_import('callbacks', 'Callback')
+Lambda = keras_import('layers', 'Lambda')
 
 from .utils import _raise, is_tf_backend, save_json, backend_channels_last
 from .six import tempfile
@@ -52,7 +65,7 @@ def limit_gpu_memory(fraction, allow_growth=False, total_memory=None):
     is_tf_backend() or _raise(NotImplementedError('Not using tensorflow backend.'))
     fraction is None or (np.isscalar(fraction) and 0<=fraction<=1) or _raise(ValueError('fraction must be between 0 and 1.'))
 
-    if _IS_TF_1:
+    if IS_TF_1:
         _session = None
         try:
             _session = K.tensorflow_backend._SESSION

@@ -6,10 +6,11 @@ from ..internals.losses import loss_laplace, loss_mse, loss_mae, loss_thresh_wei
 
 import numpy as np
 
-
-import keras.backend as K
-from keras.callbacks import Callback, TerminateOnNaN
-from keras.utils import Sequence
+from ..utils.tf import keras_import
+K = keras_import('backend')
+Callback, TerminateOnNaN = keras_import('callbacks', 'Callback', 'TerminateOnNaN')
+Sequence = keras_import('utils', 'Sequence')
+Optimizer = keras_import('optimizers', 'Optimizer')
 
 
 class ParameterDecayCallback(Callback):
@@ -35,7 +36,6 @@ def prepare_model(model, optimizer, loss, metrics=('mse','mae'),
                   loss_bg_thresh=0, loss_bg_decay=0.06, Y=None):
     """ TODO """
 
-    from keras.optimizers import Optimizer
     isinstance(optimizer,Optimizer) or _raise(ValueError())
 
 

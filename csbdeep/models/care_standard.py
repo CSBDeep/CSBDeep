@@ -11,14 +11,14 @@ from .base_model import BaseModel, suppress_without_basedir
 
 from ..utils import _raise, axes_check_and_normalize, axes_dict, move_image_axes
 from ..utils.six import Path
-from ..utils.tf import export_SavedModel, _IS_TF_1
+from ..utils.tf import export_SavedModel, IS_TF_1, keras_import
 from ..version import __version__ as package_version
 from ..data import Normalizer, NoNormalizer, PercentileNormalizer
 from ..data import Resizer, NoResizer, PadAndCropResizer
 from ..internals.predict import predict_tiled, tile_overlap, Progress, total_n_tiles
 from ..internals import nets, train
 
-if _IS_TF_1:
+if IS_TF_1:
     import tensorflow as tf
 else:
     import tensorflow.compat.v1 as tf
@@ -104,7 +104,7 @@ class CARE(BaseModel):
 
         """
         if optimizer is None:
-            from keras.optimizers import Adam
+            Adam = keras_import('optimizers', 'Adam')
             optimizer = Adam(lr=self.config.train_learning_rate)
         self.callbacks = train.prepare_model(self.keras_model, optimizer, self.config.train_loss, **kwargs)
 
@@ -116,7 +116,7 @@ class CARE(BaseModel):
                 self.callbacks.append(CARETensorBoard(log_dir=str(self.logdir), prefix_with_timestamp=False, n_images=3, write_images=True, prob_out=self.config.probabilistic))
 
         if self.config.train_reduce_lr is not None:
-            from keras.callbacks import ReduceLROnPlateau
+            ReduceLROnPlateau = keras_import('callbacks', 'ReduceLROnPlateau')
             rlrop_params = self.config.train_reduce_lr
             if 'verbose' not in rlrop_params:
                 rlrop_params['verbose'] = True

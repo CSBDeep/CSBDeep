@@ -173,7 +173,8 @@ class BaseModel(object):
     def _checkpoint_callbacks(self):
         callbacks = []
         if self.basedir is not None:
-            from keras.callbacks import ModelCheckpoint
+            from ..utils.tf import keras_import
+            ModelCheckpoint = keras_import('callbacks', 'ModelCheckpoint')
             if self.config.train_checkpoint is not None:
                 callbacks.append(ModelCheckpoint(str(self.logdir / self.config.train_checkpoint),       save_best_only=True,  save_weights_only=True))
             if self.config.train_checkpoint_epoch is not None:

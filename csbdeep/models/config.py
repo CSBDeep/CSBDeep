@@ -7,8 +7,10 @@ import argparse
 import warnings
 
 from distutils.version import LooseVersion
-import keras
-import keras.backend as K
+
+from ..utils.tf import keras_import
+keras = keras_import()
+K = keras_import('backend')
 
 from ..utils import _raise, axes_check_and_normalize, axes_dict, backend_channels_last
 
