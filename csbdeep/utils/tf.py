@@ -129,16 +129,20 @@ def export_SavedModel(model, outpath, meta={}, format='zip'):
     def export_to_dir(dirname):
         if len(model.inputs) > 1 or len(model.outputs) > 1:
             warnings.warn('Found multiple input or output layers.')
-        builder = tf.saved_model.builder.SavedModelBuilder(dirname)
-        # use name 'input'/'output' if there's just a single input/output layer
-        inputs  = dict(zip(model.input_names,model.inputs))   if len(model.inputs)  > 1 else dict(input=model.input)
-        outputs = dict(zip(model.output_names,model.outputs)) if len(model.outputs) > 1 else dict(output=model.output)
-        signature = tf.saved_model.signature_def_utils.predict_signature_def(inputs=inputs, outputs=outputs)
-        signature_def_map = { tf.saved_model.signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: signature }
-        builder.add_meta_graph_and_variables(K.get_session(),
-                                             [tf.saved_model.tag_constants.SERVING],
-                                             signature_def_map=signature_def_map)
-        builder.save()
+        if IS_TF_1:
+            builder = tf.saved_model.builder.SavedModelBuilder(dirname)
+            # use name 'input'/'output' if there's just a single input/output layer
+            inputs  = dict(zip(model.input_names,model.inputs))   if len(model.inputs)  > 1 else dict(input=model.input)
+            outputs = dict(zip(model.output_names,model.outputs)) if len(model.outputs) > 1 else dict(output=model.output)
+            signature = tf.saved_model.signature_def_utils.predict_signature_def(inputs=inputs, outputs=outputs)
+            signature_def_map = { tf.saved_model.signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: signature }
+            builder.add_meta_graph_and_variables(K.get_session(),
+                                                 [tf.saved_model.tag_constants.SERVING],
+                                                 signature_def_map=signature_def_map)
+            builder.save()
+        else:
+            warnings.warn('Model export in TensorFlow 2 is untested.')
+            tf.saved_model.save(model, dirname)
         if meta is not None and len(meta) > 0:
             save_json(meta, os.path.join(dirname,'meta.json'))
 
