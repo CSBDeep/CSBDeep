@@ -14,9 +14,9 @@ _KERAS = 'keras' if IS_TF_1 else 'tensorflow.keras'
 
 def keras_import(sub=None, *names):
     if sub is None:
-        return import_module(f'{_KERAS}')
+        return import_module(_KERAS)
     else:
-        mod = import_module(f'{_KERAS}.{sub}')
+        mod = import_module('{_KERAS}.{sub}'.format(_KERAS=_KERAS,sub=sub))
         if len(names) == 0:
             return mod
         elif len(names) == 1:
