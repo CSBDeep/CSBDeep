@@ -7,11 +7,14 @@ import warnings
 import shutil
 import datetime
 
-try:
+from tensorflow import __version__ as _tf_version
+_IS_TF_1 = _tf_version.startswith('1.')
+
+if _IS_TF_1:
+    import tensorflow as tf
+else:
     import tensorflow.compat.v1 as tf
     # tf.disable_v2_behavior()
-except ModuleNotFoundError:
-    import tensorflow as tf
 
 import keras
 from keras import backend as K
@@ -23,12 +26,7 @@ from .six import tempfile
 
 
 
-def _is_tf_1():
-    return tf.__version__.startswith('1.')
-
-
-
-def limit_gpu_memory(fraction, allow_growth=False):
+def limit_gpu_memory(fraction, allow_growth=False, total_memory=None):
     """Limit GPU memory allocation for TensorFlow (TF) backend.
 
     Parameters
@@ -40,6 +38,8 @@ def limit_gpu_memory(fraction, allow_growth=False):
         If ``False`` (default), TF will allocate all designated (see `fraction`) memory all at once.
         If ``True``, TF will allocate memory as needed up to the limit imposed by `fraction`; this may
         incur a performance penalty due to memory fragmentation.
+    total_memory :  int or iterable of int
+        Total amount of available GPU memory (in MB).
 
     Raises
     ------
@@ -52,22 +52,38 @@ def limit_gpu_memory(fraction, allow_growth=False):
     is_tf_backend() or _raise(NotImplementedError('Not using tensorflow backend.'))
     fraction is None or (np.isscalar(fraction) and 0<=fraction<=1) or _raise(ValueError('fraction must be between 0 and 1.'))
 
-    _session = None
-    try:
-        _session = K.tensorflow_backend._SESSION
-    except AttributeError:
-        pass
+    if _IS_TF_1:
+        _session = None
+        try:
+            _session = K.tensorflow_backend._SESSION
+        except AttributeError:
+            pass
 
-    if _session is None:
-        config = tf.ConfigProto()
-        if fraction is not None:
-            config.gpu_options.per_process_gpu_memory_fraction = fraction
-        config.gpu_options.allow_growth = bool(allow_growth)
-        session = tf.Session(config=config)
-        K.tensorflow_backend.set_session(session)
-        # print("[tf_limit]\t setting config.gpu_options.per_process_gpu_memory_fraction to ",config.gpu_options.per_process_gpu_memory_fraction)
+        if _session is None:
+            config = tf.ConfigProto()
+            if fraction is not None:
+                config.gpu_options.per_process_gpu_memory_fraction = fraction
+            config.gpu_options.allow_growth = bool(allow_growth)
+            session = tf.Session(config=config)
+            K.tensorflow_backend.set_session(session)
+            # print("[tf_limit]\t setting config.gpu_options.per_process_gpu_memory_fraction to ",config.gpu_options.per_process_gpu_memory_fraction)
+        else:
+            warnings.warn('Too late to limit GPU memory, can only be done once and before any computation.')
     else:
-        warnings.warn('Too late to limit GPU memory, can only be done once and before any computation.')
+        gpus = tf.config.experimental.list_physical_devices('GPU')
+        if gpus:
+            if fraction is not None:
+                np.isscalar(total_memory) or _raise(ValueError("'total_memory' must be provided when using TensorFlow 2."))
+                vdc = tf.config.experimental.VirtualDeviceConfiguration(memory_limit=int(np.ceil(total_memory*fraction)))
+            try:
+                for gpu in gpus:
+                    if fraction is not None:
+                        tf.config.experimental.set_virtual_device_configuration(gpu,[vdc])
+                    if allow_growth:
+                        tf.config.experimental.set_memory_growth(gpu, True)
+            except RuntimeError as e:
+                # must be set before GPUs have been initialized
+                print(e)
 
 
 

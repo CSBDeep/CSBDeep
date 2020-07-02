@@ -2,13 +2,7 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
 
 import warnings
-
 import numpy as np
-try:
-    import tensorflow.compat.v1 as tf
-    # tf.disable_v2_behavior()
-except ModuleNotFoundError:
-    import tensorflow as tf
 from six import string_types
 
 from csbdeep.internals.probability import ProbabilisticPrediction
@@ -17,12 +11,18 @@ from .base_model import BaseModel, suppress_without_basedir
 
 from ..utils import _raise, axes_check_and_normalize, axes_dict, move_image_axes
 from ..utils.six import Path
-from ..utils.tf import export_SavedModel
+from ..utils.tf import export_SavedModel, _IS_TF_1
 from ..version import __version__ as package_version
 from ..data import Normalizer, NoNormalizer, PercentileNormalizer
 from ..data import Resizer, NoResizer, PadAndCropResizer
 from ..internals.predict import predict_tiled, tile_overlap, Progress, total_n_tiles
 from ..internals import nets, train
+
+if _IS_TF_1:
+    import tensorflow as tf
+else:
+    import tensorflow.compat.v1 as tf
+    # tf.disable_v2_behavior()
 
 
 class CARE(BaseModel):
