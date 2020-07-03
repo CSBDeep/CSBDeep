@@ -23,18 +23,19 @@ def keras_import(sub=None, *names):
             return getattr(mod, names[0])
         return tuple(getattr(mod, name) for name in names)
 
-if IS_TF_1:
-    import tensorflow as tf
-else:
-    import tensorflow.compat.v1 as tf
-    # tf.disable_v2_behavior()
+import tensorflow as tf
+# if IS_TF_1:
+#     import tensorflow as tf
+# else:
+#     import tensorflow.compat.v1 as tf
+#     # tf.disable_v2_behavior()
 
 keras = keras_import()
 K = keras_import('backend')
 Callback = keras_import('callbacks', 'Callback')
 Lambda = keras_import('layers', 'Lambda')
 
-from .utils import _raise, is_tf_backend, save_json, backend_channels_last
+from .utils import _raise, is_tf_backend, save_json, backend_channels_last, normalize
 from .six import tempfile
 
 
@@ -218,6 +219,7 @@ class CARETensorBoard(Callback):
         super(CARETensorBoard, self).__init__()
         is_tf_backend() or _raise(RuntimeError('TensorBoard callback only works with the TensorFlow backend.'))
         backend_channels_last() or _raise(NotImplementedError())
+        IS_TF_1 or _raise(NotImplementedError("Not supported with TensorFlow 2"))
 
         self.freq = freq
         self.image_freq = freq
@@ -356,3 +358,140 @@ class CARETensorBoard(Callback):
 
     def on_train_end(self, _):
         self.writer.close()
+
+
+
+class CARETensorBoardImage(Callback):
+
+    def __init__(self, model, data, log_dir,
+                 n_images=3,
+                 batch_size=1,
+                 prob_out=False,
+                 image_for_inputs=None,  # write images for only these input indices
+                 image_for_outputs=None, # write images for only these output indices
+                 input_slices=None,      # list (of list) of slices to apply to `image_for_inputs` layers before writing image
+                 output_slices=None):    # list (of list) of slices to apply to `image_for_outputs` layers before writing image
+
+        super(CARETensorBoardImage, self).__init__()
+        backend_channels_last() or _raise(NotImplementedError())
+        not IS_TF_1 or _raise(NotImplementedError("Not supported with TensorFlow 1"))
+
+        ## model
+        from ..models import BaseModel
+        if isinstance(model, BaseModel):
+            model = model.keras_model
+        isinstance(model, keras.Model) or _raise(ValueError())
+        self.model = model
+        self.n_inputs  = len(self.model.inputs)
+        self.n_outputs = len(self.model.outputs)
+
+        ## data
+        if isinstance(data,(list,tuple)):
+            X, Y = data
+        else:
+            X, Y = data[0]
+        if self.n_inputs  == 1 and isinstance(X,np.ndarray): X = (X,)
+        if self.n_outputs == 1 and isinstance(Y,np.ndarray): Y = (Y,)
+        (self.n_inputs == len(X) and self.n_outputs == len(Y)) or _raise(ValueError())
+        all(len(v)>=n_images for v in X) or _raise(ValueError())
+        all(len(v)>=n_images for v in Y) or _raise(ValueError())
+        self.X = [v[:n_images] for v in X]
+        self.Y = [v[:n_images] for v in Y]
+
+        self.log_dir = log_dir
+        self.batch_size = batch_size
+        self.prob_out = prob_out
+
+        ## I/O choices
+        image_for_inputs  = np.arange(self.n_inputs)  if image_for_inputs  is None else image_for_inputs
+        image_for_outputs = np.arange(self.n_outputs) if image_for_outputs is None else image_for_outputs
+
+        input_slices  = (slice(None),) if input_slices  is None else input_slices
+        output_slices = (slice(None),) if output_slices is None else output_slices
+        if isinstance(input_slices[0],slice): # apply same slices to all inputs
+            input_slices = [input_slices]*len(image_for_inputs)
+        if isinstance(output_slices[0],slice): # apply same slices to all outputs
+            output_slices = [output_slices]*len(image_for_outputs)
+
+        len(input_slices)  == len(image_for_inputs)  or _raise(ValueError())
+        len(output_slices) == len(image_for_outputs) or _raise(ValueError())
+
+        self.image_for_inputs = image_for_inputs
+        self.image_for_outputs = image_for_outputs
+        self.input_slices = input_slices
+        self.output_slices = output_slices
+
+        self.file_writer = tf.summary.create_file_writer(str(self.log_dir))
+
+
+    def _name(self, prefix, layer, i, n, show_layer_names=False):
+        return '{prefix}{i}{name}'.format (
+            prefix = prefix,
+            i      = (i if n > 1 else ''),
+            name   = '' if (layer is None or not show_layer_names) else '_'+''.join(layer.name.split(':')[:-1]),
+        )
+
+
+    def _normalize_image(self, x, pmin=1, pmax=99.8, clip=True):
+        def norm(x, axis):
+            return normalize(x, pmin=pmin, pmax=pmax, axis=axis, clip=clip)
+
+        n_channels_out = x.shape[-1]
+        n_dim_out = len(x.shape)
+        assert 0 < n_channels_out
+
+        if n_dim_out > 4:
+            x = np.max(x, axis=tuple(range(1,1+n_dim_out-4)))
+
+        if n_channels_out == 1:
+            out = norm(x, axis=(1,2))
+        elif n_channels_out == 2:
+            out = norm(np.concatenate([x,x[...,:1]], axis=-1), axis=(1,2,3))
+        elif n_channels_out == 3:
+            out = norm(x, axis=(1,2,3))
+        else:
+            out = norm(np.max(x, axis=-1, keepdims=True), axis=(1,2,3))
+        return out
+
+
+    def on_epoch_end(self, epoch, logs=None):
+
+        # inputs
+        if epoch == 0:
+            with self.file_writer.as_default():
+                for i,sl in zip(self.image_for_inputs,self.input_slices):
+                    # print('input', self.model.inputs[i], tuple(sl))
+                    input_name = self._name('net_input', self.model.inputs[i], i, self.n_inputs)
+                    input_image = self._normalize_image(self.X[i][tuple(sl)])
+                    tf.summary.image(input_name, input_image, step=epoch)
+
+        # outputs
+        Yhat = self.model.predict(self.X, batch_size=self.batch_size)
+        if self.n_outputs == 1 and isinstance(Yhat,np.ndarray): Yhat = (Yhat,)
+        with self.file_writer.as_default():
+            for i,sl in zip(self.image_for_outputs,self.output_slices):
+                # print('output', self.model.outputs[i], tuple(sl))
+                output_shape = self.model.output_shape if self.n_outputs==1 else self.model.output_shape[i]
+                n_channels_out = sep = output_shape[-1]
+                if self.prob_out: # first half of output channels is mean, second half scale
+                    n_channels_out % 2 == 0 or _raise(ValueError())
+                    sep = sep // 2
+                output_image = self._normalize_image(Yhat[i][...,:sep][tuple(sl)])
+                if self.prob_out:
+                    scale_image = self._normalize_image(Yhat[i][...,sep:][tuple(sl)], pmin=0, pmax=100)
+                    scale_name = self._name('net_output_scale', self.model.outputs[i], i, self.n_outputs)
+                    output_name = self._name('net_output_mean',  self.model.outputs[i], i, self.n_outputs)
+                    tf.summary.image(output_name, output_image, step=epoch)
+                    tf.summary.image(scale_name, scale_image, step=epoch)
+                else:
+                    output_name = self._name('net_output', self.model.outputs[i], i, self.n_outputs)
+                    tf.summary.image(output_name, output_image, step=epoch)
+
+        # targets
+        if epoch == 0:
+            with self.file_writer.as_default():
+                for i,sl in zip(self.image_for_outputs,self.output_slices):
+                    # print('target', self.model.outputs[i], tuple(sl))
+                    target_name = self._name('net_target', self.model.outputs[i], i, self.n_outputs)
+                    target_image = self._normalize_image(self.Y[i][tuple(sl)])
+                    tf.summary.image(target_name, target_image, step=epoch)

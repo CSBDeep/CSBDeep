@@ -11,18 +11,19 @@ from .base_model import BaseModel, suppress_without_basedir
 
 from ..utils import _raise, axes_check_and_normalize, axes_dict, move_image_axes
 from ..utils.six import Path
-from ..utils.tf import export_SavedModel, IS_TF_1, keras_import
+from ..utils.tf import export_SavedModel, IS_TF_1, keras_import, CARETensorBoardImage
 from ..version import __version__ as package_version
 from ..data import Normalizer, NoNormalizer, PercentileNormalizer
 from ..data import Resizer, NoResizer, PadAndCropResizer
 from ..internals.predict import predict_tiled, tile_overlap, Progress, total_n_tiles
 from ..internals import nets, train
 
-if IS_TF_1:
-    import tensorflow as tf
-else:
-    import tensorflow.compat.v1 as tf
-    # tf.disable_v2_behavior()
+import tensorflow as tf
+# if IS_TF_1:
+#     import tensorflow as tf
+# else:
+#     import tensorflow.compat.v1 as tf
+#     # tf.disable_v2_behavior()
 
 
 class CARE(BaseModel):
@@ -112,8 +113,12 @@ class CARE(BaseModel):
             self.callbacks += self._checkpoint_callbacks()
 
             if self.config.train_tensorboard:
-                from ..utils.tf import CARETensorBoard
-                self.callbacks.append(CARETensorBoard(log_dir=str(self.logdir), prefix_with_timestamp=False, n_images=3, write_images=True, prob_out=self.config.probabilistic))
+                if IS_TF_1:
+                    from ..utils.tf import CARETensorBoard
+                    self.callbacks.append(CARETensorBoard(log_dir=str(self.logdir), prefix_with_timestamp=False, n_images=3, write_images=True, prob_out=self.config.probabilistic))
+                else:
+                    from tensorflow.keras.callbacks import TensorBoard
+                    self.callbacks.append(TensorBoard(log_dir=str(self.logdir/'logs'), write_graph=False, profile_batch=0))
 
         if self.config.train_reduce_lr is not None:
             ReduceLROnPlateau = keras_import('callbacks', 'ReduceLROnPlateau')
@@ -173,6 +178,11 @@ class CARE(BaseModel):
 
         if not self._model_prepared:
             self.prepare_for_training()
+
+        if self.config.train_tensorboard and not IS_TF_1 and not any(isinstance(cb,CARETensorBoardImage) for cb in self.callbacks):
+            self.callbacks.append(CARETensorBoardImage(model=self.keras_model, data=validation_data,
+                                                       log_dir=str(self.logdir/'logs'/'images'),
+                                                       n_images=3, prob_out=self.config.probabilistic))
 
         training_data = train.DataWrapper(X, Y, self.config.train_batch_size)
 
