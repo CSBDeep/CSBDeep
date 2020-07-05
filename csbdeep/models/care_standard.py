@@ -187,7 +187,7 @@ class CARE(BaseModel):
         training_data = train.DataWrapper(X, Y, self.config.train_batch_size, length=epochs*steps_per_epoch)
 
         fit = self.keras_model.fit_generator if IS_TF_1 else self.keras_model.fit
-        history = fit(training_data, validation_data=validation_data,
+        history = fit(iter(training_data), validation_data=validation_data,
                       epochs=epochs, steps_per_epoch=steps_per_epoch,
                       callbacks=self.callbacks, verbose=1)
         self._training_finished()

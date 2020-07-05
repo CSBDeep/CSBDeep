@@ -4,7 +4,6 @@ from six.moves import range, zip, map, reduce, filter
 # import warnings
 import numpy as np
 import pytest
-from math import ceil
 from csbdeep.data import NoNormalizer, PercentileNormalizer, NoResizer, PadAndCropResizer
 from csbdeep.utils import normalize_minmse
 from csbdeep.internals.predict import tile_iterator_1d, tile_iterator, total_n_tiles
@@ -153,7 +152,7 @@ def test_rolling_sequence():
             for batch_size in (3,7,32):
                 seq = RollingSequence(data_size, batch_size, shuffle=shuffle, rng=rng)
 
-                n_batches = 3 * ceil(data_size/batch_size)
+                n_batches = 3 * int(np.ceil(data_size/float(batch_size)))
                 perm = np.random.permutation(n_batches)
                 batches_perm = [seq[i] for i in perm]
                 batches_linear = [seq[i] for i in np.arange(n_batches)]
