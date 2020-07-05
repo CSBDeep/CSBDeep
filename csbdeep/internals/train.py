@@ -76,6 +76,7 @@ def prepare_model(model, optimizer, loss, metrics=('mse','mae'),
 class RollingSequence(Sequence):
 
     def __init__(self, data_size, batch_size, length=None, shuffle=True, rng=None):
+        # print(f"### __init__", flush=True)
         if rng is None: rng = np.random
         self.data_size = int(data_size)
         self.batch_size = int(batch_size)
@@ -85,6 +86,7 @@ class RollingSequence(Sequence):
         self.index_map = {}
 
     def __len__(self):
+        # print(f"### __len__ = {self.length}", flush=True)
         return self.length
 
     def _index(self, loop):
@@ -92,6 +94,15 @@ class RollingSequence(Sequence):
             return self.index_map[loop]
         else:
             return self.index_map.setdefault(loop, self.index_gen(self.data_size))
+
+    def on_epoch_end(self):
+        # print(f"### on_epoch_end", flush=True)
+        pass
+
+    def __iter__(self):
+        # print(f"### __iter__", flush=True)
+        for i in range(len(self)):
+            yield self[i]
 
     def batch(self, i):
         pos      =   i *  self.batch_size
@@ -103,6 +114,7 @@ class RollingSequence(Sequence):
         while sl.stop > len(index):
             _loop += 1
             index = np.concatenate((index, self._index(_loop)))
+        # print(f"### - batch({i:02}) -> {tuple(index[sl])}", flush=True)
         return index[sl]
 
     def __getitem__(self, i):
