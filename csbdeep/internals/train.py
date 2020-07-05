@@ -73,20 +73,49 @@ def prepare_model(model, optimizer, loss, metrics=('mse','mae'),
     return callbacks
 
 
-class DataWrapper(Sequence):
+class RollingSequence(Sequence):
 
-    def __init__(self, X, Y, batch_size):
-        self.X, self.Y = X, Y
-        self.batch_size = batch_size
-        self.perm = np.random.permutation(len(self.X))
+    def __init__(self, data_size, batch_size, length=None, shuffle=True, rng=None):
+        if rng is None: rng = np.random
+        self.data_size = int(data_size)
+        self.batch_size = int(batch_size)
+        self.length = 2**63-1 if length is None else int(length) # 2**63-1 is max possible value
+        self.shuffle = bool(shuffle)
+        self.index_gen = rng.permutation if self.shuffle else np.arange
+        self.index_map = {}
 
     def __len__(self):
-        return int(np.ceil(len(self.X) / float(self.batch_size)))
+        return self.length
 
-    def on_epoch_end(self):
-        self.perm = np.random.permutation(len(self.X))
+    def _index(self, loop):
+        if loop in self.index_map:
+            return self.index_map[loop]
+        else:
+            return self.index_map.setdefault(loop, self.index_gen(self.data_size))
+
+    def batch(self, i):
+        pos      =   i *  self.batch_size
+        loop     = pos // self.data_size
+        pos_loop = pos %  self.data_size
+        sl = slice(pos_loop, pos_loop + self.batch_size)
+        index = self._index(loop)
+        _loop = loop
+        while sl.stop > len(index):
+            _loop += 1
+            index = np.concatenate((index, self._index(_loop)))
+        return index[sl]
 
     def __getitem__(self, i):
-        idx = slice(i*self.batch_size,(i+1)*self.batch_size)
-        idx = self.perm[idx]
+        return self.batch(i)
+
+
+class DataWrapper(RollingSequence):
+
+    def __init__(self, X, Y, batch_size, length):
+        super(DataWrapper, self).__init__(data_size=len(X), batch_size=batch_size, length=length, shuffle=True)
+        len(X) == len(Y) or _raise(ValueError("X and Y must have same length"))
+        self.X, self.Y = X, Y
+
+    def __getitem__(self, i):
+        idx = self.batch(i)
         return self.X[idx], self.Y[idx]
