@@ -74,6 +74,15 @@ def prepare_model(model, optimizer, loss, metrics=('mse','mae'),
 
 
 class RollingSequence(Sequence):
+    """Helper class for creating batches for rolling sequence.
+
+    Create batches of size `batch_size` that contain indices in `range(data_size)`.
+    To that end, the data indices are repeated (rolling), either in ascending order or
+    shuffled if `shuffle=True`. If taking batches sequentially, all data indices will
+    appear equally often. All calls to `batch(i)` will return the same batch for same i.
+    Parameter `length` will only determine the result of `len`, it has no effect otherwise.
+    Note that batch_size is allowed to be larger than data_size.
+    """
 
     def __init__(self, data_size, batch_size, length=None, shuffle=True, rng=None):
         # print(f"### __init__", flush=True)
