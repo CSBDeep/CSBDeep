@@ -133,8 +133,11 @@ def export_SavedModel(model, outpath, meta={}, format='zip'):
 
         if IS_TF_1:
             from tensorflow import saved_model
+            import keras.backend as K
         else:
-            from tensorflow.compat.v1 import saved_model
+            from tensorflow.compat.v1 import saved_model, disable_eager_execution
+            import tensorflow.compat.v1.keras.backend as K
+            disable_eager_execution()
 
         builder = saved_model.builder.SavedModelBuilder(dirname)
         # use name 'input'/'output' if there's just a single input/output layer
