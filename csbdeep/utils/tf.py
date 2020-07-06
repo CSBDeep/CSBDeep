@@ -135,9 +135,11 @@ def export_SavedModel(model, outpath, meta={}, format='zip'):
             from tensorflow import saved_model
             import keras.backend as K
         else:
-            from tensorflow.compat.v1 import saved_model, disable_eager_execution
+            from tensorflow.compat.v1 import saved_model, disable_eager_execution, enable_eager_execution
             import tensorflow.compat.v1.keras.backend as K
             disable_eager_execution()
+            warnings.warn("Disabling eager mode for exporting model, thus only use at the end of a tf session")
+            
 
         builder = saved_model.builder.SavedModelBuilder(dirname)
         # use name 'input'/'output' if there's just a single input/output layer
@@ -149,6 +151,7 @@ def export_SavedModel(model, outpath, meta={}, format='zip'):
                                                  [saved_model.tag_constants.SERVING],
                                                  signature_def_map=signature_def_map)
         builder.save()
+
 
         if meta is not None and len(meta) > 0:
             save_json(meta, os.path.join(dirname,'meta.json'))
