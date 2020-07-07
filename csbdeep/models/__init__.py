@@ -35,7 +35,7 @@ if IS_TF_1:
                 "https://keras.io/getting-started/faq/#where-is-the-keras-configuration-file-stored" % K.backend()
             )
 # else:
-#     print("Found TensorFlow 2 (version %s), which might cause issues with CSBDeep (e.g. model export for use in Fiji)." % tensorflow.__version__, file=sys.stderr)
+#     print("Found TensorFlow 2 (version %s), which might cause issues with CSBDeep." % tensorflow.__version__, file=sys.stderr)
 
 K = keras_import('backend')
 if K.image_data_format() != 'channels_last':

@@ -125,7 +125,8 @@ class CARE(BaseModel):
             rlrop_params = self.config.train_reduce_lr
             if 'verbose' not in rlrop_params:
                 rlrop_params['verbose'] = True
-            self.callbacks.append(ReduceLROnPlateau(**rlrop_params))
+            # TF2: add as first callback to put 'lr' in the logs for TensorBoard
+            self.callbacks.insert(0,ReduceLROnPlateau(**rlrop_params))
 
         self._model_prepared = True
 
