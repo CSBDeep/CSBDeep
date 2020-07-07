@@ -135,21 +135,24 @@ def export_SavedModel(model, outpath, meta={}, format='zip'):
             from tensorflow import saved_model
             import keras.backend as K
         else:
-            from tensorflow.compat.v1 import saved_model
+            from tensorflow.compat.v1 import saved_model, disable_eager_execution
             import tensorflow.compat.v1.keras.backend as K
+            raise NotImplementedError("Model export not yet implemented for tf 2.x")
+            # diabling eager execution resets the graph thus no weights are being saved
+            # disable_eager_execution()
+            # warnings.warn("Disabling eager mode for exporting model, thus only use at the end of a tf session")
 
 
-        with tf.Graph().as_default():
-            builder = saved_model.builder.SavedModelBuilder(dirname)
-            # use name 'input'/'output' if there's just a single input/output layer
-            inputs  = dict(zip(model.input_names,model.inputs))   if len(model.inputs)  > 1 else dict(input=model.input)
-            outputs = dict(zip(model.output_names,model.outputs)) if len(model.outputs) > 1 else dict(output=model.output)
-            signature = saved_model.signature_def_utils.predict_signature_def(inputs=inputs, outputs=outputs)
-            signature_def_map = { saved_model.signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: signature }
-            builder.add_meta_graph_and_variables(K.get_session(),
+        builder = saved_model.builder.SavedModelBuilder(dirname)
+        # use name 'input'/'output' if there's just a single input/output layer
+        inputs  = dict(zip(model.input_names,model.inputs))   if len(model.inputs)  > 1 else dict(input=model.input)
+        outputs = dict(zip(model.output_names,model.outputs)) if len(model.outputs) > 1 else dict(output=model.output)
+        signature = saved_model.signature_def_utils.predict_signature_def(inputs=inputs, outputs=outputs)
+        signature_def_map = { saved_model.signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: signature }
+        builder.add_meta_graph_and_variables(K.get_session(),
                                              [saved_model.tag_constants.SERVING],
                                              signature_def_map=signature_def_map)
-            builder.save()
+        builder.save()
 
 
         if meta is not None and len(meta) > 0:
