@@ -131,32 +131,33 @@ def export_SavedModel(model, outpath, meta={}, format='zip'):
         if len(model.inputs) > 1 or len(model.outputs) > 1:
             warnings.warn('Found multiple input or output layers.')
 
-        if IS_TF_1:
-            from tensorflow import saved_model
-            from keras.models import clone_model
-            from keras.backend import get_session
-        else:
-            from tensorflow.compat.v1 import saved_model
-            from tensorflow.keras.models import clone_model
-            from tensorflow.compat.v1.keras.backend import get_session
+        def _export(model):
+            if IS_TF_1:
+                from tensorflow import saved_model
+                from keras.backend import get_session
+            else:
+                from tensorflow.compat.v1 import saved_model
+                from tensorflow.compat.v1.keras.backend import get_session
 
-        weights = model.get_weights()
-
-        with tf.Graph().as_default():
-            # clone model in new graph and set weights
-            _model = clone_model(model)
-            _model.set_weights(weights)
             builder = saved_model.builder.SavedModelBuilder(dirname)
             # use name 'input'/'output' if there's just a single input/output layer
-            inputs  = dict(zip(_model.input_names,_model.inputs))   if len(_model.inputs)  > 1 else dict(input=_model.input)
-            outputs = dict(zip(_model.output_names,_model.outputs)) if len(_model.outputs) > 1 else dict(output=_model.output)
+            inputs  = dict(zip(model.input_names,model.inputs))   if len(model.inputs)  > 1 else dict(input=model.input)
+            outputs = dict(zip(model.output_names,model.outputs)) if len(model.outputs) > 1 else dict(output=model.output)
             signature = saved_model.signature_def_utils.predict_signature_def(inputs=inputs, outputs=outputs)
             signature_def_map = { saved_model.signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: signature }
-            builder.add_meta_graph_and_variables(get_session(),
-                                             [saved_model.tag_constants.SERVING],
-                                             signature_def_map=signature_def_map)
+            builder.add_meta_graph_and_variables(get_session(), [saved_model.tag_constants.SERVING], signature_def_map=signature_def_map)
             builder.save()
 
+        if IS_TF_1:
+            _export(model)
+        else:
+            from tensorflow.keras.models import clone_model
+            weights = model.get_weights()
+            with tf.Graph().as_default():
+                # clone model in new graph and set weights
+                _model = clone_model(model)
+                _model.set_weights(weights)
+                _export(_model)
 
         if meta is not None and len(meta) > 0:
             save_json(meta, os.path.join(dirname,'meta.json'))
@@ -474,6 +475,7 @@ class CARETensorBoardImage(Callback):
 
 
     def on_epoch_end(self, epoch, logs=None):
+        # https://www.tensorflow.org/tensorboard/image_summaries
 
         # inputs
         if epoch == 0:
