@@ -212,10 +212,11 @@ class CARETensorBoard(Callback):
                  write_graph=False,
                  prefix_with_timestamp=True,
                  write_images=False,
-                 image_for_inputs=None,  # write images for only these input indices
-                 image_for_outputs=None, # write images for only these output indices
-                 input_slices=None,      # list (of list) of slices to apply to `image_for_inputs` layers before writing image
-                 output_slices=None):    # list (of list) of slices to apply to `image_for_outputs` layers before writing image
+                 image_for_inputs=None,      # write images for only these input indices
+                 image_for_outputs=None,     # write images for only these output indices
+                 input_slices=None,          # list (of list) of slices to apply to `image_for_inputs` layers before writing image
+                 output_slices=None,         # list (of list) of slices to apply to `image_for_outputs` layers before writing image
+                 output_target_shapes=None): # list of shapes of the target/gt images that correspond to all model outputs
         super(CARETensorBoard, self).__init__()
         is_tf_backend() or _raise(RuntimeError('TensorBoard callback only works with the TensorFlow backend.'))
         backend_channels_last() or _raise(NotImplementedError())
@@ -233,6 +234,7 @@ class CARETensorBoard(Callback):
         self.image_for_outputs = image_for_outputs
         self.input_slices = input_slices
         self.output_slices = output_slices
+        self.output_target_shapes = output_target_shapes
         self.compute_histograms = compute_histograms
 
         if prefix_with_timestamp:
@@ -254,16 +256,19 @@ class CARETensorBoard(Callback):
                     tf_sums.append(tf.summary.histogram('{}_out'.format(layer.name),
                                                         layer.output))
 
-
-        def _gt_shape(output_shape):
+        def _gt_shape(output_shape,target_shape):
+            if target_shape is not None:
+                output_shape = target_shape
             if not self.prob_out: return output_shape
             output_shape[-1] % 2 == 0 or _raise(ValueError())
             return list(output_shape[:-1]) + [output_shape[-1] // 2]
-        self.gt_outputs = [K.placeholder(shape=_gt_shape(K.int_shape(x))) for x in self.model.outputs]
 
         n_inputs, n_outputs = len(self.model.inputs), len(self.model.outputs)
         image_for_inputs  = np.arange(n_inputs)  if self.image_for_inputs  is None else self.image_for_inputs
         image_for_outputs = np.arange(n_outputs) if self.image_for_outputs is None else self.image_for_outputs
+
+        output_target_shapes = [None]*n_outputs if self.output_target_shapes is None else self.output_target_shapes
+        self.gt_outputs = [K.placeholder(shape=_gt_shape(K.int_shape(x),sh)) for x,sh in zip(self.model.outputs,output_target_shapes)]
 
         input_slices  = (slice(None),) if self.input_slices  is None else self.input_slices
         output_slices = (slice(None),) if self.output_slices is None else self.output_slices
@@ -393,8 +398,8 @@ class CARETensorBoardImage(Callback):
         if self.n_inputs  == 1 and isinstance(X,np.ndarray): X = (X,)
         if self.n_outputs == 1 and isinstance(Y,np.ndarray): Y = (Y,)
         (self.n_inputs == len(X) and self.n_outputs == len(Y)) or _raise(ValueError())
-        all(len(v)>=n_images for v in X) or _raise(ValueError())
-        all(len(v)>=n_images for v in Y) or _raise(ValueError())
+        # all(len(v)>=n_images for v in X) or _raise(ValueError())
+        # all(len(v)>=n_images for v in Y) or _raise(ValueError())
         self.X = [v[:n_images] for v in X]
         self.Y = [v[:n_images] for v in Y]
 

@@ -179,7 +179,8 @@ class CARE(BaseModel):
         if not self._model_prepared:
             self.prepare_for_training()
 
-        if self.config.train_tensorboard and not IS_TF_1 and not any(isinstance(cb,CARETensorBoardImage) for cb in self.callbacks):
+        if (self.config.train_tensorboard and self.basedir is not None and
+            not IS_TF_1 and not any(isinstance(cb,CARETensorBoardImage) for cb in self.callbacks)):
             self.callbacks.append(CARETensorBoardImage(model=self.keras_model, data=validation_data,
                                                        log_dir=str(self.logdir/'logs'/'images'),
                                                        n_images=3, prob_out=self.config.probabilistic))
