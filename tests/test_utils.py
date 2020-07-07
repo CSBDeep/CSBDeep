@@ -7,6 +7,7 @@ import pytest
 from csbdeep.data import NoNormalizer, PercentileNormalizer, NoResizer, PadAndCropResizer
 from csbdeep.utils import normalize_minmse
 from csbdeep.internals.predict import tile_iterator_1d, tile_iterator, total_n_tiles
+from csbdeep.internals.train import RollingSequence
 
 
 
@@ -141,3 +142,25 @@ def test_tile_iterator(guarantee, n_dims):
 
         assert c == actual_n_tiles
         assert np.allclose(x,y)
+
+
+
+def test_rolling_sequence():
+    rng = np.random.RandomState(42)
+    for shuffle in (False,True):
+        for data_size in (5,60,123):
+            for batch_size in (3,7,32):
+                seq = RollingSequence(data_size, batch_size, shuffle=shuffle, rng=rng)
+
+                n_batches = 3 * int(np.ceil(data_size/float(batch_size)))
+                perm = np.random.permutation(n_batches)
+                batches_perm = [seq[i] for i in perm]
+                batches_linear = [seq[i] for i in np.arange(n_batches)]
+                assert all(np.all(batches_perm[i]==batches_linear[j]) for i,j in enumerate(perm))
+
+                res = np.concatenate(batches_linear)
+                ref = np.concatenate([seq.index_map[i] for i in sorted(seq.index_map.keys())])
+                assert np.all(ref[:len(res)] == res)
+
+                counts = np.unique(ref, return_counts=True)[1]
+                assert all(counts[0] == c for c in counts)

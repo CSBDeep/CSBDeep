@@ -2,9 +2,7 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
 
 import warnings
-
 import numpy as np
-import tensorflow as tf
 from six import string_types
 
 from csbdeep.internals.probability import ProbabilisticPrediction
@@ -13,12 +11,19 @@ from .base_model import BaseModel, suppress_without_basedir
 
 from ..utils import _raise, axes_check_and_normalize, axes_dict, move_image_axes
 from ..utils.six import Path
-from ..utils.tf import export_SavedModel
+from ..utils.tf import export_SavedModel, IS_TF_1, keras_import, CARETensorBoardImage
 from ..version import __version__ as package_version
 from ..data import Normalizer, NoNormalizer, PercentileNormalizer
 from ..data import Resizer, NoResizer, PadAndCropResizer
 from ..internals.predict import predict_tiled, tile_overlap, Progress, total_n_tiles
 from ..internals import nets, train
+
+import tensorflow as tf
+# if IS_TF_1:
+#     import tensorflow as tf
+# else:
+#     import tensorflow.compat.v1 as tf
+#     # tf.disable_v2_behavior()
 
 
 class CARE(BaseModel):
@@ -100,7 +105,7 @@ class CARE(BaseModel):
 
         """
         if optimizer is None:
-            from keras.optimizers import Adam
+            Adam = keras_import('optimizers', 'Adam')
             optimizer = Adam(lr=self.config.train_learning_rate)
         self.callbacks = train.prepare_model(self.keras_model, optimizer, self.config.train_loss, **kwargs)
 
@@ -108,15 +113,20 @@ class CARE(BaseModel):
             self.callbacks += self._checkpoint_callbacks()
 
             if self.config.train_tensorboard:
-                from ..utils.tf import CARETensorBoard
-                self.callbacks.append(CARETensorBoard(log_dir=str(self.logdir), prefix_with_timestamp=False, n_images=3, write_images=True, prob_out=self.config.probabilistic))
+                if IS_TF_1:
+                    from ..utils.tf import CARETensorBoard
+                    self.callbacks.append(CARETensorBoard(log_dir=str(self.logdir), prefix_with_timestamp=False, n_images=3, write_images=True, prob_out=self.config.probabilistic))
+                else:
+                    from tensorflow.keras.callbacks import TensorBoard
+                    self.callbacks.append(TensorBoard(log_dir=str(self.logdir/'logs'), write_graph=False, profile_batch=0))
 
         if self.config.train_reduce_lr is not None:
-            from keras.callbacks import ReduceLROnPlateau
+            ReduceLROnPlateau = keras_import('callbacks', 'ReduceLROnPlateau')
             rlrop_params = self.config.train_reduce_lr
             if 'verbose' not in rlrop_params:
                 rlrop_params['verbose'] = True
-            self.callbacks.append(ReduceLROnPlateau(**rlrop_params))
+            # TF2: add as first callback to put 'lr' in the logs for TensorBoard
+            self.callbacks.insert(0,ReduceLROnPlateau(**rlrop_params))
 
         self._model_prepared = True
 
@@ -170,11 +180,18 @@ class CARE(BaseModel):
         if not self._model_prepared:
             self.prepare_for_training()
 
-        training_data = train.DataWrapper(X, Y, self.config.train_batch_size)
+        if (self.config.train_tensorboard and self.basedir is not None and
+            not IS_TF_1 and not any(isinstance(cb,CARETensorBoardImage) for cb in self.callbacks)):
+            self.callbacks.append(CARETensorBoardImage(model=self.keras_model, data=validation_data,
+                                                       log_dir=str(self.logdir/'logs'/'images'),
+                                                       n_images=3, prob_out=self.config.probabilistic))
 
-        history = self.keras_model.fit_generator(generator=training_data, validation_data=validation_data,
-                                                 epochs=epochs, steps_per_epoch=steps_per_epoch,
-                                                 callbacks=self.callbacks, verbose=1)
+        training_data = train.DataWrapper(X, Y, self.config.train_batch_size, length=epochs*steps_per_epoch)
+
+        fit = self.keras_model.fit_generator if IS_TF_1 else self.keras_model.fit
+        history = fit(iter(training_data), validation_data=validation_data,
+                      epochs=epochs, steps_per_epoch=steps_per_epoch,
+                      callbacks=self.callbacks, verbose=1)
         self._training_finished()
 
         return history

@@ -6,10 +6,11 @@ from ..internals.losses import loss_laplace, loss_mse, loss_mae, loss_thresh_wei
 
 import numpy as np
 
-
-import keras.backend as K
-from keras.callbacks import Callback, TerminateOnNaN
-from keras.utils import Sequence
+from ..utils.tf import keras_import
+K = keras_import('backend')
+Callback, TerminateOnNaN = keras_import('callbacks', 'Callback', 'TerminateOnNaN')
+Sequence = keras_import('utils', 'Sequence')
+Optimizer = keras_import('optimizers', 'Optimizer')
 
 
 class ParameterDecayCallback(Callback):
@@ -35,7 +36,6 @@ def prepare_model(model, optimizer, loss, metrics=('mse','mae'),
                   loss_bg_thresh=0, loss_bg_decay=0.06, Y=None):
     """ TODO """
 
-    from keras.optimizers import Optimizer
     isinstance(optimizer,Optimizer) or _raise(ValueError())
 
 
@@ -73,20 +73,70 @@ def prepare_model(model, optimizer, loss, metrics=('mse','mae'),
     return callbacks
 
 
-class DataWrapper(Sequence):
+class RollingSequence(Sequence):
+    """Helper class for creating batches for rolling sequence.
 
-    def __init__(self, X, Y, batch_size):
-        self.X, self.Y = X, Y
-        self.batch_size = batch_size
-        self.perm = np.random.permutation(len(self.X))
+    Create batches of size `batch_size` that contain indices in `range(data_size)`.
+    To that end, the data indices are repeated (rolling), either in ascending order or
+    shuffled if `shuffle=True`. If taking batches sequentially, all data indices will
+    appear equally often. All calls to `batch(i)` will return the same batch for same i.
+    Parameter `length` will only determine the result of `len`, it has no effect otherwise.
+    Note that batch_size is allowed to be larger than data_size.
+    """
+
+    def __init__(self, data_size, batch_size, length=None, shuffle=True, rng=None):
+        # print(f"### __init__", flush=True)
+        if rng is None: rng = np.random
+        self.data_size = int(data_size)
+        self.batch_size = int(batch_size)
+        self.length = 2**63-1 if length is None else int(length) # 2**63-1 is max possible value
+        self.shuffle = bool(shuffle)
+        self.index_gen = rng.permutation if self.shuffle else np.arange
+        self.index_map = {}
 
     def __len__(self):
-        return int(np.ceil(len(self.X) / float(self.batch_size)))
+        # print(f"### __len__ = {self.length}", flush=True)
+        return self.length
+
+    def _index(self, loop):
+        if loop in self.index_map:
+            return self.index_map[loop]
+        else:
+            return self.index_map.setdefault(loop, self.index_gen(self.data_size))
 
     def on_epoch_end(self):
-        self.perm = np.random.permutation(len(self.X))
+        # print(f"### on_epoch_end", flush=True)
+        pass
+
+    def __iter__(self):
+        # print(f"### __iter__", flush=True)
+        for i in range(len(self)):
+            yield self[i]
+
+    def batch(self, i):
+        pos      =   i *  self.batch_size
+        loop     = pos // self.data_size
+        pos_loop = pos %  self.data_size
+        sl = slice(pos_loop, pos_loop + self.batch_size)
+        index = self._index(loop)
+        _loop = loop
+        while sl.stop > len(index):
+            _loop += 1
+            index = np.concatenate((index, self._index(_loop)))
+        # print(f"### - batch({i:02}) -> {tuple(index[sl])}", flush=True)
+        return index[sl]
 
     def __getitem__(self, i):
-        idx = slice(i*self.batch_size,(i+1)*self.batch_size)
-        idx = self.perm[idx]
+        return self.batch(i)
+
+
+class DataWrapper(RollingSequence):
+
+    def __init__(self, X, Y, batch_size, length):
+        super(DataWrapper, self).__init__(data_size=len(X), batch_size=batch_size, length=length, shuffle=True)
+        len(X) == len(Y) or _raise(ValueError("X and Y must have same length"))
+        self.X, self.Y = X, Y
+
+    def __getitem__(self, i):
+        idx = self.batch(i)
         return self.X[idx], self.Y[idx]

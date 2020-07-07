@@ -13,12 +13,14 @@ from .six import Path
 
 
 def is_tf_backend():
-    import keras.backend as K
+    from .tf import keras_import
+    K = keras_import('backend')
     return K.backend() == 'tensorflow'
 
 
 def backend_channels_last():
-    import keras.backend as K
+    from .tf import keras_import
+    K = keras_import('backend')
     assert K.image_data_format() in ('channels_first','channels_last')
     return K.image_data_format() == 'channels_last'
 

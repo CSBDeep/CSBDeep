@@ -1,9 +1,9 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
 from six.moves import range, zip, map, reduce, filter
 
-from keras.layers import Input, Conv2D, Conv3D, Activation, Lambda
-from keras.models import Model
-from keras.layers.merge import Add, Concatenate
+from ..utils.tf import keras_import
+Input, Conv2D, Conv3D, Activation, Lambda, Add, Concatenate = keras_import('layers', 'Input', 'Conv2D', 'Conv3D', 'Activation', 'Lambda', 'Add', 'Concatenate')
+Model = keras_import('models', 'Model')
 from .blocks import unet_block
 import re
 

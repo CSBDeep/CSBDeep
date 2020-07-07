@@ -6,19 +6,41 @@ import os
 import warnings
 import shutil
 import datetime
+from importlib import import_module
+
+from tensorflow import __version__ as _tf_version
+IS_TF_1 = _tf_version.startswith('1.')
+_KERAS = 'keras' if IS_TF_1 else 'tensorflow.keras'
+
+def keras_import(sub=None, *names):
+    if sub is None:
+        return import_module(_KERAS)
+    else:
+        mod = import_module('{_KERAS}.{sub}'.format(_KERAS=_KERAS,sub=sub))
+        if len(names) == 0:
+            return mod
+        elif len(names) == 1:
+            return getattr(mod, names[0])
+        return tuple(getattr(mod, name) for name in names)
 
 import tensorflow as tf
-import keras
-from keras import backend as K
-from keras.callbacks import Callback
-from keras.layers import Lambda
+# if IS_TF_1:
+#     import tensorflow as tf
+# else:
+#     import tensorflow.compat.v1 as tf
+#     # tf.disable_v2_behavior()
 
-from .utils import _raise, is_tf_backend, save_json, backend_channels_last
+keras = keras_import()
+K = keras_import('backend')
+Callback = keras_import('callbacks', 'Callback')
+Lambda = keras_import('layers', 'Lambda')
+
+from .utils import _raise, is_tf_backend, save_json, backend_channels_last, normalize
 from .six import tempfile
 
 
 
-def limit_gpu_memory(fraction, allow_growth=False):
+def limit_gpu_memory(fraction, allow_growth=False, total_memory=None):
     """Limit GPU memory allocation for TensorFlow (TF) backend.
 
     Parameters
@@ -30,6 +52,8 @@ def limit_gpu_memory(fraction, allow_growth=False):
         If ``False`` (default), TF will allocate all designated (see `fraction`) memory all at once.
         If ``True``, TF will allocate memory as needed up to the limit imposed by `fraction`; this may
         incur a performance penalty due to memory fragmentation.
+    total_memory :  int or iterable of int
+        Total amount of available GPU memory (in MB).
 
     Raises
     ------
@@ -42,23 +66,38 @@ def limit_gpu_memory(fraction, allow_growth=False):
     is_tf_backend() or _raise(NotImplementedError('Not using tensorflow backend.'))
     fraction is None or (np.isscalar(fraction) and 0<=fraction<=1) or _raise(ValueError('fraction must be between 0 and 1.'))
 
-    _session = None
-    try:
-        _session = K.tensorflow_backend._SESSION
-    except AttributeError:
-        pass
+    if IS_TF_1:
+        _session = None
+        try:
+            _session = K.tensorflow_backend._SESSION
+        except AttributeError:
+            pass
 
-    if _session is None:
-        config = tf.ConfigProto()
-        if fraction is not None:
-            config.gpu_options.per_process_gpu_memory_fraction = fraction
-        config.gpu_options.allow_growth = bool(allow_growth)
-        session = tf.Session(config=config)
-        K.tensorflow_backend.set_session(session)
-        # print("[tf_limit]\t setting config.gpu_options.per_process_gpu_memory_fraction to ",config.gpu_options.per_process_gpu_memory_fraction)
+        if _session is None:
+            config = tf.ConfigProto()
+            if fraction is not None:
+                config.gpu_options.per_process_gpu_memory_fraction = fraction
+            config.gpu_options.allow_growth = bool(allow_growth)
+            session = tf.Session(config=config)
+            K.tensorflow_backend.set_session(session)
+            # print("[tf_limit]\t setting config.gpu_options.per_process_gpu_memory_fraction to ",config.gpu_options.per_process_gpu_memory_fraction)
+        else:
+            warnings.warn('Too late to limit GPU memory, can only be done once and before any computation.')
     else:
-        warnings.warn('Too late to limit GPU memory, can only be done once and before any computation.')
-
+        gpus = tf.config.experimental.list_physical_devices('GPU')
+        if gpus:
+            if fraction is not None:
+                np.isscalar(total_memory) or _raise(ValueError("'total_memory' must be provided when using TensorFlow 2."))
+                vdc = tf.config.experimental.VirtualDeviceConfiguration(memory_limit=int(np.ceil(total_memory*fraction)))
+            try:
+                for gpu in gpus:
+                    if fraction is not None:
+                        tf.config.experimental.set_virtual_device_configuration(gpu,[vdc])
+                    if allow_growth:
+                        tf.config.experimental.set_memory_growth(gpu, True)
+            except RuntimeError as e:
+                # must be set before GPUs have been initialized
+                print(e)
 
 
 
@@ -91,16 +130,35 @@ def export_SavedModel(model, outpath, meta={}, format='zip'):
     def export_to_dir(dirname):
         if len(model.inputs) > 1 or len(model.outputs) > 1:
             warnings.warn('Found multiple input or output layers.')
-        builder = tf.saved_model.builder.SavedModelBuilder(dirname)
-        # use name 'input'/'output' if there's just a single input/output layer
-        inputs  = dict(zip(model.input_names,model.inputs))   if len(model.inputs)  > 1 else dict(input=model.input)
-        outputs = dict(zip(model.output_names,model.outputs)) if len(model.outputs) > 1 else dict(output=model.output)
-        signature = tf.saved_model.signature_def_utils.predict_signature_def(inputs=inputs, outputs=outputs)
-        signature_def_map = { tf.saved_model.signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: signature }
-        builder.add_meta_graph_and_variables(K.get_session(),
-                                             [tf.saved_model.tag_constants.SERVING],
-                                             signature_def_map=signature_def_map)
-        builder.save()
+
+        def _export(model):
+            if IS_TF_1:
+                from tensorflow import saved_model
+                from keras.backend import get_session
+            else:
+                from tensorflow.compat.v1 import saved_model
+                from tensorflow.compat.v1.keras.backend import get_session
+
+            builder = saved_model.builder.SavedModelBuilder(dirname)
+            # use name 'input'/'output' if there's just a single input/output layer
+            inputs  = dict(zip(model.input_names,model.inputs))   if len(model.inputs)  > 1 else dict(input=model.input)
+            outputs = dict(zip(model.output_names,model.outputs)) if len(model.outputs) > 1 else dict(output=model.output)
+            signature = saved_model.signature_def_utils.predict_signature_def(inputs=inputs, outputs=outputs)
+            signature_def_map = { saved_model.signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: signature }
+            builder.add_meta_graph_and_variables(get_session(), [saved_model.tag_constants.SERVING], signature_def_map=signature_def_map)
+            builder.save()
+
+        if IS_TF_1:
+            _export(model)
+        else:
+            from tensorflow.keras.models import clone_model
+            weights = model.get_weights()
+            with tf.Graph().as_default():
+                # clone model in new graph and set weights
+                _model = clone_model(model)
+                _model.set_weights(weights)
+                _export(_model)
+
         if meta is not None and len(meta) > 0:
             save_json(meta, os.path.join(dirname,'meta.json'))
 
@@ -169,13 +227,15 @@ class CARETensorBoard(Callback):
                  write_graph=False,
                  prefix_with_timestamp=True,
                  write_images=False,
-                 image_for_inputs=None,  # write images for only these input indices
-                 image_for_outputs=None, # write images for only these output indices
-                 input_slices=None,      # list (of list) of slices to apply to `image_for_inputs` layers before writing image
-                 output_slices=None):    # list (of list) of slices to apply to `image_for_outputs` layers before writing image
+                 image_for_inputs=None,      # write images for only these input indices
+                 image_for_outputs=None,     # write images for only these output indices
+                 input_slices=None,          # list (of list) of slices to apply to `image_for_inputs` layers before writing image
+                 output_slices=None,         # list (of list) of slices to apply to `image_for_outputs` layers before writing image
+                 output_target_shapes=None): # list of shapes of the target/gt images that correspond to all model outputs
         super(CARETensorBoard, self).__init__()
         is_tf_backend() or _raise(RuntimeError('TensorBoard callback only works with the TensorFlow backend.'))
         backend_channels_last() or _raise(NotImplementedError())
+        IS_TF_1 or _raise(NotImplementedError("Not supported with TensorFlow 2"))
 
         self.freq = freq
         self.image_freq = freq
@@ -189,6 +249,7 @@ class CARETensorBoard(Callback):
         self.image_for_outputs = image_for_outputs
         self.input_slices = input_slices
         self.output_slices = output_slices
+        self.output_target_shapes = output_target_shapes
         self.compute_histograms = compute_histograms
 
         if prefix_with_timestamp:
@@ -210,16 +271,19 @@ class CARETensorBoard(Callback):
                     tf_sums.append(tf.summary.histogram('{}_out'.format(layer.name),
                                                         layer.output))
 
-
-        def _gt_shape(output_shape):
+        def _gt_shape(output_shape,target_shape):
+            if target_shape is not None:
+                output_shape = target_shape
             if not self.prob_out: return output_shape
             output_shape[-1] % 2 == 0 or _raise(ValueError())
             return list(output_shape[:-1]) + [output_shape[-1] // 2]
-        self.gt_outputs = [K.placeholder(shape=_gt_shape(K.int_shape(x))) for x in self.model.outputs]
 
         n_inputs, n_outputs = len(self.model.inputs), len(self.model.outputs)
         image_for_inputs  = np.arange(n_inputs)  if self.image_for_inputs  is None else self.image_for_inputs
         image_for_outputs = np.arange(n_outputs) if self.image_for_outputs is None else self.image_for_outputs
+
+        output_target_shapes = [None]*n_outputs if self.output_target_shapes is None else self.output_target_shapes
+        self.gt_outputs = [K.placeholder(shape=_gt_shape(K.int_shape(x),sh)) for x,sh in zip(self.model.outputs,output_target_shapes)]
 
         input_slices  = (slice(None),) if self.input_slices  is None else self.input_slices
         output_slices = (slice(None),) if self.output_slices is None else self.output_slices
@@ -314,3 +378,141 @@ class CARETensorBoard(Callback):
 
     def on_train_end(self, _):
         self.writer.close()
+
+
+
+class CARETensorBoardImage(Callback):
+
+    def __init__(self, model, data, log_dir,
+                 n_images=3,
+                 batch_size=1,
+                 prob_out=False,
+                 image_for_inputs=None,  # write images for only these input indices
+                 image_for_outputs=None, # write images for only these output indices
+                 input_slices=None,      # list (of list) of slices to apply to `image_for_inputs` layers before writing image
+                 output_slices=None):    # list (of list) of slices to apply to `image_for_outputs` layers before writing image
+
+        super(CARETensorBoardImage, self).__init__()
+        backend_channels_last() or _raise(NotImplementedError())
+        not IS_TF_1 or _raise(NotImplementedError("Not supported with TensorFlow 1"))
+
+        ## model
+        from ..models import BaseModel
+        if isinstance(model, BaseModel):
+            model = model.keras_model
+        isinstance(model, keras.Model) or _raise(ValueError())
+        self.model = model
+        self.n_inputs  = len(self.model.inputs)
+        self.n_outputs = len(self.model.outputs)
+
+        ## data
+        if isinstance(data,(list,tuple)):
+            X, Y = data
+        else:
+            X, Y = data[0]
+        if self.n_inputs  == 1 and isinstance(X,np.ndarray): X = (X,)
+        if self.n_outputs == 1 and isinstance(Y,np.ndarray): Y = (Y,)
+        (self.n_inputs == len(X) and self.n_outputs == len(Y)) or _raise(ValueError())
+        # all(len(v)>=n_images for v in X) or _raise(ValueError())
+        # all(len(v)>=n_images for v in Y) or _raise(ValueError())
+        self.X = [v[:n_images] for v in X]
+        self.Y = [v[:n_images] for v in Y]
+
+        self.log_dir = log_dir
+        self.batch_size = batch_size
+        self.prob_out = prob_out
+
+        ## I/O choices
+        image_for_inputs  = np.arange(self.n_inputs)  if image_for_inputs  is None else image_for_inputs
+        image_for_outputs = np.arange(self.n_outputs) if image_for_outputs is None else image_for_outputs
+
+        input_slices  = (slice(None),) if input_slices  is None else input_slices
+        output_slices = (slice(None),) if output_slices is None else output_slices
+        if isinstance(input_slices[0],slice): # apply same slices to all inputs
+            input_slices = [input_slices]*len(image_for_inputs)
+        if isinstance(output_slices[0],slice): # apply same slices to all outputs
+            output_slices = [output_slices]*len(image_for_outputs)
+
+        len(input_slices)  == len(image_for_inputs)  or _raise(ValueError())
+        len(output_slices) == len(image_for_outputs) or _raise(ValueError())
+
+        self.image_for_inputs = image_for_inputs
+        self.image_for_outputs = image_for_outputs
+        self.input_slices = input_slices
+        self.output_slices = output_slices
+
+        self.file_writer = tf.summary.create_file_writer(str(self.log_dir))
+
+
+    def _name(self, prefix, layer, i, n, show_layer_names=False):
+        return '{prefix}{i}{name}'.format (
+            prefix = prefix,
+            i      = (i if n > 1 else ''),
+            name   = '' if (layer is None or not show_layer_names) else '_'+''.join(layer.name.split(':')[:-1]),
+        )
+
+
+    def _normalize_image(self, x, pmin=1, pmax=99.8, clip=True):
+        def norm(x, axis):
+            return normalize(x, pmin=pmin, pmax=pmax, axis=axis, clip=clip)
+
+        n_channels_out = x.shape[-1]
+        n_dim_out = len(x.shape)
+        assert 0 < n_channels_out
+
+        if n_dim_out > 4:
+            x = np.max(x, axis=tuple(range(1,1+n_dim_out-4)))
+
+        if n_channels_out == 1:
+            out = norm(x, axis=(1,2))
+        elif n_channels_out == 2:
+            out = norm(np.concatenate([x,x[...,:1]], axis=-1), axis=(1,2,3))
+        elif n_channels_out == 3:
+            out = norm(x, axis=(1,2,3))
+        else:
+            out = norm(np.max(x, axis=-1, keepdims=True), axis=(1,2,3))
+        return out
+
+
+    def on_epoch_end(self, epoch, logs=None):
+        # https://www.tensorflow.org/tensorboard/image_summaries
+
+        # inputs
+        if epoch == 0:
+            with self.file_writer.as_default():
+                for i,sl in zip(self.image_for_inputs,self.input_slices):
+                    # print('input', self.model.inputs[i], tuple(sl))
+                    input_name = self._name('net_input', self.model.inputs[i], i, self.n_inputs)
+                    input_image = self._normalize_image(self.X[i][tuple(sl)])
+                    tf.summary.image(input_name, input_image, step=epoch)
+
+        # outputs
+        Yhat = self.model.predict(self.X, batch_size=self.batch_size)
+        if self.n_outputs == 1 and isinstance(Yhat,np.ndarray): Yhat = (Yhat,)
+        with self.file_writer.as_default():
+            for i,sl in zip(self.image_for_outputs,self.output_slices):
+                # print('output', self.model.outputs[i], tuple(sl))
+                output_shape = self.model.output_shape if self.n_outputs==1 else self.model.output_shape[i]
+                n_channels_out = sep = output_shape[-1]
+                if self.prob_out: # first half of output channels is mean, second half scale
+                    n_channels_out % 2 == 0 or _raise(ValueError())
+                    sep = sep // 2
+                output_image = self._normalize_image(Yhat[i][...,:sep][tuple(sl)])
+                if self.prob_out:
+                    scale_image = self._normalize_image(Yhat[i][...,sep:][tuple(sl)], pmin=0, pmax=100)
+                    scale_name = self._name('net_output_scale', self.model.outputs[i], i, self.n_outputs)
+                    output_name = self._name('net_output_mean',  self.model.outputs[i], i, self.n_outputs)
+                    tf.summary.image(output_name, output_image, step=epoch)
+                    tf.summary.image(scale_name, scale_image, step=epoch)
+                else:
+                    output_name = self._name('net_output', self.model.outputs[i], i, self.n_outputs)
+                    tf.summary.image(output_name, output_image, step=epoch)
+
+        # targets
+        if epoch == 0:
+            with self.file_writer.as_default():
+                for i,sl in zip(self.image_for_outputs,self.output_slices):
+                    # print('target', self.model.outputs[i], tuple(sl))
+                    target_name = self._name('net_target', self.model.outputs[i], i, self.n_outputs)
+                    target_image = self._normalize_image(self.Y[i][tuple(sl)])
+                    tf.summary.image(target_name, target_image, step=epoch)
