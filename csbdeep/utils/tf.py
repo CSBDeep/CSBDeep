@@ -134,13 +134,11 @@ def export_SavedModel(model, outpath, meta={}, format='zip'):
         if IS_TF_1:
             from tensorflow import saved_model
             import keras.backend as K
-            import tensorflow as tf
         else:
             from tensorflow.compat.v1 import saved_model
             import tensorflow.compat.v1.keras.backend as K
-            import tensorflow as tf
-            
-        
+
+
         with tf.Graph().as_default():
             builder = saved_model.builder.SavedModelBuilder(dirname)
             # use name 'input'/'output' if there's just a single input/output layer
