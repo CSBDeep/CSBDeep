@@ -3,6 +3,7 @@ from __future__ import print_function, unicode_literals, absolute_import, divisi
 
 import datetime
 import warnings
+import sys
 
 import numpy as np
 from six import string_types, PY2
@@ -13,6 +14,7 @@ from ..utils import _raise, load_json, save_json, axes_check_and_normalize, axes
 from ..utils.six import Path, FileNotFoundError
 from ..data import Normalizer, NoNormalizer
 from ..data import Resizer, NoResizer
+from .pretrained import get_model_details, get_model_instance, get_registered_models
 
 from six import add_metaclass
 from abc import ABCMeta, abstractmethod, abstractproperty
@@ -69,6 +71,18 @@ class BaseModel(object):
     logdir : :class:`pathlib.Path`
         Path to model folder (which stores configuration, weights, etc.)
     """
+
+    @classmethod
+    def from_pretrained(cls, name_or_alias=None):
+        try:
+            get_model_details(cls, name_or_alias, verbose=True)
+            return get_model_instance(cls, name_or_alias)
+        except ValueError:
+            if name_or_alias is not None:
+                print("Could not find model with name or alias '%s'" % (name_or_alias), file=sys.stderr)
+                sys.stderr.flush()
+            get_registered_models(cls, verbose=True)
+
 
     def __init__(self, config, name=None, basedir='.'):
         """See class docstring."""

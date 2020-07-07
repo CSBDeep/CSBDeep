@@ -54,3 +54,4 @@ from .care_standard import CARE
 from .care_upsampling import UpsamplingCARE
 from .care_isotropic import IsotropicCARE
 from .care_projection import ProjectionConfig, ProjectionCARE
+from .pretrained import register_model, register_aliases, clear_models_and_aliases
