@@ -8,10 +8,11 @@
 language: python
 
 env:
-  - TENSORFLOW='tensorflow<2' KERAS='keras'
+  - TENSORFLOW='tensorflow<2' KERAS=''
 
 matrix:
   include:
+      ### TF1: always test 2.7, 3.5, 3.6, 3.7
     - os: linux
       python: 2.7
     - os: linux
@@ -20,15 +21,27 @@ matrix:
       python: 3.6
     - os: linux
       python: 3.7
-      ###########
+      ### TF2: always test 3.7, test other versions only in master
     - os: linux
       python: 3.7
-      env: TENSORFLOW='tensorflow' KERAS='keras'
-      ###########
+      env: TENSORFLOW='tensorflow' KERAS=''
+    - os: linux
+      python: 3.5
+      if: branch = master
+      env: TENSORFLOW='tensorflow' KERAS=''
+    - os: linux
+      python: 3.6
+      if: branch = master
+      env: TENSORFLOW='tensorflow' KERAS=''
+    - os: linux
+      python: 3.8
+      if: branch = master
+      env: TENSORFLOW='tensorflow' KERAS=''
+      ### only test installation from PyPI
     - os: linux
       python: 3.7
-      env: TENSORFLOW='tensorflow<2' KERAS='keras' ONLY_INSTALL=1
-      ###########
+      env: TENSORFLOW='' KERAS='' ONLY_INSTALL=1
+      ### test older versions of TF 1 and Keras only in master
     - os: linux
       python: 3.6
       if: branch = master
@@ -69,7 +82,6 @@ matrix:
       if: branch = master
       # lowest supported keras version, last tensorflow release that supports CUDA 8
       env: TENSORFLOW='tensorflow==1.4.1' KERAS='keras==2.1.2'
-      ###########
 
 install:
   - pip install $TENSORFLOW $KERAS

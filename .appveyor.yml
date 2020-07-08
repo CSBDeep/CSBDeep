@@ -4,15 +4,32 @@ branches:
 
 environment:
   matrix:
+      ### TF 1
     - PYTHON: "C:\\Python35-x64"
       PYTHON_VERSION: "3.5.x"
       PYTHON_ARCH: "64"
+      TF: "tensorflow<2"
     - PYTHON: "C:\\Python36-x64"
       PYTHON_VERSION: "3.6.x"
       PYTHON_ARCH: "64"
+      TF: "tensorflow<2"
     - PYTHON: "C:\\Python37-x64"
       PYTHON_VERSION: "3.7.x"
       PYTHON_ARCH: "64"
+      TF: "tensorflow<2"
+      ### TF 2
+    - PYTHON: "C:\\Python35-x64"
+      PYTHON_VERSION: "3.5.x"
+      PYTHON_ARCH: "64"
+      TF: "tensorflow"
+    - PYTHON: "C:\\Python36-x64"
+      PYTHON_VERSION: "3.6.x"
+      PYTHON_ARCH: "64"
+      TF: "tensorflow"
+    - PYTHON: "C:\\Python37-x64"
+      PYTHON_VERSION: "3.7.x"
+      PYTHON_ARCH: "64"
+      TF: "tensorflow"
 
 init:
   - echo %PYTHON% %PYTHON_VERSION% %PYTHON_ARCH%
@@ -21,7 +38,7 @@ install:
   - set PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%
   - "python --version"
   - "python -m pip install -U pip"
-  - "pip install \"tensorflow<2\" pytest"
+  - "pip install \"%TF%\" pytest"
   - "pip install csbdeep"
   - "pip uninstall -y csbdeep"
   - "pip install --no-cache-dir --force-reinstall ."
