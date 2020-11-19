@@ -105,7 +105,7 @@ def modelzoo_export(tf_model, folder_path, modelzoo_data: ModelZooBaseData, samp
                     zip_name=None):
     export_SavedModel(tf_model, folder_path)
     if zip_name is None:
-        zip_name = folder_path / 'export.bioimage.io.zip'
+        zip_name = folder_path / 'export.bioimage.io.model.zip'
     else:
         zip_name = Path(zip_name)
     yml_file = folder_path / "model.yml"
