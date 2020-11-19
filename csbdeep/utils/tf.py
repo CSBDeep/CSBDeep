@@ -159,8 +159,8 @@ def export_SavedModel(model, outpath, meta={}, format='zip'):
                 _model.set_weights(weights)
                 _export(_model)
 
-        if meta is not None and len(meta) > 0:
-            save_json(meta, os.path.join(dirname,'meta.json'))
+    ##    if meta is not None and len(meta) > 0:
+    ##        save_json(meta, os.path.join(dirname,'meta.json'))
 
 
     ## checks
