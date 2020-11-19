@@ -21,7 +21,7 @@ class Postprocessing(dict):
 
 
 class ZeroMeanUnitVariance(Preprocessing):
-    def __init__(self, mode: str, axes: str, mean: list[float], std: list[float]):
+    def __init__(self, mode, axes, mean, std):
         self.name = "Zero_mean_unit_variance"
         self.kwargs = {}
         self.kwargs.mode = mode
@@ -32,7 +32,7 @@ class ZeroMeanUnitVariance(Preprocessing):
 
 
 class ScaleLinear(Postprocessing):
-    def __init__(self, mode: str, axes: str):
+    def __init__(self, mode, axes):
         self.name = "Zero_mean_unit_variance"
         self.kwargs = {}
         self.kwargs.gain = mode
@@ -41,8 +41,8 @@ class ScaleLinear(Postprocessing):
 
 class ModelZooInput(dict):
 
-    def __init__(self, name: str, axes: str, data_type: type, data_range: list, halo: list, min: list, step: list,
-                 preprocessing: Preprocessing):
+    def __init__(self, name, axes, data_type, data_range, halo, min, step,
+                 preprocessing):
         self.name = name
         self.axes = axes
         self.data_type = data_type
@@ -55,7 +55,7 @@ class ModelZooInput(dict):
 
 
 class ModelZooOutput(dict):
-    def __init__(self, name: str, axes: str, offset: list, scale: list, reference_input: str, postprocessing: dict):
+    def __init__(self, name, axes, offset, scale, reference_input, postprocessing):
         self.name = name
         self.axes = axes
         self.shape = {}
@@ -66,7 +66,7 @@ class ModelZooOutput(dict):
 
 
 class ModelZooWeight(dict):
-    def __init__(self, weight_format: str, source: str, modelfile_name: str):
+    def __init__(self, weight_format, source, modelfile_name):
         self.weight_format = weight_format
         self.source = source
         with open(modelfile_name, "rb") as f:
@@ -76,13 +76,13 @@ class ModelZooWeight(dict):
 
 
 class ModelZooBaseData(dict):
-    def __init__(self, name: str, desc: str, cite: list[dict], authors: list[str], documentation: str,
-                 tags: list[str] = None,
-                 sample_input: list[str] = ['./sample_input.tif'], sample_output: list[str] = ['./sample_output.tif'],
-                 inputs: list[ModelZooInput] = [],
-                 outputs: list[ModelZooOutput] = [],
-                 weights: list[ModelZooWeight] = [], license: str = "bsd", format_version: str = "0.3.0",
-                 language: str = "python", framework: str = "tensorflow", config: dict = None):
+    def __init__(self, name, desc, cite, authors, documentation,
+                 tags=None,
+                 sample_input=['./sample_input.tif'], sample_output=['./sample_output.tif'],
+                 inputs=[],
+                 outputs=[],
+                 weights=[], license="bsd", format_version="0.3.0",
+                 language="python", framework="tensorflow", config = None):
         self.name = name
         self.desc = desc
         self.cite = cite
@@ -101,7 +101,7 @@ class ModelZooBaseData(dict):
         self.config = config
 
 
-def modelzoo_export(tf_model, folder_path, modelzoo_data: ModelZooBaseData, sample_input=None, sample_output=None,
+def modelzoo_export(tf_model, folder_path, modelzoo_data, sample_input=None, sample_output=None,
                     zip_name=None):
     export_SavedModel(tf_model, folder_path)
     if zip_name is None:

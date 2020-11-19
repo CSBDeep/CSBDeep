@@ -54,6 +54,7 @@ setup(name='csbdeep',
           "tqdm",
           "pathlib2; python_version<'3'",
           "backports.tempfile; python_version<'3.4'",
+          "ruamel.yaml"
       ],
 
       entry_points={
