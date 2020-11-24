@@ -104,6 +104,8 @@ class ModelZooBaseData(dict):
 def modelzoo_export(tf_model, folder_path, modelzoo_data, sample_input=None, sample_output=None,
                     zip_name=None):
     export_SavedModel(tf_model, folder_path)
+    modelzoo_weight = ModelZooWeight("tensorflow_keras_CARE", './variables/variables', str(zip_name))
+    modelzoo_data.weights = [modelzoo_weight]
     if zip_name is None:
         zip_name = folder_path / 'export.bioimage.io.model.zip'
     else:
