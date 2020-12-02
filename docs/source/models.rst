@@ -55,7 +55,7 @@ models that are tailored to commonly-used imaging scenarios:
 
 
 :class:`csbdeep.models.ProjectionCARE`
--------------------------------------
+--------------------------------------
 
   Description:
     - Extension of the standard model that will additionally project along a given (default: axial) dimension.
