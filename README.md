@@ -1,6 +1,7 @@
 [![PyPI version](https://badge.fury.io/py/csbdeep.svg)](https://pypi.org/project/csbdeep)
-[![Linux build status](https://travis-ci.com/CSBDeep/CSBDeep.svg?branch=master)](https://travis-ci.com/CSBDeep/CSBDeep)
-[![Windows build status](https://ci.appveyor.com/api/projects/status/xbl32vudixshj990/branch/master?svg=true)](https://ci.appveyor.com/project/UweSchmidt/csbdeep-c2jtk)
+[![Test](https://github.com/CSBDeep/CSBDeep/workflows/Test/badge.svg)](https://github.com/CSBDeep/CSBDeep/actions?query=workflow%3ATest)
+[![Test (PyPI)](https://github.com/CSBDeep/CSBDeep/workflows/Test%20(PyPI)/badge.svg)](https://github.com/CSBDeep/CSBDeep/actions?query=workflow%3A%22Test+%28PyPI%29%22)
+[![Test (Legacy)](https://github.com/CSBDeep/CSBDeep/workflows/Test%20(Legacy)/badge.svg)](https://github.com/CSBDeep/CSBDeep/actions?query=workflow%3A%22Test+%28Legacy%29%22)
 
 # CSBDeep – a toolbox for CARE
 
