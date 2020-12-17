@@ -5,13 +5,17 @@ CSBDeep – a toolbox for CARE
    :target: https://pypi.org/project/csbdeep
    :alt: PyPI version
 
-.. image:: https://travis-ci.com/CSBDeep/CSBDeep.svg?branch=master
-   :target: https://travis-ci.com/CSBDeep/CSBDeep
-   :alt: Linux build status
+.. image:: https://github.com/CSBDeep/CSBDeep/workflows/Test/badge.svg
+   :target: https://github.com/CSBDeep/CSBDeep/actions?query=workflow%3ATest
+   :alt: Test
 
-.. image:: https://ci.appveyor.com/api/projects/status/xbl32vudixshj990/branch/master?svg=true
-   :target: https://ci.appveyor.com/project/UweSchmidt/csbdeep-c2jtk
-   :alt: Windows build status
+.. image:: https://github.com/CSBDeep/CSBDeep/workflows/Test%20(PyPI)/badge.svg
+   :target: https://github.com/CSBDeep/CSBDeep/actions?query=workflow%3A%22Test+%28PyPI%29%22
+   :alt: Test (PyPI)
+
+.. image:: https://github.com/CSBDeep/CSBDeep/workflows/Test%20(Legacy)/badge.svg
+   :target: https://github.com/CSBDeep/CSBDeep/actions?query=workflow%3A%22Test+%28Legacy%29%22
+   :alt: Test (Legacy)
 
 This is the documentation for the
 `CSBDeep Python package <https://github.com/csbdeep/csbdeep>`_,
