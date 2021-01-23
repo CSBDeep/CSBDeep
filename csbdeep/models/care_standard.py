@@ -8,6 +8,7 @@ from six import string_types
 from csbdeep.internals.probability import ProbabilisticPrediction
 from .config import Config
 from .base_model import BaseModel, suppress_without_basedir
+from ..io.modelzoo import ModelZooBaseData, ModelZooWeight, ModelZooInput, ModelZooOutput, modelzoo_export
 
 from ..utils import _raise, axes_check_and_normalize, axes_dict, move_image_axes
 from ..utils.six import Path
@@ -198,7 +199,8 @@ class CARE(BaseModel):
 
 
     @suppress_without_basedir(warn=True)
-    def export_TF(self, fname=None):
+    def export_TF(self, fname=None, name=None, desc=None, cite=None, authors=None, documentation=None, min_val=None, step_val=None, halo_val=None, scale_val=[1, 1, 1, 1],
+                  offset_val=[0, 0, 0, 0]):
         """Export neural network via :func:`csbdeep.utils.tf.export_SavedModel`.
 
         Parameters
@@ -214,14 +216,29 @@ class CARE(BaseModel):
             fname = Path(fname)
 
         meta = {
-            'type':          self.__class__.__name__,
-            'version':       package_version,
+            'type': self.__class__.__name__,
+            'version': package_version,
             'probabilistic': self.config.probabilistic,
-            'axes':          self.config.axes,
-            'axes_div_by':   self._axes_div_by(self.config.axes),
-            'tile_overlap':  self._axes_tile_overlap(self.config.axes),
+            'axes': self.config.axes,
+            'axes_div_by': self._axes_div_by(self.config.axes),
+            'tile_overlap': self._axes_tile_overlap(self.config.axes),
         }
-        export_SavedModel(self.keras_model, str(fname), meta=meta)
+        val = 2 ** self.config.unet_n_depth
+        if min_val is None:
+            min_val = [1, val, val, val, self.config.n_channel_in]
+        if step_val is None:
+            min_val = [1, val, val, 0]
+        if halo_val is None:
+            halo_val = [1, val, val, 0]
+        # TODO preprocessing probabilistic/postprocessing
+        modelzoo_input = ModelZooInput("input", self.config.axes, data_type="float32", data_range=['-inf', 'inf'],
+                                       halo=halo_val, min=min_val, step=step_val)
+        modelzoo_output = ModelZooOutput(self.keras_model.layers[-1].output.name, self.config.axes, scale=scale_val,
+                                         offset=offset_val, reference_input="input")
+        modelzoo = ModelZooBaseData(name, desc, cite, authors, documentation, inputs=[modelzoo_input],
+                                    outputs=[modelzoo_output])
+        modelzoo_export(self.keras_model, self.logdir, modelzoo, None, None,
+                        str(fname))
         print("\nModel exported in TensorFlow's SavedModel format:\n%s" % str(fname.resolve()))
 
 
