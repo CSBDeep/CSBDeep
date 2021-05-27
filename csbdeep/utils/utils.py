@@ -87,7 +87,10 @@ def normalize_minmse(x, target):
 
 
 def _raise(e):
-    raise e
+    if isinstance(e, BaseException):
+        raise e
+    else:
+        raise ValueError(e)
 
 
 # https://docs.python.org/3/library/itertools.html#itertools-recipes
