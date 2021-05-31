@@ -8,7 +8,8 @@ from six import string_types
 from csbdeep.internals.probability import ProbabilisticPrediction
 from .config import Config
 from .base_model import BaseModel, suppress_without_basedir
-from ..io.modelzoo import ModelZooBaseData, ModelZooWeight, ModelZooInput, ModelZooOutput, modelzoo_export
+from ..io.modelzoo import ModelZooBaseData, ModelZooWeight, ModelZooInput, ModelZooOutput, modelzoo_export, \
+    ZeroMeanUnitVariance, ScaleLinear
 
 from ..utils import _raise, axes_check_and_normalize, axes_dict, move_image_axes
 from ..utils.six import Path
@@ -230,13 +231,43 @@ class CARE(BaseModel):
             min_val = [1, val, val, 0]
         if halo_val is None:
             halo_val = [1, val, val, 0]
-        # TODO preprocessing probabilistic/postprocessing
+        if name is None:
+            name = "CARE standard"
+        if desc is None:
+            desc = "Content-aware restoration (CARE) of (fluorescence) microscopy images, based on deep learning via Keras and TensorFlow"
+        if cite is None:
+            cite = {
+                "text": "Content-aware image restoration: pushing the limits of fluorescence microscopy",
+                "doi": "https://doi.org/10.1038/s41592-018-0216-7"
+            }
+        if authors is None:
+            authors = ["Martin Weigert", "Uwe Schmidt", "Tobias Boothe", "Andreas Müller", "Alexandr Dibrov",
+                   "Akanksha Jain", "Benjamin Wilhelm", "Deborah Schmidt", "Coleman Broaddus","Siân Culley",
+                   "Mauricio Rocha-Martins", "Fabián Segovia-Miranda", "Caren Norden",
+                   "Ricardo Henriques", "Marino Zerial", "Michele Solimena", "Jochen Rink",
+                   "Pavel Tomancak", "Loic Royer", "Florian Jug", "Eugene W. Myers" ]
+        if documentation is None:
+            documentation = "http://csbdeep.bioimagecomputing.com/doc/"
+
+        tags = ["CARE","content aware image restoration", "tensorflow", "unet"]
+        dependencies = "python:setup.py"
+        #TODO: Add a cover image to the repo for linking and adding to the zipfile, maybe move to export method
+        covers = ["./sample_input.tif"]
+
+        #TODO: pre- and post-processing values - where to get them?
+        preprocessing = ZeroMeanUnitVariance(axes=self.config.axes, mode="fixed", mean=0.0, std=0.0)
+        postprocessing = ScaleLinear(axes=self.config.axes, gain=0.0, offset=0.0)
+
+        #TODO: load sample image and add to modelzoo_export arguments
+
         modelzoo_input = ModelZooInput("input", self.config.axes, data_type="float32", data_range=['-inf', 'inf'],
-                                       halo=halo_val, min=min_val, step=step_val)
+                                       halo=halo_val, min=min_val, step=step_val, preprocessing= preprocessing)
         modelzoo_output = ModelZooOutput(self.keras_model.layers[-1].output.name, self.config.axes, scale=scale_val,
-                                         offset=offset_val, reference_input="input")
-        modelzoo = ModelZooBaseData(name, desc, cite, authors, documentation, inputs=[modelzoo_input],
-                                    outputs=[modelzoo_output])
+                                         offset=offset_val, reference_input="input", postprocessing=postprocessing)
+        modelzoo_weight = ModelZooWeight()
+        modelzoo = ModelZooBaseData(name, desc, cite, authors, documentation, tags, dependencies, covers,
+                                    sample_input="", sample_output="",
+                                    inputs=[modelzoo_input], outputs=[modelzoo_output], weights=[modelzoo_weight])
         modelzoo_export(self.keras_model, self.logdir, modelzoo, None, None,
                         str(fname))
         print("\nModel exported in TensorFlow's SavedModel format:\n%s" % str(fname.resolve()))
