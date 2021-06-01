@@ -22,48 +22,48 @@ class Postprocessing(dict):
 
 class ZeroMeanUnitVariance(Preprocessing):
     def __init__(self, mode, axes, mean, std):
-        self.name = "zero_mean_unit_variance"
-        self.kwargs = {}
-        self.kwargs.mode = mode
-        self.kwargs.axes = axes
+        self["name"] = "zero_mean_unit_variance"
+        self["kwargs"] = {}
+        self["kwargs"]["mode"] = mode
+        self["kwargs"]["axes"] = axes
         if (mode == "fixed"):
-            self.kwargs.mean = mean
-            self.kwargs.std = std
+            self["kwargs"]["mean"] = mean
+            self["kwargs"]["std"] = std
 
 
 class ScaleLinear(Postprocessing):
     def __init__(self, gain, axes, offset):
-        self.name = "scale_linear"
-        self.kwargs = {}
-        self.kwargs.gain = gain
-        self.kwargs.offset = offset
-        self.kwargs.axes = axes
+        self["name"] = "scale_linear"
+        self["kwargs"] = {}
+        self["kwargs"]["gain"] = gain
+        self["kwargs"]["offset"] = offset
+        self["kwargs"]["axes"] = axes
 
 
 class ModelZooInput(dict):
 
     def __init__(self, name, axes, data_type, data_range, halo, min, step,
                  preprocessing):
-        self.name = name
-        self.axes = axes
-        self.data_type = data_type
-        self.data_range = data_range
-        self.halo = halo
-        self.shape = {}
-        self.shape.min = min
-        self.shape.step = step
-        self.preprocessing = preprocessing
+        self["name"] = name
+        self["axes"] = axes
+        self["data_type"] = data_type
+        self["data_range"] = data_range
+        self["halo"] = halo
+        self["shape"] = {}
+        self["shape"]["min"] = min
+        self["shape"]["step"] = step
+        self["preprocessing"] = preprocessing
 
 
 class ModelZooOutput(dict):
     def __init__(self, name, axes, offset, scale, reference_input, postprocessing):
-        self.name = name
-        self.axes = axes
-        self.shape = {}
-        self.shape.offset = offset
-        self.shape.scale = scale
-        self.shape.reference_input = reference_input
-        self.postprocessing = postprocessing
+        self["name"] = name
+        self["axes"] = axes
+        self["shape"] = {}
+        self["shape"]["offset"] = offset
+        self["shape"]["scale"] = scale
+        self["shape"]["reference_input"] = reference_input
+        self["postprocessing"] = postprocessing
 
 
 class ModelZooWeight(dict):
