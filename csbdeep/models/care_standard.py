@@ -200,7 +200,7 @@ class CARE(BaseModel):
 
 
     @suppress_without_basedir(warn=True)
-    def export_TF(self, fname=None, name=None, desc=None, cite=None, authors=None, documentation=None, min_val=None, step_val=None, halo_val=None, scale_val=[1, 1, 1, 1],
+    def export_TF(self, fname=None, authors=None, tags=[], min_val=None, step_val=None, halo_val=None, scale_val=[1, 1, 1, 1],
                   offset_val=[0, 0, 0, 0]):
         """Export neural network via :func:`csbdeep.utils.tf.export_SavedModel`.
 
@@ -231,25 +231,20 @@ class CARE(BaseModel):
             min_val = [1, val, val, 0]
         if halo_val is None:
             halo_val = [1, val, val, 0]
-        if name is None:
-            name = "CARE standard"
-        if desc is None:
-            desc = "Content-aware restoration (CARE) of (fluorescence) microscopy images, based on deep learning via Keras and TensorFlow"
-        if cite is None:
-            cite = {
-                "text": "Content-aware image restoration: pushing the limits of fluorescence microscopy",
-                "doi": "https://doi.org/10.1038/s41592-018-0216-7"
-            }
-        if authors is None:
-            authors = ["Martin Weigert", "Uwe Schmidt", "Tobias Boothe", "Andreas Müller", "Alexandr Dibrov",
-                   "Akanksha Jain", "Benjamin Wilhelm", "Deborah Schmidt", "Coleman Broaddus","Siân Culley",
-                   "Mauricio Rocha-Martins", "Fabián Segovia-Miranda", "Caren Norden",
-                   "Ricardo Henriques", "Marino Zerial", "Michele Solimena", "Jochen Rink",
-                   "Pavel Tomancak", "Loic Royer", "Florian Jug", "Eugene W. Myers" ]
-        if documentation is None:
-            documentation = "http://csbdeep.bioimagecomputing.com/doc/"
+        name = "CARE standard"
+        desc = "Content-aware restoration (CARE) of (fluorescence) microscopy images, based on deep learning via Keras and TensorFlow"
+        cite = {
+            "text": "Content-aware image restoration: pushing the limits of fluorescence microscopy",
+            "doi": "https://doi.org/10.1038/s41592-018-0216-7"
+        }
+        model_authors = ["Martin Weigert", "Uwe Schmidt", "Tobias Boothe", "Andreas Müller", "Alexandr Dibrov",
+               "Akanksha Jain", "Benjamin Wilhelm", "Deborah Schmidt", "Coleman Broaddus", "Siân Culley",
+               "Mauricio Rocha-Martins", "Fabián Segovia-Miranda", "Caren Norden",
+               "Ricardo Henriques", "Marino Zerial", "Michele Solimena", "Jochen Rink",
+               "Pavel Tomancak", "Loic Royer", "Florian Jug", "Eugene W. Myers"]
+        documentation = "http://csbdeep.bioimagecomputing.com/doc/"
 
-        tags = ["CARE","content aware image restoration", "tensorflow", "unet"]
+        model_tags = ["CARE", "content aware image restoration", "tensorflow", "unet"]
         dependencies = "python:setup.py"
         #TODO: Add a cover image to the repo for linking and adding to the zipfile, maybe move to export method
         covers = ["./sample_input.tif"]
@@ -264,12 +259,16 @@ class CARE(BaseModel):
                                        halo=halo_val, min=min_val, step=step_val, preprocessing= preprocessing)
         modelzoo_output = ModelZooOutput(self.keras_model.layers[-1].output.name, self.config.axes, scale=scale_val,
                                          offset=offset_val, reference_input="input", postprocessing=postprocessing)
-        modelzoo_weight = ModelZooWeight()
-        modelzoo = ModelZooBaseData(name, desc, cite, authors, documentation, tags, dependencies, covers,
+        modelzoo_weight = ModelZooWeight(weight_format="tensorflow_saved_model_bundle",
+                                         modelfile_name=str(fname) + "/tf_saved_model_bundle.zip",
+                                         authors=authors, tag=tags, tensorflowversion=tf.version,
+                                         source="tf_saved_model_bundle.zip")
+        modelzoo = ModelZooBaseData(name, desc, cite, model_authors, documentation, model_tags, dependencies, covers,
                                     sample_input="", sample_output="",
                                     inputs=[modelzoo_input], outputs=[modelzoo_output], weights=[modelzoo_weight])
         modelzoo_export(self.keras_model, self.logdir, modelzoo, None, None,
                         str(fname))
+
         print("\nModel exported in TensorFlow's SavedModel format:\n%s" % str(fname.resolve()))
 
 

@@ -113,25 +113,22 @@ class ModelZooBaseData(dict):
 def modelzoo_export(tf_model, folder_path, modelzoo_data, sample_input=None, sample_output=None,
                     zip_name=None):
     export_SavedModel(tf_model, folder_path)
-    modelzoo_weight = ModelZooWeight("tensorflow_saved_model_bundle", './variables/variables', str(zip_name))
-    modelzoo_data.weights = [modelzoo_weight]
     if zip_name is None:
-        zip_name = folder_path / 'export.bioimage.io.model.zip'
+        zip_name = folder_path + '/export.bioimage.io.model.zip'
     else:
         zip_name = Path(zip_name)
-    input_file = folder_path / 'sample_input.tif'
-    output_file = folder_path / 'sample_output.tif'
+    input_file = folder_path + '/sample_input.tif'
+    output_file = folder_path + '/sample_output.tif'
     imsave(input_file, sample_input)
     imsave(output_file, sample_output)
     modelzoo_data.test_inputs = [input_file]
     modelzoo_data.test_outputs = [output_file]
 
-    yml_file = folder_path / "model.yml"
+    yml_file = folder_path + '/model.yml'
     yaml = YAML(typ='rt')
     yaml.default_flow_style = False
     with open(yml_file, 'w', encoding='UTF-8') as outfile:
         yaml.dump(modelzoo_data, outfile)
-
 
     with ZipFile(zip_name, 'a') as myzip:
         myzip.write(yml_file, arcname=os.path.basename(yml_file))
