@@ -134,7 +134,7 @@ def unet_block(n_depth=2, n_filter_base=16, kernel_size=(3,3), n_conv_per_depth=
 
 
 
-def resnet_block(n_filter, kernel_size=(3,3), pool=(1,1), n_conv_per_block=2,
+def resnet_block(n_filter=64, kernel_size=(3,3), pool=(1,1), n_conv_per_block=2,
                  batch_norm=False, kernel_initializer='he_normal', activation='relu'):
 
     n_conv_per_block >= 2 or _raise(ValueError('required: n_conv_per_block >= 2'))
@@ -174,3 +174,99 @@ def resnet_block(n_filter, kernel_size=(3,3), pool=(1,1), n_conv_per_block=2,
         return x
 
     return f
+
+
+
+def fpn_block(n_depth=3,
+              n_filter_base=64,
+              kernel_size=(3,3),
+              pyramid_filters=64,
+              n_conv_per_depth=2,
+              activation="relu",
+              batch_norm=False,
+              dropout=0.0,
+              last_activation=None,
+              pool=(2,2),
+              kernel_init="he_normal"):
+    """
+    Feature Pyramid Network block 
+    https://arxiv.org/abs/1612.03144
+
+    similar to a unet encoder, just that for each resolution level in the decoder path a head with `pyramid_filters` channels will be created which at the end will be concatenated
+
+    """
+    if len(pool) != len(kernel_size):
+        raise ValueError('kernel and pool sizes must match.')
+    n_dim = len(kernel_size)
+    if n_dim not in (2,3):
+        raise ValueError('unet_block only 2d or 3d.')
+
+    conv_block = conv_block2  if n_dim == 2 else conv_block3
+    pooling    = MaxPooling2D if n_dim == 2 else MaxPooling3D
+    upsampling = UpSampling2D if n_dim == 2 else UpSampling3D
+
+    if last_activation is None:
+        last_activation = activation
+
+    channel_axis = -1 if backend_channels_last() else 1
+
+    def _func(input):
+        skip_layers = []
+        layer = input
+
+        # down ...
+        for n in range(n_depth):
+            layer = resnet_block(n_filter_base * 2 ** n,
+                                 kernel_size, pool=(1,)*len(kernel_size),
+                                 n_conv_per_block=n_conv_per_depth,activation=activation,
+                                 batch_norm=batch_norm)(layer)
+            
+            skip_layers.append(layer)
+            layer = pooling(pool)(layer)
+
+        heads = []
+        
+        # ...and up with skip layers
+        for n in reversed(range(n_depth)):
+            layer = resnet_block(n_filter_base * 2 ** max(0, n_depth - 1),
+                                 kernel_size, pool=(1,)*len(kernel_size),
+                                 n_conv_per_block=n_conv_per_depth,activation=activation,
+                                 batch_norm=batch_norm)(layer)
+            
+            layer = conv_block(pyramid_filters, *((1,)*n_dim),
+                                   dropout=dropout,
+                                   init=kernel_init,
+                                   activation="linear",
+                                   batch_norm=batch_norm)(layer)
+            layer = upsampling(pool)(layer)
+            
+            skip = conv_block(pyramid_filters, *((1,)*n_dim),
+                                   dropout=dropout,
+                                   init=kernel_init,
+                                   activation="linear",
+                                   batch_norm=batch_norm)(skip_layers[n])
+            
+            layer = Add()([layer, skip])
+
+            head = conv_block(pyramid_filters, *kernel_size,
+                               dropout=dropout,
+                               init=kernel_init,
+                               activation=activation,
+                               batch_norm=batch_norm)(layer)
+
+            head = upsampling(tuple(p**n for p in pool))(head)
+
+            heads.append(head)
+
+            
+        layer = Concatenate()(heads)
+
+        final = conv_block(n_filter_base, *kernel_size,
+                           dropout=dropout,
+                           init=kernel_init,
+                           activation=last_activation,
+                           batch_norm=batch_norm)(layer)
+
+        return final
+
+    return _func
