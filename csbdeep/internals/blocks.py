@@ -195,11 +195,12 @@ def fpn_block(n_depth=3,
     similar to a unet encoder, just that for each resolution level in the decoder path a head with `pyramid_filters` channels will be created which at the end will be concatenated
 
     """
+    n_depth >= 2 or _raise(ValueError('required: n_depth >= 2'))
     if len(pool) != len(kernel_size):
         raise ValueError('kernel and pool sizes must match.')
     n_dim = len(kernel_size)
     if n_dim not in (2,3):
-        raise ValueError('unet_block only 2d or 3d.')
+        raise ValueError('fpn_block only 2d or 3d.')
 
     conv_block = conv_block2  if n_dim == 2 else conv_block3
     pooling    = MaxPooling2D if n_dim == 2 else MaxPooling3D
@@ -228,7 +229,7 @@ def fpn_block(n_depth=3,
         
         # ...and up with skip layers
         for n in reversed(range(n_depth)):
-            layer = resnet_block(n_filter_base * 2 ** max(0, n_depth - 1),
+            layer = resnet_block(n_filter_base * 2 ** max(0, n - 1),
                                  kernel_size, pool=(1,)*len(kernel_size),
                                  n_conv_per_block=n_conv_per_depth,activation=activation,
                                  batch_norm=batch_norm)(layer)
