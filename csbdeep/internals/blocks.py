@@ -192,6 +192,7 @@ def fpn_block(n_depth=3,
     Feature Pyramid Network block 
     https://arxiv.org/abs/1612.03144
 
+    Inspired by https://github.com/qubvel/segmentation_models
     similar to a unet encoder, just that for each resolution level in the decoder path a head with `pyramid_filters` channels will be created which at the end will be concatenated
 
     """
@@ -218,8 +219,10 @@ def fpn_block(n_depth=3,
         # down ...
         for n in range(n_depth):
             layer = resnet_block(n_filter_base * 2 ** n,
-                                 kernel_size, pool=(1,)*len(kernel_size),
-                                 n_conv_per_block=n_conv_per_depth,activation=activation,
+                                 kernel_size,
+                                 pool=(1,)*len(kernel_size),
+                                 n_conv_per_block=n_conv_per_depth,
+                                 activation=activation,
                                  batch_norm=batch_norm)(layer)
             
             skip_layers.append(layer)
@@ -229,31 +232,24 @@ def fpn_block(n_depth=3,
         
         # ...and up with skip layers
         for n in reversed(range(n_depth)):
-            layer = resnet_block(n_filter_base * 2 ** max(0, n - 1),
-                                 kernel_size, pool=(1,)*len(kernel_size),
-                                 n_conv_per_block=n_conv_per_depth,activation=activation,
+            layer = resnet_block(n_filter_base * 2 ** n,
+                                 kernel_size,
+                                 pool=(1,)*len(kernel_size),
+                                 n_conv_per_block=n_conv_per_depth,
+                                 activation=activation,
                                  batch_norm=batch_norm)(layer)
             
-            layer = conv_block(pyramid_filters, *((1,)*n_dim),
-                                   dropout=dropout,
-                                   init=kernel_init,
-                                   activation="linear",
-                                   batch_norm=batch_norm)(layer)
             layer = upsampling(pool)(layer)
             
-            skip = conv_block(pyramid_filters, *((1,)*n_dim),
-                                   dropout=dropout,
-                                   init=kernel_init,
-                                   activation="linear",
-                                   batch_norm=batch_norm)(skip_layers[n])
-            
-            layer = Add()([layer, skip])
+            layer = Concatenate()([layer, skip_layers[n]])
 
-            head = conv_block(pyramid_filters, *kernel_size,
-                               dropout=dropout,
-                               init=kernel_init,
-                               activation=activation,
-                               batch_norm=batch_norm)(layer)
+            # the fpn heads
+            head = resnet_block(pyramid_filters,
+                                 kernel_size,
+                                 pool=(1,)*len(kernel_size),
+                                 n_conv_per_block=n_conv_per_depth,
+                                 activation=activation,
+                                 batch_norm=batch_norm)(layer)
 
             head = upsampling(tuple(p**n for p in pool))(head)
 
