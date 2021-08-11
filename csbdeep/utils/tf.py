@@ -7,6 +7,7 @@ import warnings
 import shutil
 import datetime
 from importlib import import_module
+from packaging import version
 
 from tensorflow import __version__ as _tf_version
 IS_TF_1 = _tf_version.startswith('1.')
@@ -137,7 +138,10 @@ def export_SavedModel(model, outpath, meta={}, format='zip'):
                 from keras.backend import get_session
             else:
                 from tensorflow.compat.v1 import saved_model
-                from tensorflow.compat.v1.keras.backend import get_session
+                if version.parse(_tf_version) < version.parse('2.6'):
+                    from tensorflow.compat.v1.keras.backend import get_session
+                else:
+                    from tensorflow.python.keras.api._v1.keras.backend import get_session
 
             builder = saved_model.builder.SavedModelBuilder(dirname)
             # use name 'input'/'output' if there's just a single input/output layer
