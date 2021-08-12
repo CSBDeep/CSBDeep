@@ -145,21 +145,19 @@ def export_SavedModel(model, outpath, meta={}, format='zip'):
 
             if not IS_TF_1:
                 warnings.warn(\
-                    """  
-Note: The model is exported with Tensorflow 2.x, which is currently not fully supported by 
-many Fiji plugins (e.g. cbsdeep/stardist plugins). 
-If you experience problems loading the model in Fiji, please try the following 
+"""
+***IMPORTANT NOTE***
 
-1. conda create --name tmp python=3.9     # create a new conda environment for export 
-2. conda activate tmp
-3. conda install tensorflow==1.15         # install the most recent tensorflow 1 (no gpu neccessary)
+You are using TensorFlow 2.x, hence it is likely that the exported model *will not work*
+in associated ImageJ/Fiji plugins (e.g. CSBDeep and StarDist).
 
-and then reload the model and re-export it from python.
+If you indeed have problems loading the exported model in Fiji, the current workaround is
+to load the trained model in a Python environment with installed TensorFlow 1.x and then
+export it again. If you need help with this, please read this:
 
-Related issue: https://github.com/stardist/stardist/issues/90
+https://gist.github.com/uschmidt83/4b747862fe307044c722d6d1009f6183
 """)
-                
-            
+
             builder = saved_model.builder.SavedModelBuilder(dirname)
             # use name 'input'/'output' if there's just a single input/output layer
             inputs  = dict(zip(model.input_names,model.inputs))   if len(model.inputs)  > 1 else dict(input=model.input)
