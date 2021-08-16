@@ -24,12 +24,12 @@ Finally, install the latest stable version of the CSBDeep package with ``pip``.
 
 - If you installed TensorFlow 1 (version `1.x.x`): ::
 
-    pip install csbdeep "keras>=2.1.2,<2.4"
+    pip install "csbdeep[tf1]"
 
 .. Note::
     - The package is compatible with Python 2 and 3, but mainly developed and tested with Python 3 (which we recommend to use).
     - If you use Python 3, you may need to use ``pip3`` instead of ``pip``.
-    - You can find out which version of TensorFlow is installed via ``python -c "import tensorflow; print(tensorflow.__version__)"``.
+    - You can find out which version of TensorFlow is installed via ``pip show tensorflow``.
 
 
 .. .. Note::
@@ -40,9 +40,9 @@ Finally, install the latest stable version of the CSBDeep package with ``pip``.
 ..         pip install -e csbdeep
 
 
-.. Todo::
-    - Enable installation via **conda** and `conda forge <https://conda-forge.org/>`_.
-    - Provide `docker container <https://www.docker.com/what-docker>`_ to avoid potential installation issues.
+.. .. Todo::
+..     - Enable installation via **conda** and `conda forge <https://conda-forge.org/>`_.
+..     - Provide `docker container <https://www.docker.com/what-docker>`_ to avoid potential installation issues.
 
 
 Alternative GPU-enabled Installation (Linux only)

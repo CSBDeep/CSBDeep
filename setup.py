@@ -55,6 +55,12 @@ setup(name='csbdeep',
           "backports.tempfile; python_version<'3.4'",
       ],
 
+      extras_require={
+          "tf1":  ["keras>=2.1.2,<2.4"],
+          "test": ["pytest"],
+          "docs": ["sphinx","sphinx-rtd-theme"],
+      },
+
       entry_points={
           'console_scripts': [
               'care_predict = csbdeep.scripts.care_predict:main'
