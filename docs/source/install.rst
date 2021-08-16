@@ -16,14 +16,20 @@ compatible with the respective version of TensorFlow.
 Second, we suggest to `install Jupyter <http://jupyter.org/install>`_ to be able to
 run our provided example notebooks that contain step-by-step instructions on how to use this package.
 
-Finally, install the latest stable version of the CSBDeep package with **pip**: ::
+Finally, install the latest stable version of the CSBDeep package with ``pip``.
+
+- If you installed TensorFlow 2 (version `2.x.x`): ::
 
     pip install csbdeep
 
+- If you installed TensorFlow 1 (version `1.x.x`): ::
+
+    pip install csbdeep "keras>=2.1.2,<2.4"
 
 .. Note::
     - The package is compatible with Python 2 and 3, but mainly developed and tested with Python 3 (which we recommend to use).
     - If you use Python 3, you may need to use ``pip3`` instead of ``pip``.
+    - You can find out which version of TensorFlow is installed via ``python -c "import tensorflow; print(tensorflow.__version__)"``.
 
 
 .. .. Note::

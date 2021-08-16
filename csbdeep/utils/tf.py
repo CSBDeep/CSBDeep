@@ -10,8 +10,41 @@ from importlib import import_module
 from packaging import version
 
 from tensorflow import __version__ as _tf_version
-IS_TF_1 = _tf_version.startswith('1.')
+_tf_version = version.parse(_tf_version)
+IS_TF_1 = _tf_version.major == 1
 _KERAS = 'keras' if IS_TF_1 else 'tensorflow.keras'
+
+if IS_TF_1:
+    try:
+        import keras
+    except ModuleNotFoundError:
+        raise RuntimeError("""
+
+For 'tensorflow' 1.x (found version {_tf_version}), the stand-alone 'keras' package (2.1.2 <= version < 2.4) is required.
+When using the most recent version of 'tensorflow' 1.x, install 'keras' like this: pip install "keras>=2.1.2,<2.4"
+
+If you must use an older version of 'tensorflow' 1.x, please see this file for compatible versions of 'keras':
+https://github.com/CSBDeep/CSBDeep/blob/master/.github/workflows/tests_legacy.yml
+""".format(_tf_version=_tf_version))
+
+elif _tf_version >= version.parse('2.6'):
+    try:
+        from keras import __version__ as _keras_version
+        _keras_version = version.parse(_keras_version)
+        # TODO: assumption justified that keras and tensorflow versions will evolve in lockstep?
+        if (_tf_version.major,_tf_version.minor) > (_keras_version.major,_keras_version.minor):
+            raise RuntimeError("""
+
+Found version {_keras_version} of 'keras', which appears to be too old for the installed version {_tf_version} of 'tensorflow'.
+Please update 'keras': pip install "keras>={_tf_version.major}.{_tf_version.minor}"
+""".format(_keras_version=_keras_version, _tf_version=_tf_version))
+    except ModuleNotFoundError:
+        raise RuntimeError("""
+
+Starting with 'tensorflow' version 2.6.0, a recent version of the stand-alone 'keras' package is required.
+Please install/update 'keras': pip install "keras>={_tf_version.major}.{_tf_version.minor}"
+""".format(_tf_version=_tf_version))
+
 
 def keras_import(sub=None, *names):
     if sub is None:
@@ -138,10 +171,7 @@ def export_SavedModel(model, outpath, meta={}, format='zip'):
                 from keras.backend import get_session
             else:
                 from tensorflow.compat.v1 import saved_model
-                if version.parse(_tf_version) < version.parse('2.6'):
-                    from tensorflow.compat.v1.keras.backend import get_session
-                else:
-                    from tensorflow.python.keras.api._v1.keras.backend import get_session
+                from tensorflow.compat.v1.keras.backend import get_session
 
             if not IS_TF_1:
                 warnings.warn(\
@@ -153,7 +183,7 @@ in associated ImageJ/Fiji plugins (e.g. CSBDeep and StarDist).
 
 If you indeed have problems loading the exported model in Fiji, the current workaround is
 to load the trained model in a Python environment with installed TensorFlow 1.x and then
-export it again. If you need help with this, please read this:
+export it again. If you need help with this, please read:
 
 https://gist.github.com/uschmidt83/4b747862fe307044c722d6d1009f6183
 """)
