@@ -178,11 +178,11 @@ def export_SavedModel(model, outpath, meta={}, format='zip'):
 """
 ***IMPORTANT NOTE***
 
-You are using TensorFlow 2.x, hence it is likely that the exported model *will not work*
+You are using 'tensorflow' 2.x, hence it is likely that the exported model *will not work*
 in associated ImageJ/Fiji plugins (e.g. CSBDeep and StarDist).
 
 If you indeed have problems loading the exported model in Fiji, the current workaround is
-to load the trained model in a Python environment with installed TensorFlow 1.x and then
+to load the trained model in a Python environment with installed 'tensorflow' 1.x and then
 export it again. If you need help with this, please read:
 
 https://gist.github.com/uschmidt83/4b747862fe307044c722d6d1009f6183
