@@ -27,7 +27,17 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install --upgrade pip wheel setuptools
-      - run: pip install ${{ matrix.tensorflow }}
+
+      - if: ${{ matrix.python-version == 2.7 }}
+        run: pip install --prefer-binary ${{ matrix.tensorflow }}
+      - if: ${{ matrix.python-version != 2.7 }}
+        run: pip install ${{ matrix.tensorflow }}
+
       - uses: actions/checkout@v2
-      - run: pip install ".[test]"
+
+      - if: ${{ matrix.python-version == 2.7 }}
+        run: pip install --prefer-binary ".[test]"
+      - if: ${{ matrix.python-version != 2.7 }}
+        run: pip install ".[test]"
+
       - run: pytest -v --durations=50
