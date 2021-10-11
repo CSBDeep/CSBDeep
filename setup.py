@@ -21,6 +21,7 @@ setup(name='csbdeep',
       author_email='uschmidt@mpi-cbg.de, martin.weigert@epfl.ch',
       license='BSD 3-Clause License',
       packages=find_packages(),
+      python_requires='>=3.6',
 
       project_urls={
           'Documentation': 'http://csbdeep.bioimagecomputing.com/doc/',
@@ -33,8 +34,6 @@ setup(name='csbdeep',
           'Topic :: Scientific/Engineering',
           'License :: OSI Approved :: BSD License',
 
-          'Programming Language :: Python :: 2.7',
-          'Programming Language :: Python :: 3.5',
           'Programming Language :: Python :: 3.6',
           'Programming Language :: Python :: 3.7',
           'Programming Language :: Python :: 3.8',
@@ -48,11 +47,8 @@ setup(name='csbdeep',
           "six",
           "h5py<3; python_version<'3.9'",
           "h5py>=3; python_version>='3.9'",
-          "imagecodecs-lite<=2020; python_version<'3.6'",
           "tifffile",
           "tqdm",
-          "pathlib2; python_version<'3'",
-          "backports.tempfile; python_version<'3.4'",
       ],
 
       extras_require={
