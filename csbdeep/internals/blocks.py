@@ -145,27 +145,30 @@ def resnet_block(n_filter, kernel_size=(3,3), pool=(1,1), n_conv_per_block=2,
     conv_layer = Conv2D if n_dim == 2 else Conv3D
     conv_kwargs = dict (
         padding            = 'same',
-        use_bias           = not batch_norm,
         kernel_initializer = kernel_initializer,
     )
     channel_axis = -1 if backend_channels_last() else 1
 
     def f(inp):
-        x = conv_layer(n_filter, kernel_size, strides=pool, **conv_kwargs)(inp)
+        # first conv to prepare filter sizes and strides...
+        x = conv_layer(n_filter, kernel_size, strides=pool, use_bias=not batch_norm,**conv_kwargs)(inp)
         if batch_norm:
             x = BatchNormalization(axis=channel_axis)(x)
         x = Activation(activation)(x)
 
+        # middle conv 
         for _ in range(n_conv_per_block-2):
-            x = conv_layer(n_filter, kernel_size, **conv_kwargs)(x)
+            x = conv_layer(n_filter, kernel_size, use_bias=not batch_norm, **conv_kwargs)(x)
             if batch_norm:
                 x = BatchNormalization(axis=channel_axis)(x)
             x = Activation(activation)(x)
 
-        x = conv_layer(n_filter, kernel_size, **conv_kwargs)(x)
+        # last conv with no activation for residual addition
+        x = conv_layer(n_filter, kernel_size, use_bias=not batch_norm, **conv_kwargs)(x)
         if batch_norm:
             x = BatchNormalization(axis=channel_axis)(x)
 
+        # transform input if not compatible...
         if any(p!=1 for p in pool) or n_filter != K.int_shape(inp)[-1]:
             inp = conv_layer(n_filter, (1,)*n_dim, strides=pool, **conv_kwargs)(inp)
 
