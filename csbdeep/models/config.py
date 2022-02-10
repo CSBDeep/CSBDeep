@@ -75,6 +75,25 @@ class BaseConfig(argparse.Namespace):
         for k in kwargs:
             setattr(self, k, kwargs[k])
 
+    @classmethod
+    def parse_loaded_config(cls, conf):
+        """Called when loading a model from file
+
+        Can be used to provide config specific parsing of loaded 
+        parameters, e.g. to ensure backwards compatibility when introducing 
+        new parameters
+
+        Parameters
+        ----------
+        param : dict
+            dictionary of config arguments as loaded from config.json 
+
+        Returns
+        -------
+        updated_params: dict
+            a updated version of the parameters 
+        """
+        return conf
 
 
 
