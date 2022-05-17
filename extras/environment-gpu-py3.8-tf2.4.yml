@@ -1,0 +1,13 @@
+name: csbdeep
+channels:
+  - defaults
+  - nvidia
+dependencies:
+  - python=3.8
+  - cudatoolkit=11.0.*
+  - cudnn=8.0.*
+  - jupyter
+  - pip
+  - pip:
+    - tensorflow==2.4.*
+    - csbdeep

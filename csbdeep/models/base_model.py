@@ -77,7 +77,7 @@ class BaseModel(object):
         try:
             get_model_details(cls, name_or_alias, verbose=True)
             return get_model_instance(cls, name_or_alias)
-        except ValueError:
+        except ValueError as e:
             if name_or_alias is not None:
                 print("Could not find model with name or alias '%s'" % (name_or_alias), file=sys.stderr)
                 sys.stderr.flush()
