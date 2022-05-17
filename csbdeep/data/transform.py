@@ -160,7 +160,7 @@ def anisotropic_distortions(
 
 
     def _scale_down_up(data,subsample):
-        from scipy.ndimage.interpolation import zoom
+        from scipy.ndimage import zoom
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
             factor = np.ones(data.ndim)

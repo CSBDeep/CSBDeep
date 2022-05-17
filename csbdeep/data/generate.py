@@ -50,7 +50,7 @@ def no_background_patches(threshold=0.4, percentile=99.9):
     (np.isscalar(percentile) and 0 <= percentile <= 100) or _raise(ValueError())
     (np.isscalar(threshold)  and 0 <= threshold  <=   1) or _raise(ValueError())
 
-    from scipy.ndimage.filters import maximum_filter
+    from scipy.ndimage import maximum_filter
     def _filter(datas, patch_size, dtype=np.float32):
         image = datas[0]
         if dtype is not None:
@@ -87,7 +87,7 @@ def sample_patches_from_multiple_stacks(datas, patch_size, n_samples, datas_mask
         warnings.warn('Using pixel masks for raw/transformed images not tested.')
         datas_mask.shape == datas[0].shape or _raise(ValueError())
         datas_mask.dtype == np.bool or _raise(ValueError())
-        from scipy.ndimage.filters import minimum_filter
+        from scipy.ndimage import minimum_filter
         patch_mask &= minimum_filter(datas_mask, patch_size, mode='constant', cval=False)
 
     # get the valid indices
