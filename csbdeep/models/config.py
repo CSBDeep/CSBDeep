@@ -75,6 +75,24 @@ class BaseConfig(argparse.Namespace):
         for k in kwargs:
             setattr(self, k, kwargs[k])
 
+    @classmethod
+    def update_loaded_config(cls, config):
+        """Called by model to update loaded config dictionary before config object is created
+
+        Can be used to modify or introduce/delete parameters, e.g. to ensure
+        backwards compatibility after new parameters have been introduced.
+
+        Parameters
+        ----------
+        config : dict
+            dictionary of config parameters loaded from file
+
+        Returns
+        -------
+        updated_config: dict
+            an updated version of the config parameter dictionary
+        """
+        return config
 
 
 
