@@ -1,7 +1,7 @@
 from __future__ import print_function, unicode_literals, absolute_import, division
 
 import numpy as np
-from scipy.ndimage.interpolation import zoom
+from scipy.ndimage import zoom
 
 from .care_standard import CARE
 from ..data import PercentileNormalizer, PadAndCropResizer

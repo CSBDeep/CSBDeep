@@ -12,3 +12,9 @@ If you use [Miniconda](https://docs.conda.io/en/latest/miniconda.html) or [Anaco
   ```console
   $ conda env create -f https://raw.githubusercontent.com/CSBDeep/CSBDeep/master/extras/environment-gpu-py3.7-tf2.3.yml
   ```
+
+- Python 3.8 and TensorFlow 2.4:
+
+  ```console
+  $ conda env create -f https://raw.githubusercontent.com/CSBDeep/CSBDeep/master/extras/environment-gpu-py3.8-tf2.4.yml
+  ```
