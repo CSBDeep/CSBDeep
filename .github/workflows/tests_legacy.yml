@@ -1,8 +1,6 @@
 name: Test (Legacy)
 
-on:
-  schedule:
-    - cron: "0 18 * * 5"
+on: [push]
 
 jobs:
   test-legacy:
@@ -60,5 +58,5 @@ jobs:
       - run: python -m pip install --upgrade pip wheel setuptools
       - run: pip install "${{ matrix.tensorflow }}" "${{ matrix.keras }}"
       - uses: actions/checkout@v2
-      - run: pip install "csbdeep[test]"
+      - run: pip install ".[test]"
       - run: pytest -v --durations=50
