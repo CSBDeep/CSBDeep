@@ -50,6 +50,7 @@ setup(name='csbdeep',
           "h5py>=3; python_version>='3.9'",
           "tifffile",
           "tqdm",
+          "packaging",
       ],
 
       extras_require={

@@ -4,7 +4,11 @@ from six.moves import range, zip, map, reduce, filter
 # import warnings
 import numpy as np
 import pytest
-from tifffile import imread, imsave
+from tifffile import imread
+try:
+    from tifffile import imwrite as imsave
+except ImportError:
+    from tifffile import imsave
 from csbdeep.data import RawData, create_patches, create_patches_reduced_target
 from csbdeep.io import load_training_data
 from csbdeep.utils import Path, axes_dict, move_image_axes, backend_channels_last

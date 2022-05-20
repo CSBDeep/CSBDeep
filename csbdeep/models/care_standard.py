@@ -106,7 +106,7 @@ class CARE(BaseModel):
         """
         if optimizer is None:
             Adam = keras_import('optimizers', 'Adam')
-            optimizer = Adam(lr=self.config.train_learning_rate)
+            optimizer = Adam(learning_rate=self.config.train_learning_rate)
         self.callbacks = train.prepare_model(self.keras_model, optimizer, self.config.train_loss, **kwargs)
 
         if self.basedir is not None:
@@ -329,7 +329,7 @@ class CARE(BaseModel):
         # _permute_axes_n_tiles: (img_axes_in <-> net_axes_in) to convert n_tiles between img and net axes
         def _permute_n_tiles(n,undo=False):
             # hack: move tiling axis around in the same way as the image was permuted by creating an array
-            return _permute_axes_n_tiles(np.empty(n,np.bool),undo=undo).shape
+            return _permute_axes_n_tiles(np.empty(n,bool),undo=undo).shape
 
         # to support old api: set scalar n_tiles value for the largest tiling axis
         if np.isscalar(n_tiles) and int(n_tiles)==n_tiles and 1<=n_tiles:

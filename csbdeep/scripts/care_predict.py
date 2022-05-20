@@ -94,7 +94,11 @@ def main():
         sys.exit(0)
 
     # delay imports after checking to all required arguments are provided
-    from tifffile import imread, imsave
+    from tifffile import imread
+    try:
+        from tifffile import imwrite as imsave
+    except ImportError:
+        from tifffile import imsave
     from csbdeep.utils.tf import keras_import
     K = keras_import('backend')
     from csbdeep.models import CARE

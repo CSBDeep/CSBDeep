@@ -6,7 +6,7 @@ import numpy as np
 import argparse
 import warnings
 
-from distutils.version import LooseVersion
+from packaging.version import Version
 
 from ..utils.tf import keras_import
 keras = keras_import()
@@ -183,7 +183,7 @@ class Config(BaseConfig):
         self.train_tensorboard     = True
 
         # the parameter 'min_delta' was called 'epsilon' for keras<=2.1.5
-        min_delta_key = 'epsilon' if LooseVersion(keras.__version__)<=LooseVersion('2.1.5') else 'min_delta'
+        min_delta_key = 'epsilon' if Version(keras.__version__)<=Version('2.1.5') else 'min_delta'
         self.train_reduce_lr       = {'factor': 0.5, 'patience': 10, min_delta_key: 0}
 
         # disallow setting 'n_dim' manually
