@@ -25,6 +25,11 @@ def clear_models_and_aliases(*cls):
 
 
 def register_model(cls, key, url, hash):
+    """ Example: 
+    
+    register_model(StarDist2D,   'my_great_model', 'https://github.com/stardist/stardist-models/releases/download/v0.1/python_2D_versatile_fluo.zip', md5sum_as_astring)
+
+    """
     # key must be a valid file/folder name in the file system
     models = _MODELS.setdefault(cls,OrderedDict())
     key not in models or warn("re-registering model '%s' (was already registered for '%s')" % (key, cls.__name__))
