@@ -18,6 +18,9 @@ from ..data import Resizer, NoResizer, PadAndCropResizer
 from ..internals.predict import predict_tiled, tile_overlap, Progress, total_n_tiles
 from ..internals import nets, train
 
+from packaging.version import Version
+keras = keras_import()
+
 import tensorflow as tf
 # if IS_TF_1:
 #     import tensorflow as tf
@@ -106,7 +109,8 @@ class CARE(BaseModel):
         """
         if optimizer is None:
             Adam = keras_import('optimizers', 'Adam')
-            optimizer = Adam(learning_rate=self.config.train_learning_rate)
+            learning_rate = 'lr' if Version(keras.__version__) < Version('2.3.0') else 'learning_rate'
+            optimizer = Adam(**{learning_rate: self.config.train_learning_rate})
         self.callbacks = train.prepare_model(self.keras_model, optimizer, self.config.train_loss, **kwargs)
 
         if self.basedir is not None:
