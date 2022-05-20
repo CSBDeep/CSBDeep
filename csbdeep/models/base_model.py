@@ -137,7 +137,7 @@ class BaseModel(object):
         if self.config is None:
             if config_file.exists():
                 config_dict = load_json(str(config_file))
-                config_dict = self._config_class.parse_loaded_config(config_dict)
+                config_dict = self._config_class.update_loaded_config(config_dict)
                 self.config = self._config_class(**config_dict)
                 if not self.config.is_valid():
                     invalid_attr = self.config.is_valid(True)[1]
