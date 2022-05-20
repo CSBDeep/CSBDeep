@@ -136,46 +136,47 @@ def unet_block(n_depth=2, n_filter_base=16, kernel_size=(3,3), n_conv_per_depth=
 
 def resnet_block(n_filter, kernel_size=(3,3), pool=(1,1), n_conv_per_block=2,
                  batch_norm=False, kernel_initializer='he_normal', activation='relu',
-                 no_bias_if_batch_norm=False):
+                 last_conv_bias_if_batch_norm=False):
+    """
+    The default value for 'last_conv_bias_if_batch_norm' is 'False' for legacy reasons only.
+    """
 
     n_conv_per_block >= 2 or _raise(ValueError('required: n_conv_per_block >= 2'))
     len(pool) == len(kernel_size) or _raise(ValueError('kernel and pool sizes must match.'))
     n_dim = len(kernel_size)
     n_dim in (2,3) or _raise(ValueError('resnet_block only 2d or 3d.'))
 
-    if no_bias_if_batch_norm:
-        bias = not batch_norm
-    else:
-        bias = True
-
     conv_layer = Conv2D if n_dim == 2 else Conv3D
     conv_kwargs = dict (
         padding            = 'same',
+        use_bias           = not batch_norm,
         kernel_initializer = kernel_initializer,
     )
     channel_axis = -1 if backend_channels_last() else 1
 
     def f(inp):
         # first conv to prepare filter sizes and strides...
-        x = conv_layer(n_filter, kernel_size, strides=pool, use_bias=bias,**conv_kwargs)(inp)
+        x = conv_layer(n_filter, kernel_size, strides=pool, **conv_kwargs)(inp)
         if batch_norm:
             x = BatchNormalization(axis=channel_axis)(x)
         x = Activation(activation)(x)
 
         # middle conv
         for _ in range(n_conv_per_block-2):
-            x = conv_layer(n_filter, kernel_size, use_bias=bias, **conv_kwargs)(x)
+            x = conv_layer(n_filter, kernel_size, **conv_kwargs)(x)
             if batch_norm:
                 x = BatchNormalization(axis=channel_axis)(x)
             x = Activation(activation)(x)
 
         # last conv with no activation for residual addition
-        x = conv_layer(n_filter, kernel_size, use_bias=bias, **conv_kwargs)(x)
+        x = conv_layer(n_filter, kernel_size, **conv_kwargs)(x)
         if batch_norm:
             x = BatchNormalization(axis=channel_axis)(x)
 
         # transform input if not compatible...
         if any(p!=1 for p in pool) or n_filter != K.int_shape(inp)[-1]:
+            if batch_norm:
+                conv_kwargs['use_bias'] = last_conv_bias_if_batch_norm
             inp = conv_layer(n_filter, (1,)*n_dim, strides=pool, **conv_kwargs)(inp)
 
         x = Add()([inp, x])
