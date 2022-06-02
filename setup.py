@@ -54,7 +54,7 @@ setup(name='csbdeep',
       ],
 
       extras_require={
-          "tf1":  ["keras>=2.1.2,<2.4"],
+          "tf1":  ["keras>=2.1.2,<2.4","protobuf<3.21"],
           "test": ["pytest"],
           "docs": ["sphinx","sphinx-rtd-theme"],
       },
