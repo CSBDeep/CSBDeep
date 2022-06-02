@@ -25,7 +25,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install --upgrade pip wheel setuptools
-      - run: pip install "tensorflow<${{ 1+matrix.tensorflow }}"
+      - run: pip install "tensorflow==${{ matrix.tensorflow }}.*"
       - uses: actions/checkout@v2
       - if: matrix.tensorflow == 1
         run: pip install ".[test,tf1]"
