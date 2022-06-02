@@ -60,5 +60,5 @@ jobs:
       - run: python -m pip install --upgrade pip wheel setuptools
       - run: pip install "${{ matrix.tensorflow }}" "${{ matrix.keras }}"
       - uses: actions/checkout@v2
-      - run: pip install "csbdeep[test]"
+      - run: pip install "csbdeep[tf1,test]"
       - run: pytest -v --durations=50
