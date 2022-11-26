@@ -6,7 +6,7 @@ on:
 
 jobs:
   test-legacy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: Legacy (${{ matrix.tensorflow }}, ${{ matrix.keras }})
     strategy:
       fail-fast: false
@@ -54,11 +54,11 @@ jobs:
             keras: "keras==2.1.2"
 
     steps:
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install --upgrade pip wheel setuptools
       - run: pip install "${{ matrix.tensorflow }}" "${{ matrix.keras }}"
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - run: pip install "csbdeep[tf1,test]"
       - run: pytest -v --durations=50
