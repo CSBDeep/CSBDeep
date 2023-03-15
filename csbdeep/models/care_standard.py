@@ -135,7 +135,7 @@ class CARE(BaseModel):
         self._model_prepared = True
 
 
-    def train(self, X,Y, validation_data, epochs=None, steps_per_epoch=None):
+    def train(self, X,Y, validation_data, epochs=None, steps_per_epoch=None, augmenter=None):
         """Train the neural network with the given data.
 
         Parameters
@@ -190,7 +190,7 @@ class CARE(BaseModel):
                                                        log_dir=str(self.logdir/'logs'/'images'),
                                                        n_images=3, prob_out=self.config.probabilistic))
 
-        training_data = train.DataWrapper(X, Y, self.config.train_batch_size, length=epochs*steps_per_epoch)
+        training_data = train.DataWrapper(X, Y, self.config.train_batch_size, length=epochs*steps_per_epoch, augmenter=augmenter)
 
         fit = self.keras_model.fit_generator if IS_TF_1 else self.keras_model.fit
         history = fit(iter(training_data), validation_data=validation_data,
