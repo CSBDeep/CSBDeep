@@ -109,7 +109,7 @@ class CARE(BaseModel):
         """
         if optimizer is None:
             Adam = keras_import('optimizers', 'Adam')
-            learning_rate = 'lr' if Version(keras.__version__) < Version('2.3.0') else 'learning_rate'
+            learning_rate = 'lr' if Version(getattr(keras, '__version__', '9.9.9')) < Version('2.3.0') else 'learning_rate'
             optimizer = Adam(**{learning_rate: self.config.train_learning_rate})
         self.callbacks = train.prepare_model(self.keras_model, optimizer, self.config.train_loss, **kwargs)
 
