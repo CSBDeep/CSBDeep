@@ -132,11 +132,17 @@ class RollingSequence(Sequence):
 
 class DataWrapper(RollingSequence):
 
-    def __init__(self, X, Y, batch_size, length):
+    def __init__(self, X, Y, batch_size, length, augmenter=None):
         super(DataWrapper, self).__init__(data_size=len(X), batch_size=batch_size, length=length, shuffle=True)
         len(X) == len(Y) or _raise(ValueError("X and Y must have same length"))
         self.X, self.Y = X, Y
+        self.augmenter = augmenter
 
     def __getitem__(self, i):
         idx = self.batch(i)
-        return self.X[idx], self.Y[idx]
+        X, Y = self.X[idx], self.Y[idx]
+        if self.augmenter is not None:
+            X,Y = tuple(zip(*tuple(self.augmenter(x,y) for x,y in zip(X,Y))))
+            X,Y = np.stack(X), np.stack(Y)
+            
+        return X,Y
