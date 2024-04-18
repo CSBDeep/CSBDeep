@@ -83,7 +83,8 @@ class RollingSequence(Sequence):
     Note that batch_size is allowed to be larger than data_size.
     """
 
-    def __init__(self, data_size, batch_size, length=None, shuffle=True, rng=None):
+    def __init__(self, data_size, batch_size, length=None, shuffle=True, rng=None, keras_kwargs=None):
+        super(RollingSequence, self).__init__(**({} if keras_kwargs is None else keras_kwargs))
         # print(f"### __init__", flush=True)
         if rng is None: rng = np.random
         self.data_size = int(data_size)
@@ -131,8 +132,8 @@ class RollingSequence(Sequence):
 
 class DataWrapper(RollingSequence):
 
-    def __init__(self, X, Y, batch_size, length, augmenter=None):
-        super(DataWrapper, self).__init__(data_size=len(X), batch_size=batch_size, length=length, shuffle=True)
+    def __init__(self, X, Y, batch_size, length, augmenter=None, keras_kwargs=None):
+        super(DataWrapper, self).__init__(data_size=len(X), batch_size=batch_size, length=length, shuffle=True, keras_kwargs=keras_kwargs)
         len(X) == len(Y) or _raise(ValueError("X and Y must have same length"))
         self.X, self.Y = X, Y
         self.augmenter = augmenter
