@@ -217,10 +217,16 @@ class BaseModel(object):
         if self.basedir is not None:
             from ..utils.tf import keras_import
             ModelCheckpoint = keras_import('callbacks', 'ModelCheckpoint')
+            # keras 3: need to add suffix to filename because ModelCheckpoint constructor throws error if it's missing
+            suffix = ".weights.h5" if IS_KERAS_3_PLUS else ""
             if self.config.train_checkpoint is not None:
-                callbacks.append(ModelCheckpoint(str(self.logdir / self.config.train_checkpoint),       save_best_only=True,  save_weights_only=True))
+                callbacks.append(ModelCheckpoint(str(self.logdir / self.config.train_checkpoint) + suffix,  save_best_only=True,  save_weights_only=True))
+                # keras3: remove suffix because patched model.save_weights can save in legacy format
+                if IS_KERAS_3_PLUS: callbacks[-1].filepath = callbacks[-1].filepath[:-len(suffix)]
             if self.config.train_checkpoint_epoch is not None:
-                callbacks.append(ModelCheckpoint(str(self.logdir / self.config.train_checkpoint_epoch), save_best_only=False, save_weights_only=True))
+                callbacks.append(ModelCheckpoint(str(self.logdir / self.config.train_checkpoint_epoch) + suffix, save_best_only=False, save_weights_only=True))
+                # keras3: remove suffix because patched model.save_weights can save in legacy format
+                if IS_KERAS_3_PLUS: callbacks[-1].filepath = callbacks[-1].filepath[:-len(suffix)]
         return callbacks
 
 
