@@ -28,8 +28,8 @@ Please update '{package}': pip install "{package}>={min_version}"
 
 if IS_TF_1:
     try:
-        import keras
-        v_keras = version.parse(keras.__version__)
+        from keras import __version__ as _v_keras
+        v_keras = version.parse(_v_keras)
     except ModuleNotFoundError:
         raise RuntimeError(\
 """
@@ -85,9 +85,6 @@ else:
     from tensorflow.keras import __version__ as _v_keras
     v_keras = version.parse(_v_keras)
     assert v_keras.major < 3
-
-
-del _v_tf, v_tf, _v_keras, v_keras
 
 
 _KERAS = 'keras' if (IS_TF_1 or IS_KERAS_3_PLUS) else 'tensorflow.keras'
