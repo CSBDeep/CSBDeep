@@ -4,8 +4,7 @@ from six.moves import range, zip, map, reduce, filter
 from ..utils import _raise, backend_channels_last
 
 import numpy as np
-from ..utils.tf import keras_import
-K = keras_import('backend')
+from ..utils.tf import keras_import, BACKEND as K
 
 
 

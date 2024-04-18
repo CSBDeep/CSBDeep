@@ -6,8 +6,7 @@ from ..internals.losses import loss_laplace, loss_mse, loss_mae, loss_thresh_wei
 
 import numpy as np
 
-from ..utils.tf import keras_import
-K = keras_import('backend')
+from ..utils.tf import keras_import, BACKEND as K
 Callback, TerminateOnNaN = keras_import('callbacks', 'Callback', 'TerminateOnNaN')
 Sequence = keras_import('utils', 'Sequence')
 Optimizer = keras_import('optimizers', 'Optimizer')

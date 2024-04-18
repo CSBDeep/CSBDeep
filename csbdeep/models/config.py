@@ -8,9 +8,8 @@ import warnings
 
 from packaging.version import Version
 
-from ..utils.tf import keras_import
+from ..utils.tf import keras_import, BACKEND as K
 keras = keras_import()
-K = keras_import('backend')
 
 from ..utils import _raise, axes_check_and_normalize, axes_dict, backend_channels_last
 

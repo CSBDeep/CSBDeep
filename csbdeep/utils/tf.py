@@ -9,43 +9,88 @@ import datetime
 from importlib import import_module
 from packaging import version
 
-from tensorflow import __version__ as _tf_version
-_tf_version = version.parse(_tf_version)
-IS_TF_1 = _tf_version.major == 1
-_KERAS = 'keras' if IS_TF_1 else 'tensorflow.keras'
+from tensorflow import __version__ as _v_tf
+v_tf = version.parse(_v_tf)
+IS_TF_1 = v_tf.major == 1
+IS_TF_2_6_PLUS = v_tf >= version.parse('2.6')
+IS_TF_2_16_PLUS = v_tf >= version.parse('2.16')
+IS_KERAS_3_PLUS = False
+
+
+def err_old_keras(v_keras, package='keras', min_version=None):
+    min_version = "{v_tf.major}.{v_tf.minor}".format(v_tf=v_tf) if min_version is None else min_version
+    return RuntimeError(\
+"""
+Found version {v_keras} of '{package}', which is too old for the installed version {v_tf} of 'tensorflow'.
+Please update '{package}': pip install "{package}>={min_version}"
+""".format(v_keras=v_keras, v_tf=v_tf, package=package, min_version=min_version))
+    
 
 if IS_TF_1:
     try:
         import keras
+        v_keras = version.parse(keras.__version__)
     except ModuleNotFoundError:
-        raise RuntimeError("""
-
-For 'tensorflow' 1.x (found version {_tf_version}), the stand-alone 'keras' package (2.1.2 <= version < 2.4) is required.
+        raise RuntimeError(\
+"""
+For 'tensorflow' 1.x (found version {v_tf}), the stand-alone 'keras' package (2.1.2 <= version < 2.4) is required.
 When using the most recent version of 'tensorflow' 1.x, install 'keras' like this: pip install "keras>=2.1.2,<2.4"
 
 If you must use an older version of 'tensorflow' 1.x, please see this file for compatible versions of 'keras':
 https://github.com/CSBDeep/CSBDeep/blob/master/.github/workflows/tests_legacy.yml
-""".format(_tf_version=_tf_version))
+""".format(v_tf=v_tf))
 
-elif _tf_version >= version.parse('2.6'):
+elif IS_TF_2_16_PLUS:
+    # https://keras.io/getting_started/#tensorflow--keras-2-backwards-compatibility
+    # https://keras.io/keras_3/ -> "Moving from Keras 2 to Keras 3"
+    if os.environ.get('TF_USE_LEGACY_KERAS','0') == '1':
+        try:
+            from tf_keras import __version__ as _v_keras
+            v_keras = version.parse(_v_keras)
+            assert v_keras.major < 3
+            if (v_tf.major,v_tf.minor) > (v_keras.major,v_keras.minor):
+                raise err_old_keras(v_keras, package='tf_keras')
+            warnings.warn("Using Keras 2 (via 'tf_keras' package) with Tensorflow 2.16+ might work, but is not regularly tested.")
+        except ModuleNotFoundError:
+            raise RuntimeError("Found environment variable 'TF_USE_LEGACY_KERAS=1' but 'tf_keras' package not installed.")
+    else:
+        try:
+            from keras import __version__ as _v_keras
+            v_keras = version.parse(_v_keras)
+            IS_KERAS_3_PLUS = v_keras.major >= 3
+            if not IS_KERAS_3_PLUS:
+                raise err_old_keras(v_keras, min_version='3')
+        except ModuleNotFoundError:
+            raise RuntimeError("Package 'keras' is not installed.")
+
+elif IS_TF_2_6_PLUS:
+    # https://github.com/CSBDeep/CSBDeep/releases/tag/0.6.3
     try:
-        from keras import __version__ as _keras_version
-        _keras_version = version.parse(_keras_version)
-        # TODO: assumption justified that keras and tensorflow versions will evolve in lockstep?
-        if (_tf_version.major,_tf_version.minor) > (_keras_version.major,_keras_version.minor):
-            raise RuntimeError("""
-
-Found version {_keras_version} of 'keras', which appears to be too old for the installed version {_tf_version} of 'tensorflow'.
-Please update 'keras': pip install "keras>={_tf_version.major}.{_tf_version.minor}"
-""".format(_keras_version=_keras_version, _tf_version=_tf_version))
+        from keras import __version__ as _v_keras
+        v_keras = version.parse(_v_keras)
+        IS_KERAS_3_PLUS = v_keras.major >= 3
+        if IS_KERAS_3_PLUS:
+            warnings.warn("Using Keras version 3+ with Tensorflow below version 2.16 might work, but has not been tested.")
+        else:
+            if (v_tf.major,v_tf.minor) > (v_keras.major,v_keras.minor):
+                raise err_old_keras(v_keras)
     except ModuleNotFoundError:
-        raise RuntimeError("""
-
+        raise RuntimeError(\
+"""
 Starting with 'tensorflow' version 2.6.0, a recent version of the stand-alone 'keras' package is required.
-Please install/update 'keras': pip install "keras>={_tf_version.major}.{_tf_version.minor}"
-""".format(_tf_version=_tf_version))
+Please install/update 'keras': pip install "keras>={v_tf.major}.{v_tf.minor}<3"
+""".format(v_tf=v_tf))
+
+else:
+    from tensorflow.keras import __version__ as _v_keras
+    v_keras = version.parse(_v_keras)
+    assert v_keras.major < 3
 
 
+del _v_tf, v_tf, _v_keras, v_keras
+
+
+_KERAS = 'keras' if (IS_TF_1 or IS_KERAS_3_PLUS) else 'tensorflow.keras'
 def keras_import(sub=None, *names):
     if sub is None:
         return import_module(_KERAS)
@@ -71,6 +116,28 @@ Lambda = keras_import('layers', 'Lambda')
 
 from .utils import _raise, is_tf_backend, save_json, backend_channels_last, normalize
 from .six import tempfile
+
+
+if IS_KERAS_3_PLUS:
+    OPS = keras_import('ops')
+    _remap = dict(tf=tf, int_shape=OPS.shape)
+    class Backend(object):
+        def __getattr__(self, name):
+            if name in _remap:
+                return _remap[name]
+            elif hasattr(K, name):
+                return getattr(K, name)
+            else:
+                return getattr(OPS, name)
+else:
+    _remap = dict(tf=tf)
+    class Backend(object):
+        def __getattr__(self, name):
+            if name in _remap:
+                return _remap[name]
+            else:
+                return getattr(K, name)
+BACKEND = Backend()
 
 
 
