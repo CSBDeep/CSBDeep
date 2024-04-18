@@ -19,6 +19,7 @@ def loss_laplace(mean=True):
     C = np.log(2.0)
     if backend_channels_last():
         def nll(y_true, y_pred):
+            y_true = K.cast(y_true, K.floatx())
             n     = K.shape(y_true)[-1]
             mu    = y_pred[...,:n]
             sigma = y_pred[...,n:]
@@ -26,6 +27,7 @@ def loss_laplace(mean=True):
         return nll
     else:
         def nll(y_true, y_pred):
+            y_true = K.cast(y_true, K.floatx())
             n     = K.shape(y_true)[1]
             mu    = y_pred[:,:n,...]
             sigma = y_pred[:,n:,...]
@@ -37,11 +39,13 @@ def loss_mae(mean=True):
     R = _mean_or_not(mean)
     if backend_channels_last():
         def mae(y_true, y_pred):
+            y_true = K.cast(y_true, K.floatx())
             n = K.shape(y_true)[-1]
             return R(K.abs(y_pred[...,:n] - y_true))
         return mae
     else:
         def mae(y_true, y_pred):
+            y_true = K.cast(y_true, K.floatx())
             n = K.shape(y_true)[1]
             return R(K.abs(y_pred[:,:n,...] - y_true))
         return mae
@@ -51,11 +55,13 @@ def loss_mse(mean=True):
     R = _mean_or_not(mean)
     if backend_channels_last():
         def mse(y_true, y_pred):
+            y_true = K.cast(y_true, K.floatx())
             n = K.shape(y_true)[-1]
             return R(K.square(y_pred[...,:n] - y_true))
         return mse
     else:
         def mse(y_true, y_pred):
+            y_true = K.cast(y_true, K.floatx())
             n = K.shape(y_true)[1]
             return R(K.square(y_pred[:,:n,...] - y_true))
         return mse
@@ -63,6 +69,7 @@ def loss_mse(mean=True):
 
 def loss_thresh_weighted_decay(loss_per_pixel, thresh, w1, w2, alpha):
     def _loss(y_true, y_pred):
+        y_true = K.cast(y_true, K.floatx())
         val = loss_per_pixel(y_true, y_pred)
         k1 = alpha * w1 + (1 - alpha)
         k2 = alpha * w2 + (1 - alpha)

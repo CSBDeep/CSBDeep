@@ -47,7 +47,7 @@ def prepare_model(model, optimizer, loss, metrics=('mse','mae'),
     assert loss_bg_thresh == 0 or Y is not None
     if loss == 'laplace':
         assert K.image_data_format() == "channels_last", "TODO"
-        assert model.output.shape.as_list()[-1] >= 2 and model.output.shape.as_list()[-1] % 2 == 0
+        assert list(model.output.shape)[-1] >= 2 and list(model.output.shape)[-1] % 2 == 0
 
     # loss
     if loss_bg_thresh == 0:

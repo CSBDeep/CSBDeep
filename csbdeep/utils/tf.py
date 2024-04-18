@@ -529,9 +529,10 @@ class CARETensorBoardImage(Callback):
         if isinstance(model, BaseModel):
             model = model.keras_model
         isinstance(model, keras.Model) or _raise(ValueError())
-        self.model = model
-        self.n_inputs  = len(self.model.inputs)
-        self.n_outputs = len(self.model.outputs)
+        # self.model is already used by keras.callbacks.Callback in keras 3+
+        self.model_ = model
+        self.n_inputs  = len(self.model_.inputs)
+        self.n_outputs = len(self.model_.outputs)
 
         ## data
         if isinstance(data,(list,tuple)):
@@ -609,18 +610,18 @@ class CARETensorBoardImage(Callback):
         if epoch == 0:
             with self.file_writer.as_default():
                 for i,sl in zip(self.image_for_inputs,self.input_slices):
-                    # print('input', self.model.inputs[i], tuple(sl))
-                    input_name = self._name('net_input', self.model.inputs[i], i, self.n_inputs)
+                    # print('input', self.model_.inputs[i], tuple(sl))
+                    input_name = self._name('net_input', self.model_.inputs[i], i, self.n_inputs)
                     input_image = self._normalize_image(self.X[i][tuple(sl)])
                     tf.summary.image(input_name, input_image, step=epoch)
 
         # outputs
-        Yhat = self.model.predict(self.X, batch_size=self.batch_size)
+        Yhat = self.model_.predict(self.X, batch_size=self.batch_size)
         if self.n_outputs == 1 and isinstance(Yhat,np.ndarray): Yhat = (Yhat,)
         with self.file_writer.as_default():
             for i,sl in zip(self.image_for_outputs,self.output_slices):
-                # print('output', self.model.outputs[i], tuple(sl))
-                output_shape = self.model.output_shape if self.n_outputs==1 else self.model.output_shape[i]
+                # print('output', self.model_.outputs[i], tuple(sl))
+                output_shape = self.model_.output_shape if self.n_outputs==1 else self.model_.output_shape[i]
                 n_channels_out = sep = output_shape[-1]
                 if self.prob_out: # first half of output channels is mean, second half scale
                     n_channels_out % 2 == 0 or _raise(ValueError())
@@ -628,19 +629,19 @@ class CARETensorBoardImage(Callback):
                 output_image = self._normalize_image(Yhat[i][...,:sep][tuple(sl)])
                 if self.prob_out:
                     scale_image = self._normalize_image(Yhat[i][...,sep:][tuple(sl)], pmin=0, pmax=100)
-                    scale_name = self._name('net_output_scale', self.model.outputs[i], i, self.n_outputs)
-                    output_name = self._name('net_output_mean',  self.model.outputs[i], i, self.n_outputs)
+                    scale_name = self._name('net_output_scale', self.model_.outputs[i], i, self.n_outputs)
+                    output_name = self._name('net_output_mean',  self.model_.outputs[i], i, self.n_outputs)
                     tf.summary.image(output_name, output_image, step=epoch)
                     tf.summary.image(scale_name, scale_image, step=epoch)
                 else:
-                    output_name = self._name('net_output', self.model.outputs[i], i, self.n_outputs)
+                    output_name = self._name('net_output', self.model_.outputs[i], i, self.n_outputs)
                     tf.summary.image(output_name, output_image, step=epoch)
 
         # targets
         if epoch == 0:
             with self.file_writer.as_default():
                 for i,sl in zip(self.image_for_outputs,self.output_slices):
-                    # print('target', self.model.outputs[i], tuple(sl))
-                    target_name = self._name('net_target', self.model.outputs[i], i, self.n_outputs)
+                    # print('target', self.model_.outputs[i], tuple(sl))
+                    target_name = self._name('net_target', self.model_.outputs[i], i, self.n_outputs)
                     target_image = self._normalize_image(self.Y[i][tuple(sl)])
                     tf.summary.image(target_name, target_image, step=epoch)
