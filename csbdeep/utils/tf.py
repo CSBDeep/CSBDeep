@@ -227,6 +227,18 @@ def export_SavedModel(model, outpath, meta={}, format='zip'):
         Illegal arguments.
 
     """
+    if IS_KERAS_3_PLUS:
+        raise NotImplementedError(\
+"""Exporting to SavedModel is no longer supported with Keras 3+.
+
+It is likely that the exported model *will only work* in associated ImageJ/Fiji
+plugins (e.g. CSBDeep and StarDist) when using 'tensorflow' 1.x to export the model.
+
+The current workaround is to load the trained model in a Python environment with
+installed 'tensorflow' 1.x and then export it again. If you need help with this, please read:
+
+https://gist.github.com/uschmidt83/4b747862fe307044c722d6d1009f6183
+""")    
 
     def export_to_dir(dirname):
         if len(model.inputs) > 1 or len(model.outputs) > 1:
