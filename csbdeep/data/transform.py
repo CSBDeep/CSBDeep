@@ -266,7 +266,7 @@ def anisotropic_distortions(
 
             if bool(poisson_noise):
                 # print("apply poisson noise")
-                x = np.random.poisson(np.maximum(0,x).astype(np.int)).astype(np.float32)
+                x = np.random.poisson(np.maximum(0,x).astype(int)).astype(np.float32)
 
             if gauss_sigma > 0:
                 # print("adding gaussian noise with sigma = ", gauss_sigma)
