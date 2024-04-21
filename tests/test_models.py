@@ -8,8 +8,7 @@ import numpy as np
 import pytest
 from csbdeep.data import NoNormalizer, NoResizer
 from csbdeep.internals.predict import tile_overlap
-from csbdeep.utils.tf import keras_import
-K = keras_import('backend')
+from csbdeep.utils.tf import IS_KERAS_3_PLUS, BACKEND as K
 
 from csbdeep.internals.nets import receptive_field_unet
 from csbdeep.models import Config, CARE, UpsamplingCARE, IsotropicCARE
@@ -104,7 +103,11 @@ def test_model_build_and_export(tmpdir,config):
         with pytest.raises(ValueError):
             CARE(None,basedir=None)
 
-        CARE(config,basedir=str(tmpdir)).export_TF()
+        if IS_KERAS_3_PLUS:
+            with pytest.raises(NotImplementedError):
+                CARE(config,basedir=str(tmpdir)).export_TF()
+        else:
+            CARE(config,basedir=str(tmpdir)).export_TF()
 
         with pytest.warns(UserWarning):
             CARE(config,name='model',basedir=str(tmpdir))
@@ -282,6 +285,7 @@ def test_model_predict_tiled(tmpdir,config):
 @pytest.mark.parametrize('n_depth', (1,2,3,4,5))
 @pytest.mark.parametrize('kern_size', (3,5,7))
 @pytest.mark.parametrize('pool_size', (1,2))
+# TODO: (pool_size=2, kern_size=7, n_depth>=2): works on CPU, but fails on GPU! (at least in TF 2.3.1, 2.5.0, 2.6.0)
 def test_tile_overlap(n_depth, kern_size, pool_size):
     K.clear_session()
     img_size = 1280 if pool_size > 1 else 160

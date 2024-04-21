@@ -12,6 +12,7 @@ from functools import wraps
 from .config import BaseConfig
 from ..utils import _raise, load_json, save_json, axes_check_and_normalize, axes_dict, move_image_axes
 from ..utils.six import Path, FileNotFoundError
+from ..utils.tf import IS_KERAS_3_PLUS
 from ..data import Normalizer, NoNormalizer
 from ..data import Resizer, NoResizer
 from .pretrained import get_model_details, get_model_instance, get_registered_models
@@ -32,6 +33,29 @@ def suppress_without_basedir(warn):
                 return f(*args, **kwargs)
         return wrapper
     return _suppress_without_basedir
+
+
+
+if IS_KERAS_3_PLUS:
+    import h5py
+    from keras.src.legacy.saving import legacy_h5_format
+
+    def _keras3_monkey_patch_legacy_weights(model):
+        ref_save_weights = model.save_weights
+
+        def save_weights(self, filepath, overwrite=True):    
+            p = Path(filepath)
+            if not overwrite and p.exists():
+                raise FileExistsError(f"Weights file already exists: {str(p.resolve())}")
+            if p.name.endswith(".weights.h5"):
+                warnings.warn("Detected filename suffix '.weights.h5', thus saving in newer Keras 3.x file format (cannot be loaded with Keras 2.x)")
+            if not p.name.endswith(".weights.h5"):
+                with h5py.File(str(p), "w") as f:
+                    legacy_h5_format.save_weights_to_hdf5_group(f, self)
+            else:
+                return ref_save_weights(filepath, overwrite=overwrite)
+
+        model.save_weights = save_weights.__get__(model)
 
 
 
@@ -109,6 +133,9 @@ class BaseModel(object):
             self._update_and_check_config()
         self._model_prepared = False
         self.keras_model = self._build()
+        if IS_KERAS_3_PLUS:
+            # monkey-patch keras model to save weights in legacy format if suffix is not '.weights.h5'
+            _keras3_monkey_patch_legacy_weights(self.keras_model)
         if config is None:
             self._find_and_load_weights()
 
@@ -190,10 +217,16 @@ class BaseModel(object):
         if self.basedir is not None:
             from ..utils.tf import keras_import
             ModelCheckpoint = keras_import('callbacks', 'ModelCheckpoint')
+            # keras 3: need to add suffix to filename because ModelCheckpoint constructor throws error if it's missing
+            suffix = ".weights.h5" if IS_KERAS_3_PLUS else ""
             if self.config.train_checkpoint is not None:
-                callbacks.append(ModelCheckpoint(str(self.logdir / self.config.train_checkpoint),       save_best_only=True,  save_weights_only=True))
+                callbacks.append(ModelCheckpoint(str(self.logdir / self.config.train_checkpoint) + suffix,  save_best_only=True,  save_weights_only=True))
+                # keras3: remove suffix because patched model.save_weights can save in legacy format
+                if IS_KERAS_3_PLUS: callbacks[-1].filepath = callbacks[-1].filepath[:-len(suffix)]
             if self.config.train_checkpoint_epoch is not None:
-                callbacks.append(ModelCheckpoint(str(self.logdir / self.config.train_checkpoint_epoch), save_best_only=False, save_weights_only=True))
+                callbacks.append(ModelCheckpoint(str(self.logdir / self.config.train_checkpoint_epoch) + suffix, save_best_only=False, save_weights_only=True))
+                # keras3: remove suffix because patched model.save_weights can save in legacy format
+                if IS_KERAS_3_PLUS: callbacks[-1].filepath = callbacks[-1].filepath[:-len(suffix)]
         return callbacks
 
 

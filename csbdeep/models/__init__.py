@@ -10,7 +10,7 @@ except ModuleNotFoundError as e:
 
 
 import tensorflow, sys
-from ..utils.tf import keras_import, IS_TF_1
+from ..utils.tf import keras_import, IS_TF_1, BACKEND as K
 
 if IS_TF_1:
     try:
@@ -27,17 +27,12 @@ if IS_TF_1:
         else:
             raise e
 
-    K = keras_import('backend')
-    if K.backend() != 'tensorflow':
-        raise NotImplementedError(
-                "Keras is configured to use the '%s' backend, which is currently not supported. "
-                "Please configure Keras to use 'tensorflow' instead: "
-                "https://keras.io/getting-started/faq/#where-is-the-keras-configuration-file-stored" % K.backend()
-            )
-# else:
-#     print("Found TensorFlow 2 (version %s), which might cause issues with CSBDeep." % tensorflow.__version__, file=sys.stderr)
+if K.backend() != 'tensorflow':
+    raise NotImplementedError(
+        "Keras is configured to use the '%s' backend, which is currently not supported. "
+        "Please configure Keras to use 'tensorflow' instead." % K.backend()
+    )
 
-K = keras_import('backend')
 if K.image_data_format() != 'channels_last':
     raise NotImplementedError(
         "Keras is configured to use the '%s' image data format, which is currently not supported. "

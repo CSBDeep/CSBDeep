@@ -4,8 +4,7 @@ from __future__ import print_function, unicode_literals, absolute_import, divisi
 import numpy as np
 from collections import namedtuple
 
-from ..utils.tf import keras_import
-K = keras_import('backend')
+from ..utils.tf import keras_import, BACKEND as K
 Model = keras_import('models', 'Model')
 Input, Conv3D, MaxPooling3D, UpSampling3D, Lambda, Multiply = keras_import('layers', 'Input', 'Conv3D', 'MaxPooling3D', 'UpSampling3D', 'Lambda', 'Multiply')
 softmax = keras_import('activations', 'softmax')

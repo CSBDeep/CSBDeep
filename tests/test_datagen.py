@@ -55,7 +55,7 @@ def test_create_patches_reduced_target():
     def get_data(n_images, axes, shape):
         red_n = rng.choice(len(axes)-1)+1
         red_axes = ''.join(rng.choice(tuple(axes),red_n,replace=False))
-        keepdims = rng.choice((True,False))
+        keepdims = bool(rng.choice((True,False)))
 
         def _gen():
             for i in range(n_images):

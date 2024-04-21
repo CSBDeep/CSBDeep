@@ -99,8 +99,7 @@ def main():
         from tifffile import imwrite as imsave
     except ImportError:
         from tifffile import imsave
-    from csbdeep.utils.tf import keras_import
-    K = keras_import('backend')
+    from csbdeep.utils.tf import BACKEND as K
     from csbdeep.models import CARE
     from csbdeep.data import PercentileNormalizer
     sys.stdout.flush()
