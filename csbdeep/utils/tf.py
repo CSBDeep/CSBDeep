@@ -613,7 +613,7 @@ class CARETensorBoardImage(Callback):
                     tf.summary.image(input_name, input_image, step=epoch)
 
         # outputs
-        Yhat = self.model_.predict(self.X, batch_size=self.batch_size)
+        Yhat = self.model_.predict(self.X, batch_size=self.batch_size, verbose=0)
         if self.n_outputs == 1 and isinstance(Yhat,np.ndarray): Yhat = (Yhat,)
         with self.file_writer.as_default():
             for i,sl in zip(self.image_for_outputs,self.output_slices):
