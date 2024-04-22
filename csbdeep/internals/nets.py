@@ -102,7 +102,7 @@ def common_unet(n_dim=2, n_depth=1, kern_size=3, n_first=16, n_channel_out=1, re
 
 
 
-modelname = re.compile("^(?P<model>resunet|unet)(?P<n_dim>\d)(?P<prob_out>p)?_(?P<n_depth>\d+)_(?P<kern_size>\d+)_(?P<n_first>\d+)(_(?P<n_channel_out>\d+)out)?(_(?P<last_activation>.+)-last)?$")
+modelname = re.compile(r"^(?P<model>resunet|unet)(?P<n_dim>\d)(?P<prob_out>p)?_(?P<n_depth>\d+)_(?P<kern_size>\d+)_(?P<n_first>\d+)(_(?P<n_channel_out>\d+)out)?(_(?P<last_activation>.+)-last)?$")
 def common_unet_by_name(model):
     r"""Shorthand notation for equivalent use of :func:`common_unet`.
 

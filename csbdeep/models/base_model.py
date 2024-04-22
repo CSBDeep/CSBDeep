@@ -12,7 +12,7 @@ from functools import wraps
 from .config import BaseConfig
 from ..utils import _raise, load_json, save_json, axes_check_and_normalize, axes_dict, move_image_axes
 from ..utils.six import Path, FileNotFoundError
-from ..utils.tf import IS_KERAS_3_PLUS
+from ..utils.tf import keras_import, IS_KERAS_3_PLUS
 from ..data import Normalizer, NoNormalizer
 from ..data import Resizer, NoResizer
 from .pretrained import get_model_details, get_model_instance, get_registered_models
@@ -133,7 +133,7 @@ class BaseModel(object):
             self._update_and_check_config()
         self._model_prepared = False
         self.keras_model = self._build()
-        if IS_KERAS_3_PLUS:
+        if IS_KERAS_3_PLUS and isinstance(self.keras_model, keras_import('models', 'Model')):
             # monkey-patch keras model to save weights in legacy format if suffix is not '.weights.h5'
             _keras3_monkey_patch_legacy_weights(self.keras_model)
         if config is None:
