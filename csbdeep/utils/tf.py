@@ -37,7 +37,7 @@ For 'tensorflow' 1.x (found version {v_tf}), the stand-alone 'keras' package (2.
 When using the most recent version of 'tensorflow' 1.x, install 'keras' like this: pip install "keras>=2.1.2,<2.4"
 
 If you must use an older version of 'tensorflow' 1.x, please see this file for compatible versions of 'keras':
-https://github.com/CSBDeep/CSBDeep/blob/master/.github/workflows/tests_legacy.yml
+https://github.com/CSBDeep/CSBDeep/blob/main/.github/workflows/tests_legacy.yml
 """.format(v_tf=v_tf))
 
 elif IS_TF_2_16_PLUS:

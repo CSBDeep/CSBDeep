@@ -43,7 +43,7 @@ def linkcode_resolve(domain, info):
     if not info['module']:
         return None
     filename = info['module'].replace('.', '/')
-    return "https://github.com/csbdeep/csbdeep/tree/master/%s.py" % filename
+    return "https://github.com/csbdeep/csbdeep/tree/main/%s.py" % filename
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
