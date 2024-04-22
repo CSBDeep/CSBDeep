@@ -39,6 +39,28 @@ def suppress_without_basedir(warn):
 if IS_KERAS_3_PLUS:
     import h5py
     from keras.src.legacy.saving import legacy_h5_format
+    from keras.src import backend, __version__ as keras_version
+
+    def save_weights_to_hdf5_group(f, model):
+        legacy_h5_format.save_attributes_to_hdf5_group(f, "layer_names", [layer.name.encode("utf8") for layer in model.layers])
+        f.attrs["backend"] = backend.backend().encode("utf8")
+        f.attrs["keras_version"] = str(keras_version).encode("utf8")
+        for layer in sorted(model.layers, key=lambda x: x.name):
+            g = f.create_group(layer.name)
+            weights = legacy_h5_format._legacy_weights(layer)
+            save_subset_weights_to_hdf5_group(g, weights)
+        g = f.create_group("top_level_model_weights")
+        weights = [v for v in model._trainable_variables + model._non_trainable_variables if v in model.weights]
+        save_subset_weights_to_hdf5_group(g, weights)
+
+    def save_subset_weights_to_hdf5_group(f, weights):
+        # FIX: use w.path instead of w.name to avoid name collisions (for "functional" layers)
+        weight_names = [w.path.encode("utf8") for w in weights]
+        weight_values = [backend.convert_to_numpy(w) for w in weights]
+        legacy_h5_format.save_attributes_to_hdf5_group(f, "weight_names", weight_names)
+        for name, val in zip(weight_names, weight_values):
+            param_dset = f.create_dataset(name, val.shape, dtype=val.dtype)
+            param_dset[() if not val.shape else slice(None)] = val
 
     def _keras3_monkey_patch_legacy_weights(model):
         ref_save_weights = model.save_weights
@@ -51,7 +73,7 @@ if IS_KERAS_3_PLUS:
                 warnings.warn("Detected filename suffix '.weights.h5', thus saving in newer Keras 3.x file format (cannot be loaded with Keras 2.x)")
             if not p.name.endswith(".weights.h5"):
                 with h5py.File(str(p), "w") as f:
-                    legacy_h5_format.save_weights_to_hdf5_group(f, self)
+                    save_weights_to_hdf5_group(f, self)
             else:
                 return ref_save_weights(filepath, overwrite=overwrite)
 
