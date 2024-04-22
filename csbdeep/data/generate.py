@@ -78,7 +78,7 @@ def sample_patches_from_multiple_stacks(datas, patch_size, n_samples, datas_mask
         raise ValueError("patch_size %s negative or larger than data shape %s along some dimensions" % (str(patch_size), str(datas[0].shape)))
 
     if patch_filter is None:
-        patch_mask = np.ones(datas[0].shape,dtype=np.bool)
+        patch_mask = np.ones(datas[0].shape,dtype=bool)
     else:
         patch_mask = patch_filter(datas, patch_size)
 
@@ -86,7 +86,7 @@ def sample_patches_from_multiple_stacks(datas, patch_size, n_samples, datas_mask
         # TODO: Test this
         warnings.warn('Using pixel masks for raw/transformed images not tested.')
         datas_mask.shape == datas[0].shape or _raise(ValueError())
-        datas_mask.dtype == np.bool or _raise(ValueError())
+        datas_mask.dtype == bool or _raise(ValueError())
         from scipy.ndimage import minimum_filter
         patch_mask &= minimum_filter(datas_mask, patch_size, mode='constant', cval=False)
 

@@ -33,6 +33,7 @@ def predict_direct(keras_model,x,axes_in,axes_out=None,**kwargs):
     """TODO."""
     if axes_out is None:
         axes_out = axes_in
+    kwargs.setdefault('verbose', 0)
     ax_in, ax_out = axes_dict(axes_in), axes_dict(axes_out)
     channel_in, channel_out = ax_in['C'], ax_out['C']
     single_sample = ax_in['S'] is None
