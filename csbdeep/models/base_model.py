@@ -38,34 +38,39 @@ def suppress_without_basedir(warn):
 
 if IS_KERAS_3_PLUS:
     import h5py
+    from packaging.version import Version
     from keras.src.legacy.saving import legacy_h5_format
     from keras.src import backend, __version__ as keras_version
 
-    def save_weights_to_hdf5_group(f, model):
-        legacy_h5_format.save_attributes_to_hdf5_group(f, "layer_names", [layer.name.encode("utf8") for layer in model.layers])
-        f.attrs["backend"] = backend.backend().encode("utf8")
-        f.attrs["keras_version"] = str(keras_version).encode("utf8")
-        for layer in sorted(model.layers, key=lambda x: x.name):
-            g = f.create_group(layer.name)
-            weights = legacy_h5_format._legacy_weights(layer)
+    if Version(keras_version) >= Version("3.3.0"):
+        save_weights_to_hdf5_group = legacy_h5_format.save_weights_to_hdf5_group
+    else:
+        def save_weights_to_hdf5_group(f, model):
+            legacy_h5_format.save_attributes_to_hdf5_group(f, "layer_names", [layer.name.encode("utf8") for layer in model.layers])
+            f.attrs["backend"] = backend.backend().encode("utf8")
+            f.attrs["keras_version"] = str(keras_version).encode("utf8")
+            for layer in sorted(model.layers, key=lambda x: x.name):
+                g = f.create_group(layer.name)
+                weights = legacy_h5_format._legacy_weights(layer)
+                save_subset_weights_to_hdf5_group(g, weights)
+            g = f.create_group("top_level_model_weights")
+            weights = [v for v in model._trainable_variables + model._non_trainable_variables if v in model.weights]
             save_subset_weights_to_hdf5_group(g, weights)
-        g = f.create_group("top_level_model_weights")
-        weights = [v for v in model._trainable_variables + model._non_trainable_variables if v in model.weights]
-        save_subset_weights_to_hdf5_group(g, weights)
 
-    def save_subset_weights_to_hdf5_group(f, weights):
-        # FIX: use w.path instead of w.name to avoid name collisions (for "functional" layers)
-        weight_names = [w.path.encode("utf8") for w in weights]
-        weight_values = [backend.convert_to_numpy(w) for w in weights]
-        legacy_h5_format.save_attributes_to_hdf5_group(f, "weight_names", weight_names)
-        for name, val in zip(weight_names, weight_values):
-            param_dset = f.create_dataset(name, val.shape, dtype=val.dtype)
-            param_dset[() if not val.shape else slice(None)] = val
+        def save_subset_weights_to_hdf5_group(f, weights):
+            # FIX: use w.path instead of w.name to avoid name collisions (for "functional" layers)
+            # -> has been fixed since keras 3.3.0: https://github.com/keras-team/keras/blob/v3.3.0/keras/src/legacy/saving/legacy_h5_format.py#L234
+            weight_names = [w.path.encode("utf8") for w in weights]
+            weight_values = [backend.convert_to_numpy(w) for w in weights]
+            legacy_h5_format.save_attributes_to_hdf5_group(f, "weight_names", weight_names)
+            for name, val in zip(weight_names, weight_values):
+                param_dset = f.create_dataset(name, val.shape, dtype=val.dtype)
+                param_dset[() if not val.shape else slice(None)] = val
 
     def _keras3_monkey_patch_legacy_weights(model):
         ref_save_weights = model.save_weights
 
-        def save_weights(self, filepath, overwrite=True):    
+        def save_weights(self, filepath, overwrite=True):
             p = Path(filepath)
             if not overwrite and p.exists():
                 raise FileExistsError(f"Weights file already exists: {str(p.resolve())}")
