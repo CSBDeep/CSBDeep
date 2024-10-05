@@ -6,7 +6,8 @@ from warnings import warn
 from ..utils import _raise
 from ..utils.six import Path
 
-from ..utils.tf import keras_import
+from packaging.version import Version
+from ..utils.tf import keras_import, v_keras
 get_file = keras_import('utils', 'get_file')
 
 
@@ -98,8 +99,17 @@ def get_model_folder(cls, key_or_alias):
     target = str(Path('models') / cls.__name__ / key)
     path = Path(get_file(fname=key+'.zip', origin=m['url'], file_hash=m['hash'],
                          cache_subdir=target, extract=True))
-    assert path.exists() and path.parent.exists()
-    return path.parent
+    if v_keras >= Version("3.6.0"):
+        path_folder = path
+        suffix = "_extracted"
+        if path_folder.is_dir() and path_folder.name.endswith(suffix) and len(path_folder.name) > len(suffix):
+            path_folder = path_folder.with_name(path_folder.name[:-len(suffix)])
+            if not path_folder.exists():
+                path_folder.symlink_to(path.relative_to(path.parent))
+    else:
+        path_folder = path.parent
+    assert path_folder.exists()
+    return path_folder
 
 
 def get_model_instance(cls, key_or_alias):
