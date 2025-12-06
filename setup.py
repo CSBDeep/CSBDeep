@@ -41,6 +41,7 @@ setup(name='csbdeep',
           'Programming Language :: Python :: 3.10',
           'Programming Language :: Python :: 3.11',
           'Programming Language :: Python :: 3.12',
+          'Programming Language :: Python :: 3.13',
       ],
 
       install_requires=[
@@ -54,7 +55,7 @@ setup(name='csbdeep',
       ],
 
       extras_require={
-          "tf1":  ["keras>=2.1.2,<2.4","protobuf<3.21","h5py<3"],
+          "tf1":  ["keras>=2.1.2,<2.4","protobuf<3.21","h5py<3","numpy<2"],
           "test": ["pytest"],
           "docs": ["sphinx","sphinx-rtd-theme"],
       },
@@ -64,4 +65,4 @@ setup(name='csbdeep',
               'care_predict = csbdeep.scripts.care_predict:main'
           ]
       }
-      )
+)
