@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-22.04, windows-latest, macos-latest]
-        python-version: ['3.6', '3.7', '3.8', '3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
+        python-version: ['3.6', '3.7', '3.8', '3.9', '3.10', '3.11', '3.12', '3.13']
         tensorflow: [1, 2]
         include:
           # cases for using x86_64-based runner (macos-13)
@@ -55,6 +55,8 @@ jobs:
             python-version: '3.6'
           - os: macos-latest
             python-version: '3.7'
+          - os: ubuntu-22.04
+            python-version: '3.6'  # https://github.com/actions/setup-python/issues/1048
 
     steps:
       - uses: actions/setup-python@v5
