@@ -14,8 +14,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04, windows-latest, macos-latest]
-        python-version: ['3.6', '3.7', '3.8', '3.9', '3.10', '3.11', '3.12']
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.6', '3.7', '3.8', '3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
         tensorflow: [1, 2]
         include:
           # cases for using x86_64-based runner (macos-13)
