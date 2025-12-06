@@ -35,8 +35,6 @@ jobs:
             python-version: '3.13' # test x86_64 on latest supported python
             tensorflow: 2
         exclude:
-          - python-version: '3.14'
-            tensorflow: 1
           - python-version: '3.13'
             tensorflow: 1
           - python-version: '3.12'
