@@ -34,7 +34,7 @@ jobs:
             python-version: '3.7'  # no arm64 wheels
             tensorflow: 2
           - os: macos-15-intel
-            python-version: '3.13' # test x86_64 on latest supported python
+            python-version: '3.12' # test x86_64 on latest supported python version that has tf wheels
             tensorflow: 2
         exclude:
           - python-version: '3.14'
