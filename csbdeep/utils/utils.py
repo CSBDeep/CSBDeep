@@ -260,7 +260,7 @@ def choice(population, k=1, replace=True):
         try:
             # save state of 'random' and set seed using 'np.random'
             state = random.getstate()
-            random.seed(np.random.randint(np.iinfo(int).min, np.iinfo(int).max))
+            random.seed(int(np.random.randint(0, np.iinfo(np.uint32).max, dtype=np.uint32)))
             if replace:
                 # sample with replacement
                 return random.choices(population, k=k)
