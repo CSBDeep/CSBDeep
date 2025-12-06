@@ -35,6 +35,10 @@ jobs:
             python-version: '3.12'
             tensorflow: 2
         exclude:
+          - python-version: '3.14'
+            tensorflow: 1
+          - python-version: '3.13'
+            tensorflow: 1
           - python-version: '3.12'
             tensorflow: 1
           - python-version: '3.11'
