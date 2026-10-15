@@ -29,7 +29,7 @@ for details and options).
 
 >>> from tifffile import imread
 >>> from csbdeep.models import IsotropicCARE
->>> model = CARE(config=None, name='my_model')
+>>> model = IsotropicCARE(config=None, name='my_model')
 >>> x = imread('my_image.tif')
 >>> restored = model.predict(x, axes='ZYX', factor=4)
 
